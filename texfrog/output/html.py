@@ -243,7 +243,10 @@ _HTML_TEMPLATE = """\
   <div id="main">
     <div id="controls">
       <button id="btn-prev" onclick="navigate(-1)">&#8592; Prev</button>
-      <span id="game-title"></span>
+      <div id="title-block">
+        <span id="game-title"></span>
+        <div id="game-subtitle"></div>
+      </div>
       <button id="btn-next" onclick="navigate(+1)">Next &#8594;</button>
     </div>
     <div id="game-display">
@@ -281,13 +284,18 @@ body { display: flex; height: 100vh; font-family: sans-serif; }
 #controls button { padding: 0.4rem 1rem; border: 1px solid #aaa; border-radius: 4px;
                    background: #fff; cursor: pointer; font-size: 0.95rem; }
 #controls button:hover { background: #e8e8e8; }
-#game-title { flex: 1; text-align: center; font-size: 1.1rem; }
+#title-block { flex: 1; text-align: center; height: 3.8rem; display: flex;
+               flex-direction: column; justify-content: center; }
+#game-title { font-size: 1.1rem; }
+#game-subtitle { font-size: 0.8rem; color: #666; margin-top: 0.4rem;
+                 line-height: 1.3; }
 #game-display { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex;
                 flex-direction: column; gap: 1.5rem; }
-#game-svg-container { display: flex; gap: 0.5rem; justify-content: center; }
-.game-panel { text-align: center; min-width: 0; }
+#game-svg-container { display: flex; gap: 0.5rem; justify-content: center;
+                      overflow-x: auto; }
+.game-panel { text-align: center; flex-shrink: 0; }
 .game-panel-header { font-size: 1rem; margin-bottom: 0.25rem; color: #333; }
-.game-panel img { max-width: 100%; }
+.game-panel img { zoom: 1.33; }
 #commentary-box { background: #fafafa; border: 1px solid #ddd; border-radius: 6px;
                   padding: 1rem; font-size: 0.9rem; line-height: 1.6; }
 #commentary-box:empty { display: none; }
@@ -340,8 +348,9 @@ function showGame(idx) {
     if (i === idx) li.scrollIntoView({ block: 'nearest' });
   });
 
-  // Update title
+  // Update title and subtitle
   document.getElementById('game-title').innerHTML = `$${g.latex_name}$`;
+  document.getElementById('game-subtitle').innerHTML = g.description || '';
 
   // Build side-by-side display
   const container = document.getElementById('game-svg-container');
@@ -368,6 +377,7 @@ function showGame(idx) {
   if (window.MathJax) {
     MathJax.typesetPromise([
       document.getElementById('game-title'),
+      document.getElementById('game-subtitle'),
       document.getElementById('game-svg-container'),
       document.getElementById('commentary-box'),
       document.getElementById('nav'),
