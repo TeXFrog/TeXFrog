@@ -49,7 +49,7 @@ _WRAPPER_TEMPLATE = r"""\documentclass{{article}}
 \newcommand{{\graybox}}[1]{{\adjustbox{{cframe=black!15, bgcolor=black!15}}{{\strut #1}}}}
 \newcommand{{\highlightbox}}[2][RoyalBlue!20]{{\adjustbox{{cframe=#1, bgcolor=#1}}{{\strut #2}}}}
 \newcommand{{\tfchanged}}[1]{{\highlightbox{{\ensuremath{{#1}}}}}}
-\newcommand{{\tfremoved}}[1]{{\textcolor{{red}}{{\sbox0{{\strut\ensuremath{{#1}}}}\rlap{{\usebox0}}\rule[0.4ex]{{\wd0}}{{0.5pt}}}}}}
+\newcommand{{\tfremoved}}[1]{{\textcolor{{red}}{{\ensuremath{{#1}}}}}}
 \newcommand{{\tfgamelabel}}[2]{{#2 \pccomment{{#1}}}}
 {macro_inputs}
 {gamename_defs}
