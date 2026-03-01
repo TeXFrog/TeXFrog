@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "texfrog"
+version = "0.1.0"
+description = "Tool for organizing and rendering cryptographic game-hopping proofs in LaTeX"
+requires-python = ">=3.10"
+dependencies = [
+    "pyyaml",
+    "click",
+    "jinja2",
+]
+
+[project.scripts]
+texfrog = "texfrog.cli:main"
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+include = ["texfrog*"]

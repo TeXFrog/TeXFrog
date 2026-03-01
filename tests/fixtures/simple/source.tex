@@ -1,0 +1,21 @@
+\begin{pcvstack}[boxed]
+    \procedure[linenumbering]{Starting game}{ %:tags: G0
+    \procedure[linenumbering]{Game 1}{ %:tags: G1
+    \procedure[linenumbering]{Game 2}{ %:tags: G2
+    \procedure[linenumbering]{Reduction $\bdv_1$}{ %:tags: Red1
+        (\pk, \sk) \getsr \KEM.\keygen() \\
+        (\ct^*, \key_A) \getsr \KEM.\encaps(\pk) \\ %:tags: G0
+        (\ct^*, \key_A^*) \getsr \KEM.\encaps(\pk) \\ %:tags: G1,Red1
+        (\ct^*, \_\_) \getsr \KEM.\encaps(\pk) \\ %:tags: G2
+        \key \gets F(\key_A) \\ %:tags: G0,G1,Red1
+        \key \getsr F.\kemkeyspace \\ %:tags: G2
+        \pcreturn \adv^{\oracle}(\pk, \ct^*, \key)
+    }
+    \procedure[linenumbering]{$\oracle(\ct)$}{
+        \pcif \ct = \ct^* \pcthen \\
+        \pcind \pcreturn \bot \\
+        \key_A \gets \KEM.\decaps(\sk, \ct) \\ %:tags: G0,G1,G2
+        \key_A \gets \oracle[Okem](\ct) \\ %:tags: Red1
+        \pcreturn F(\key_A)
+    }
+\end{pcvstack}

@@ -1,0 +1,32 @@
+macros:
+  - macros.tex
+
+source: source.tex
+
+games:
+  - label: G0
+    latex_name: '$\indcca.\REAL()$'
+    description: 'The starting game.'
+  - label: G1
+    latex_name: 'Game~1'
+    description: 'Use cached key.'
+  - label: Red1
+    latex_name: 'Reduction $\bdv_1$'
+    description: 'Reduction against $\KEM$ security.'
+  - label: G2
+    latex_name: 'Game~2'
+    description: 'Use random key.'
+
+commentary:
+  G0: |
+    This is the starting game.
+  G1: |
+    \begin{claim}
+    G0 and G1 are indistinguishable.
+    \end{claim}
+
+figures:
+  - label: start_end
+    games: "G0,G2"
+  - label: with_reduction
+    games: "G1,G2,Red1"
