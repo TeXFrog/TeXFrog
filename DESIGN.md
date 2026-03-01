@@ -64,6 +64,7 @@ class Game:
     latex_name: str   # Math-mode content without $ delimiters, e.g. r'\indcca_\QSH^\adv.\REAL()'
     description: str  # One-sentence LaTeX description (shown in HTML sidebar)
     reduction: bool = False  # True for reductions (displayed alone in HTML, not side-by-side)
+    related_games: list[str] = field(default_factory=list)  # 0–2 game labels shown alongside this reduction
 
 @dataclass
 class SourceLine:
@@ -104,6 +105,11 @@ games:
   - label: G1
     latex_name: 'G_1'
     description: 'Replace $\key_2$ with a fresh $\key_2^*$.'
+  - label: Red2
+    latex_name: '\bdv_2'
+    description: 'Reduction against $\indcca$ security of $\KEM_2$.'
+    reduction: true
+    related_games: [G0, G1]      # show clean G0 and G1 alongside in HTML viewer
   # ... more games ...
 
 commentary:                    # optional
@@ -277,6 +283,7 @@ output_dir/
 └── games/
     ├── G0.svg               # highlighted version (blue on new/changed lines)
     ├── G0-removed.svg       # removed version (red strikethrough on deleted/changed lines)
+    ├── G0-clean.svg         # clean version (no highlighting; only for related_games targets)
     ├── G0_commentary.svg    # rendered commentary (only if commentary was provided)
     ├── G1.svg
     ├── G1-removed.svg
@@ -288,7 +295,8 @@ Each game is compiled twice: once with `\tfchanged` highlighting (blue, for the
 current-game panel) and once with `\tfremoved` highlighting (red strikethrough, for
 the previous-game panel in side-by-side view showing lines that will be removed or
 changed in the next game). The last game does not need a removed SVG since it never
-appears as a "previous" game.
+appears as a "previous" game. Games referenced by a reduction's `related_games` also
+get a third "clean" compilation with no highlighting, used in the reduction's display.
 
 HTML features: MathJax for LaTeX names and descriptions, URL hash navigation (`#G1`),
 keyboard arrows, commentary rendered as SVG via the LaTeX pipeline, prev/next buttons,
@@ -299,8 +307,13 @@ side-by-side game comparison.
 After the first game, the HTML viewer shows the previous game (with red strikethrough
 on lines that are removed or changed) next to the current game (with blue highlights
 on new/changed lines), making it easy to see what changed between game transitions.
-Reductions (games with `reduction: true` in the YAML) are shown alone, not
-side-by-side.
+
+Reductions support a `related_games` field listing zero, one, or two game labels:
+- **0 related games**: the reduction is shown alone (legacy behaviour).
+- **1 related game**: the clean game appears on the left, the highlighted reduction
+  on the right.
+- **2 related games**: the first clean game on the left, the highlighted reduction in
+  the middle, the second clean game on the right.
 
 ---
 

@@ -158,9 +158,30 @@ def parse_proof(yaml_path: Path) -> Proof:
                 latex_name=entry["latex_name"],
                 description=entry["description"],
                 reduction=bool(entry.get("reduction", False)),
+                related_games=list(entry.get("related_games", [])),
             )
         )
     ordered_labels = [g.label for g in games]
+
+    # Validate related_games
+    for game in games:
+        if game.related_games:
+            if not game.reduction:
+                raise ValueError(
+                    f"Game '{game.label}' has related_games but is not a reduction. "
+                    f"related_games is only valid on entries with reduction: true."
+                )
+            if len(game.related_games) > 2:
+                raise ValueError(
+                    f"Reduction '{game.label}' has {len(game.related_games)} related_games "
+                    f"(maximum is 2)."
+                )
+            for ref_label in game.related_games:
+                if ref_label not in ordered_labels:
+                    raise ValueError(
+                        f"Reduction '{game.label}' references unknown related game "
+                        f"'{ref_label}'. Available labels: {ordered_labels}"
+                    )
 
     # --- source ---
     source_rel = data.get("source")

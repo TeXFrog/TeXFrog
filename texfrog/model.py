@@ -13,6 +13,7 @@ class Game:
     latex_name: str   # Math-mode LaTeX for the name (no $ delimiters), e.g. r'\indcca_\QSH^\adv.\REAL()'
     description: str  # One-sentence LaTeX description
     reduction: bool = False  # True for reductions (shown alone, not side-by-side)
+    related_games: list[str] = field(default_factory=list)  # 0–2 game labels shown alongside this reduction
 
 
 @dataclass

@@ -52,18 +52,54 @@ function showGame(idx) {
   const container = document.getElementById('game-svg-container');
   container.innerHTML = '';
 
-  if (idx > 0 && !g.reduction) {
-    // Show previous game (with red strikethrough on removed lines) on the left
+  const findGame = (label) => games.find(x => x.label === label);
+
+  if (g.reduction && g.related_games && g.related_games.length > 0) {
+    // Reduction with related games: show clean game(s) alongside highlighted reduction
+    if (g.related_games.length === 1) {
+      // 2-panel: clean game on left, highlighted reduction on right
+      const rg = findGame(g.related_games[0]);
+      if (rg) {
+        container.appendChild(
+          makePanel(rg.label, rg.latex_name, `games/${rg.label}-clean.svg`)
+        );
+      }
+      container.appendChild(
+        makePanel(g.label, g.latex_name, `games/${g.label}.svg`)
+      );
+    } else {
+      // 3-panel: clean game[0] left, highlighted reduction middle, clean game[1] right
+      const rg0 = findGame(g.related_games[0]);
+      if (rg0) {
+        container.appendChild(
+          makePanel(rg0.label, rg0.latex_name, `games/${rg0.label}-clean.svg`)
+        );
+      }
+      container.appendChild(
+        makePanel(g.label, g.latex_name, `games/${g.label}.svg`)
+      );
+      const rg1 = findGame(g.related_games[1]);
+      if (rg1) {
+        container.appendChild(
+          makePanel(rg1.label, rg1.latex_name, `games/${rg1.label}-clean.svg`)
+        );
+      }
+    }
+  } else if (idx > 0 && !g.reduction) {
+    // Regular game transition: show previous removed + current highlighted
     const prev = games[idx - 1];
     container.appendChild(
       makePanel(prev.label, prev.latex_name, `games/${prev.label}-removed.svg`)
     );
+    container.appendChild(
+      makePanel(g.label, g.latex_name, `games/${g.label}.svg`)
+    );
+  } else {
+    // First game or reduction with no related_games: show alone
+    container.appendChild(
+      makePanel(g.label, g.latex_name, `games/${g.label}.svg`)
+    );
   }
-
-  // Current game (with highlights) on the right, or alone for first game / reductions
-  container.appendChild(
-    makePanel(g.label, g.latex_name, `games/${g.label}.svg`)
-  );
 
   // Update commentary (rendered as SVG image)
   const box = document.getElementById('commentary-box');

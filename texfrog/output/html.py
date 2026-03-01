@@ -383,6 +383,18 @@ def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
                 macro=r"\tfremoved",
             )
 
+        # Generate clean (no-highlight) .tex files for related_games references.
+        clean_labels: set[str] = set()
+        for game in proof.games:
+            if game.related_games:
+                clean_labels.update(game.related_games)
+        for label in clean_labels:
+            clean_lines = filter_for_game(proof.source_lines, label)
+            _write_game_file(
+                label, clean_lines, set(),
+                latex_dir / f"{label}-clean.tex",
+            )
+
         # Step 2: compile all games to SVG in parallel.
         _placeholder_svg = (
             '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="60">'
@@ -410,6 +422,15 @@ def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
                     f"{label}-removed",
                     (latex_dir / f"{label}-removed.tex").resolve(),
                     games_dir / f"{label}-removed.svg",
+                    None,
+                    _WRAPPER_TEMPLATE,
+                ))
+            # Clean (no-highlight) version — needed for related_games display.
+            if label in clean_labels:
+                tasks.append((
+                    f"{label}-clean",
+                    (latex_dir / f"{label}-clean.tex").resolve(),
+                    games_dir / f"{label}-clean.svg",
                     None,
                     _WRAPPER_TEMPLATE,
                 ))
@@ -458,6 +479,7 @@ def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
             "description": _expand_tfgamename(game.description, game_names),
             "has_commentary": bool(proof.commentary.get(game.label, "").strip()),
             "reduction": game.reduction,
+            "related_games": game.related_games,
         })
 
     template = _jinja_env.get_template("index.html.j2")

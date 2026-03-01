@@ -41,7 +41,8 @@ Each entry has the following fields:
 | `label` | yes | Short identifier used in `%:tags:` comments and as the output filename stem (e.g. `G0`, `Red2`) |
 | `latex_name` | yes | Math-mode LaTeX for the game name, without `$` delimiters (e.g. `'G_1'` or `'\indcca_\QSH^\adv.\REAL()'`). Rendered via `\ensuremath` in LaTeX and `$...$` in the HTML viewer. |
 | `description` | yes | A one-sentence LaTeX description shown in the HTML viewer |
-| `reduction` | no | Set to `true` for reductions. In the HTML viewer, reductions are displayed alone rather than side-by-side with the previous game. Defaults to `false`. |
+| `reduction` | no | Set to `true` for reductions. In the HTML viewer, reductions are displayed alone rather than side-by-side with the previous game (unless `related_games` is set). Defaults to `false`. |
+| `related_games` | no | A list of zero, one, or two game labels. Only valid when `reduction: true`. In the HTML viewer, clean (unhighlighted) versions of these games are shown alongside the reduction: one related game gives a 2-panel layout, two gives a 3-panel layout with the reduction in the middle. |
 
 ```yaml
 games:
@@ -57,6 +58,7 @@ games:
     latex_name: '\bdv_2'
     description: 'Reduction against $\indcca$ security of $\KEM_2$.'
     reduction: true
+    related_games: [G0, G1]
 
   - label: G2
     latex_name: 'G_2'

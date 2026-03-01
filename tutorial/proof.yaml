@@ -22,14 +22,15 @@ games:
     latex_name: 'G_1'
     description: 'Replace $\mathrm{PRF}(k, r)$ with a truly random value.'
 
-  - label: G2
-    latex_name: 'G_2'
-    description: '$\INDCPA_\Enc^\Adversary.\mathsf{Ideal}()$: the ideal IND-CPA game. Ciphertext is uniformly random, independent of $m_b$.'
-
   - label: Red1
     latex_name: '\Bdversary_1'
     description: 'Reduction against PRF security, simulating Games \tfgamename{G0} and \tfgamename{G1} via an external PRF challenger.'
     reduction: true
+    related_games: [G0, G1]
+
+  - label: G2
+    latex_name: 'G_2'
+    description: '$\INDCPA_\Enc^\Adversary.\mathsf{Ideal}()$: the ideal IND-CPA game. Ciphertext is uniformly random, independent of $m_b$.'
 
 commentary:
   G0: |

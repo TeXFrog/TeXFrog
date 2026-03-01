@@ -141,3 +141,78 @@ def test_parse_proof_missing_source_raises(tmp_path):
     # Don't copy source.tex — should raise FileNotFoundError
     with pytest.raises(FileNotFoundError):
         parse_proof(dest)
+
+
+# ---------------------------------------------------------------------------
+# related_games
+# ---------------------------------------------------------------------------
+
+def test_parse_proof_related_games():
+    proof = parse_proof(FIXTURE_DIR / "proof.yaml")
+    red1 = next(g for g in proof.games if g.label == "Red1")
+    assert red1.related_games == ["G1", "G2"]
+
+
+def test_parse_proof_related_games_default_empty():
+    proof = parse_proof(FIXTURE_DIR / "proof.yaml")
+    g0 = next(g for g in proof.games if g.label == "G0")
+    assert g0.related_games == []
+
+
+def test_related_games_on_non_reduction_raises(tmp_path):
+    """related_games is only valid on entries with reduction: true."""
+    import yaml
+    data = {
+        "macros": [],
+        "source": "source.tex",
+        "games": [
+            {"label": "G0", "latex_name": "G_0", "description": "test",
+             "related_games": ["G1"]},
+            {"label": "G1", "latex_name": "G_1", "description": "test"},
+        ],
+    }
+    yaml_path = tmp_path / "proof.yaml"
+    yaml_path.write_text(yaml.dump(data))
+    (tmp_path / "source.tex").write_text("")
+    with pytest.raises(ValueError, match="not a reduction"):
+        parse_proof(yaml_path)
+
+
+def test_related_games_too_many_raises(tmp_path):
+    """related_games must have at most 2 entries."""
+    import yaml
+    data = {
+        "macros": [],
+        "source": "source.tex",
+        "games": [
+            {"label": "G0", "latex_name": "G_0", "description": "test"},
+            {"label": "G1", "latex_name": "G_1", "description": "test"},
+            {"label": "G2", "latex_name": "G_2", "description": "test"},
+            {"label": "Red1", "latex_name": "R_1", "description": "test",
+             "reduction": True, "related_games": ["G0", "G1", "G2"]},
+        ],
+    }
+    yaml_path = tmp_path / "proof.yaml"
+    yaml_path.write_text(yaml.dump(data))
+    (tmp_path / "source.tex").write_text("")
+    with pytest.raises(ValueError, match="maximum is 2"):
+        parse_proof(yaml_path)
+
+
+def test_related_games_unknown_label_raises(tmp_path):
+    """related_games labels must exist in the games list."""
+    import yaml
+    data = {
+        "macros": [],
+        "source": "source.tex",
+        "games": [
+            {"label": "G0", "latex_name": "G_0", "description": "test"},
+            {"label": "Red1", "latex_name": "R_1", "description": "test",
+             "reduction": True, "related_games": ["G99"]},
+        ],
+    }
+    yaml_path = tmp_path / "proof.yaml"
+    yaml_path.write_text(yaml.dump(data))
+    (tmp_path / "source.tex").write_text("")
+    with pytest.raises(ValueError, match="unknown related game"):
+        parse_proof(yaml_path)
