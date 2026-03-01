@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from texfrog.filter import (
     compute_changed_lines,
+    compute_removed_lines,
     filter_for_game,
     wrap_changed_line,
 )
@@ -148,6 +149,55 @@ def test_unchanged_lines_not_flagged():
     assert 0 not in changed
     assert 1 not in changed
     assert 2 not in changed
+
+
+# ---------------------------------------------------------------------------
+# compute_removed_lines
+# ---------------------------------------------------------------------------
+
+def test_no_removals_when_equal():
+    lines = ["a \\\\", "b \\\\", "c"]
+    assert compute_removed_lines(lines, lines) == set()
+
+
+def test_no_removals_from_empty_prev():
+    curr = ["a \\\\", "b"]
+    assert compute_removed_lines([], curr) == set()
+
+
+def test_deleted_line_detected():
+    prev = ["a \\\\", "b \\\\", "c"]
+    curr = ["a \\\\", "c"]  # "b" deleted
+    removed = compute_removed_lines(prev, curr)
+    assert 1 in removed   # index of "b \\\\" in prev
+    assert 0 not in removed
+    assert 2 not in removed
+
+
+def test_replaced_line_detected_in_prev():
+    prev = ["a \\\\", "old \\\\", "c"]
+    curr = ["a \\\\", "new \\\\", "c"]  # "old" replaced by "new"
+    removed = compute_removed_lines(prev, curr)
+    assert 1 in removed   # "old" in prev is being replaced
+    assert 0 not in removed
+    assert 2 not in removed
+
+
+def test_no_removals_when_only_additions():
+    prev = ["a \\\\", "b \\\\", "c"]
+    curr = ["a \\\\", "b \\\\", "c", "d"]  # "d" added, nothing removed
+    removed = compute_removed_lines(prev, curr)
+    assert removed == set()
+
+
+def test_removed_and_changed_symmetric_on_replace():
+    prev = ["a \\\\", "old \\\\", "c"]
+    curr = ["a \\\\", "new \\\\", "c"]
+    removed = compute_removed_lines(prev, curr)
+    changed = compute_changed_lines(prev, curr)
+    # Both should flag index 1 in their respective lists
+    assert 1 in removed
+    assert 1 in changed
 
 
 # ---------------------------------------------------------------------------

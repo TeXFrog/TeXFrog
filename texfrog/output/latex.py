@@ -19,14 +19,16 @@ def _write_game_file(
     current_lines: list[str],
     changed_indices: set[int],
     out_path: Path,
+    macro: str = _CHANGED_MACRO,
 ) -> None:
     """Write per-game LaTeX file with changed lines highlighted.
 
     Args:
         game_label: The game/reduction label (used only in a leading comment).
         current_lines: Filtered content lines for this game.
-        changed_indices: 0-based indices of lines to wrap with ``\\tfchanged``.
+        changed_indices: 0-based indices of lines to wrap with a highlighting macro.
         out_path: Destination file path.
+        macro: LaTeX macro name to use for wrapping (default ``\\tfchanged``).
     """
     parts: list[str] = [f"% TeXFrog output for game: {game_label}\n"]
     for i, line in enumerate(current_lines):
@@ -36,7 +38,7 @@ def _write_game_file(
         if not line.strip():
             continue
         if i in changed_indices:
-            parts.append(wrap_changed_line(line, _CHANGED_MACRO) + "\n")
+            parts.append(wrap_changed_line(line, macro) + "\n")
         else:
             parts.append(line + "\n")
     out_path.write_text("".join(parts), encoding="utf-8")

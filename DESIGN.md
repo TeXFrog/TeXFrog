@@ -269,24 +269,27 @@ output_dir/
 ├── style.css
 ├── app.js           # showGame(), navigate(), keyboard nav (arrow keys)
 └── games/
-    ├── G0.svg           # highlighted version
-    ├── G0-clean.svg     # clean version (no \tfchanged highlights)
+    ├── G0.svg           # highlighted version (blue on new/changed lines)
+    ├── G0-removed.svg   # removed version (red strikethrough on deleted/changed lines)
     ├── G1.svg
-    ├── G1-clean.svg
+    ├── G1-removed.svg
     └── ...
 ```
 
-Each game is compiled twice: once with `\tfchanged` highlighting (for the current-game
-panel) and once without (for the previous-game panel in side-by-side view). The last
-game does not need a clean SVG since it never appears as a "previous" game.
+Each game is compiled twice: once with `\tfchanged` highlighting (blue, for the
+current-game panel) and once with `\tfremoved` highlighting (red strikethrough, for
+the previous-game panel in side-by-side view showing lines that will be removed or
+changed in the next game). The last game does not need a removed SVG since it never
+appears as a "previous" game.
 
 HTML features: MathJax for LaTeX names, URL hash navigation (`#G1`), keyboard arrows,
 commentary panel, prev/next buttons, side-by-side game comparison.
 
 ### Side-by-Side Display
 
-After the first game, the HTML viewer shows the previous game (clean, no highlights)
-next to the current game (with highlights), making it easy to see what changed.
+After the first game, the HTML viewer shows the previous game (with red strikethrough
+on lines that are removed or changed) next to the current game (with blue highlights
+on new/changed lines), making it easy to see what changed between game transitions.
 Reductions (games with `reduction: true` in the YAML) are shown alone, not
 side-by-side.
 

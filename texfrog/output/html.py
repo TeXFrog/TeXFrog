@@ -26,7 +26,7 @@ from typing import Optional
 
 from jinja2 import Environment, PackageLoader, select_autoescape
 
-from ..filter import filter_for_game
+from ..filter import compute_removed_lines, filter_for_game
 from ..model import Proof
 from .latex import _write_game_file, generate_latex
 
@@ -46,6 +46,7 @@ _WRAPPER_TEMPLATE = r"""\documentclass{{article}}
 \newcommand{{\graybox}}[1]{{\adjustbox{{cframe=black!15, bgcolor=black!15}}{{\strut #1}}}}
 \newcommand{{\highlightbox}}[2][RoyalBlue!20]{{\adjustbox{{cframe=#1, bgcolor=#1}}{{\strut #2}}}}
 \newcommand{{\tfchanged}}[1]{{\highlightbox{{\ensuremath{{#1}}}}}}
+\newcommand{{\tfremoved}}[1]{{\textcolor{{red}}{{\sbox0{{\strut\ensuremath{{#1}}}}\rlap{{\usebox0}}\rule[0.4ex]{{\wd0}}{{0.5pt}}}}}}
 \newcommand{{\tfgamelabel}}[2]{{#2 \pccomment{{#1}}}}
 {macro_inputs}
 \pagestyle{{empty}}
@@ -347,10 +348,10 @@ function showGame(idx) {
   container.innerHTML = '';
 
   if (idx > 0 && !g.reduction) {
-    // Show previous game (clean, no highlights) on the left
+    // Show previous game (with red strikethrough on removed lines) on the left
     const prev = games[idx - 1];
     container.appendChild(
-      makePanel(prev.label, prev.latex_name, `games/${prev.label}-clean.svg`)
+      makePanel(prev.label, prev.latex_name, `games/${prev.label}-removed.svg`)
     );
   }
 
@@ -468,13 +469,18 @@ def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
         latex_dir = Path(tmp)
         generate_latex(proof, latex_dir)
 
-        # Also generate clean (no-highlight) .tex files for the side-by-side
-        # view.  Each game except the last may appear as the "previous" panel.
-        for game in proof.games[:-1]:
-            clean_lines = filter_for_game(proof.source_lines, game.label)
+        # Generate removed-highlight .tex files for the side-by-side view.
+        # Each game except the last may appear as the "previous" panel, with
+        # red strikethrough on lines removed/changed in the next game.
+        for i, game in enumerate(proof.games[:-1]):
+            prev_lines = filter_for_game(proof.source_lines, game.label)
+            next_game = proof.games[i + 1]
+            next_lines = filter_for_game(proof.source_lines, next_game.label)
+            removed_indices = compute_removed_lines(prev_lines, next_lines)
             _write_game_file(
-                game.label, clean_lines, set(),
-                latex_dir / f"{game.label}-clean.tex",
+                game.label, prev_lines, removed_indices,
+                latex_dir / f"{game.label}-removed.tex",
+                macro=r"\tfremoved",
             )
 
         # Step 2: compile each game to SVG (highlighted + clean).
@@ -503,24 +509,24 @@ def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
                     _placeholder_svg.format(label=label), encoding="utf-8",
                 )
 
-            # Clean (no-highlight) version — needed for all but the last game.
+            # Removed (red strikethrough) version — needed for all but the last game.
             if i < len(proof.games) - 1:
-                print(f"  Compiling {label} (clean) …", file=sys.stderr)
-                clean_tex = latex_dir / f"{label}-clean.tex"
-                clean_svg = games_dir / f"{label}-clean.svg"
+                print(f"  Compiling {label} (removed) …", file=sys.stderr)
+                removed_tex = latex_dir / f"{label}-removed.tex"
+                removed_svg = games_dir / f"{label}-removed.svg"
                 try:
                     _compile_game_to_svg(
-                        f"{label}-clean",
-                        clean_tex.resolve(),
+                        f"{label}-removed",
+                        removed_tex.resolve(),
                         proof.macros,
                         proof_dir,
-                        clean_svg,
+                        removed_svg,
                     )
                 except (RuntimeError, EnvironmentError) as exc:
-                    print(f"    Warning: could not render {label} (clean): {exc}",
+                    print(f"    Warning: could not render {label} (removed): {exc}",
                           file=sys.stderr)
-                    clean_svg.write_text(
-                        _placeholder_svg.format(label=f"{label}-clean"),
+                    removed_svg.write_text(
+                        _placeholder_svg.format(label=f"{label}-removed"),
                         encoding="utf-8",
                     )
 

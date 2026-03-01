@@ -65,6 +65,31 @@ def filter_for_game(source_lines: list[SourceLine], label: str) -> list[str]:
     return _strip_trailing_newline_sep(included)
 
 
+def compute_removed_lines(prev_lines: list[str], curr_lines: list[str]) -> set[int]:
+    """Compute which lines in ``prev_lines`` are deleted or replaced in ``curr_lines``.
+
+    Uses :class:`difflib.SequenceMatcher` to align the two sequences and
+    identifies lines in ``prev_lines`` that are *deletions* or *replacements*
+    (i.e., present in ``prev`` but not matched to an equal line in ``curr``).
+
+    Args:
+        prev_lines: Filtered lines for the previous game.
+        curr_lines: Filtered lines for the current game.
+
+    Returns:
+        A set of 0-based indices into ``prev_lines`` that are removed or changed.
+    """
+    if not prev_lines:
+        return set()
+
+    removed: set[int] = set()
+    matcher = difflib.SequenceMatcher(None, prev_lines, curr_lines, autojunk=False)
+    for tag, i1, i2, _j1, _j2 in matcher.get_opcodes():
+        if tag in ("delete", "replace"):
+            removed.update(range(i1, i2))
+    return removed
+
+
 def compute_changed_lines(prev_lines: list[str], curr_lines: list[str]) -> set[int]:
     """Compute which lines in ``curr_lines`` are new or changed relative to ``prev_lines``.
 

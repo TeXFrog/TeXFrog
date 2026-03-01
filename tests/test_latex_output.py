@@ -8,7 +8,7 @@ import pytest
 
 from texfrog.model import Figure, Game, Proof, SourceLine
 from texfrog.output.html import _expand_tfgamename
-from texfrog.output.latex import generate_latex
+from texfrog.output.latex import _write_game_file, generate_latex
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "simple"
 
@@ -82,6 +82,16 @@ def test_unchanged_line_not_wrapped(tmp_path):
     lines_with_common = [l for l in text.splitlines() if "common" in l]
     for l in lines_with_common:
         assert r"\tfchanged" not in l
+
+
+def test_write_game_file_custom_macro(tmp_path):
+    """_write_game_file should use the provided macro for wrapping."""
+    lines = [r"    common \\", r"    changed \\", r"    end"]
+    _write_game_file("test", lines, {1}, tmp_path / "test.tex", macro=r"\tfremoved")
+    text = (tmp_path / "test.tex").read_text()
+    assert r"\tfremoved" in text
+    assert r"\tfchanged" not in text
+    assert "changed" in text
 
 
 def test_excluded_line_not_in_game_file(tmp_path):
