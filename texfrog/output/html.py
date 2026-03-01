@@ -26,9 +26,9 @@ from typing import Optional
 
 from jinja2 import Environment, PackageLoader, select_autoescape
 
-from ..filter import compute_changed_lines, filter_for_game
+from ..filter import filter_for_game
 from ..model import Proof
-from .latex import generate_latex
+from .latex import _write_game_file, generate_latex
 
 # ---------------------------------------------------------------------------
 # LaTeX wrapper template used to compile individual game files to PDF
@@ -283,9 +283,10 @@ body { display: flex; height: 100vh; font-family: sans-serif; }
 #game-title { flex: 1; text-align: center; font-size: 1.1rem; }
 #game-display { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex;
                 flex-direction: column; gap: 1.5rem; }
-#game-svg-container { text-align: center; zoom: 1.2; display: grid; }
-.svg-layer { grid-area: 1 / 1; transition: opacity 1s ease; }
-.svg-layer img, .svg-layer svg { max-width: 100%; }
+#game-svg-container { display: flex; gap: 0.5rem; justify-content: center; }
+.game-panel { text-align: center; min-width: 0; }
+.game-panel-header { font-size: 1rem; margin-bottom: 0.25rem; color: #333; }
+.game-panel img { max-width: 100%; }
 #commentary-box { background: #fafafa; border: 1px solid #ddd; border-radius: 6px;
                   padding: 1rem; font-size: 0.9rem; line-height: 1.6; }
 #commentary-box:empty { display: none; }
@@ -294,8 +295,6 @@ body { display: flex; height: 100vh; font-family: sans-serif; }
 _JS = """\
 let currentIndex = 0;
 let games = [];
-let isFirstLoad = true;
-let fadeTimer = null;
 
 function init(gamesData) {
   games = gamesData;
@@ -311,6 +310,20 @@ function init(gamesData) {
   const hash = window.location.hash.slice(1);
   const idx = hash ? games.findIndex(g => g.label === hash) : -1;
   showGame(idx >= 0 ? idx : 0);
+}
+
+function makePanel(label, latexName, svgSrc) {
+  const panel = document.createElement('div');
+  panel.className = 'game-panel';
+  const header = document.createElement('div');
+  header.className = 'game-panel-header';
+  header.innerHTML = `$${latexName}$`;
+  panel.appendChild(header);
+  const img = new Image();
+  img.alt = label;
+  img.src = svgSrc;
+  panel.appendChild(img);
+  return panel;
 }
 
 function showGame(idx) {
@@ -329,67 +342,22 @@ function showGame(idx) {
   // Update title
   document.getElementById('game-title').innerHTML = `$${g.latex_name}$`;
 
-  // Update SVG with crossfade
+  // Build side-by-side display
   const container = document.getElementById('game-svg-container');
+  container.innerHTML = '';
 
-  // Cancel any in-progress transition cleanup
-  if (fadeTimer !== null) {
-    clearTimeout(fadeTimer);
-    fadeTimer = null;
+  if (idx > 0 && !g.reduction) {
+    // Show previous game (clean, no highlights) on the left
+    const prev = games[idx - 1];
+    container.appendChild(
+      makePanel(prev.label, prev.latex_name, `games/${prev.label}-clean.svg`)
+    );
   }
 
-  // Remove all layers except the most recent one (handles rapid clicking)
-  const existingLayers = Array.from(container.querySelectorAll('.svg-layer'));
-  if (existingLayers.length > 1) {
-    for (let i = 0; i < existingLayers.length - 1; i++) {
-      existingLayers[i].remove();
-    }
-  }
-  const oldLayer = container.querySelector('.svg-layer');
-
-  // Create the new layer
-  const newLayer = document.createElement('div');
-  newLayer.className = 'svg-layer';
-  const img = new Image();
-  img.alt = g.label;
-  img.src = `games/${g.label}.svg`;
-
-  if (isFirstLoad || !oldLayer) {
-    // First load or empty container: show immediately, no animation
-    newLayer.style.opacity = '1';
-    newLayer.appendChild(img);
-    container.appendChild(newLayer);
-    isFirstLoad = false;
-  } else {
-    // Crossfade transition
-    newLayer.style.opacity = '0';
-    newLayer.appendChild(img);
-    container.appendChild(newLayer);
-
-    const startFade = () => {
-      // Double rAF ensures the browser has painted opacity:0 before transitioning
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          newLayer.style.opacity = '1';
-          oldLayer.style.opacity = '0';
-          fadeTimer = setTimeout(() => {
-            oldLayer.remove();
-            fadeTimer = null;
-          }, 1050);
-        });
-      });
-    };
-
-    if (img.complete) {
-      startFade();
-    } else {
-      img.onload = startFade;
-      img.onerror = () => {
-        newLayer.style.opacity = '1';
-        if (oldLayer) oldLayer.remove();
-      };
-    }
-  }
+  // Current game (with highlights) on the right, or alone for first game / reductions
+  container.appendChild(
+    makePanel(g.label, g.latex_name, `games/${g.label}.svg`)
+  );
 
   // Update commentary
   const box = document.getElementById('commentary-box');
@@ -399,6 +367,7 @@ function showGame(idx) {
   if (window.MathJax) {
     MathJax.typesetPromise([
       document.getElementById('game-title'),
+      document.getElementById('game-svg-container'),
       document.getElementById('commentary-box'),
       document.getElementById('nav'),
     ]).catch(console.error);
@@ -499,9 +468,24 @@ def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
         latex_dir = Path(tmp)
         generate_latex(proof, latex_dir)
 
-        # Step 2: compile each game to SVG.
-        for game in proof.games:
+        # Also generate clean (no-highlight) .tex files for the side-by-side
+        # view.  Each game except the last may appear as the "previous" panel.
+        for game in proof.games[:-1]:
+            clean_lines = filter_for_game(proof.source_lines, game.label)
+            _write_game_file(
+                game.label, clean_lines, set(),
+                latex_dir / f"{game.label}-clean.tex",
+            )
+
+        # Step 2: compile each game to SVG (highlighted + clean).
+        _placeholder_svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="60">'
+            '<text x="10" y="40" font-family="monospace" font-size="14">'
+            '[SVG render failed for {label}]</text></svg>'
+        )
+        for i, game in enumerate(proof.games):
             label = game.label
+            # Highlighted version
             print(f"  Compiling {label} …", file=sys.stderr)
             game_tex = latex_dir / f"{label}.tex"
             svg_path = games_dir / f"{label}.svg"
@@ -515,13 +499,30 @@ def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
                 )
             except (RuntimeError, EnvironmentError) as exc:
                 print(f"    Warning: could not render {label}: {exc}", file=sys.stderr)
-                # Write a placeholder SVG so the page still loads.
                 svg_path.write_text(
-                    f'<svg xmlns="http://www.w3.org/2000/svg" width="400" height="60">'
-                    f'<text x="10" y="40" font-family="monospace" font-size="14">'
-                    f'[SVG render failed for {label}]</text></svg>',
-                    encoding="utf-8",
+                    _placeholder_svg.format(label=label), encoding="utf-8",
                 )
+
+            # Clean (no-highlight) version — needed for all but the last game.
+            if i < len(proof.games) - 1:
+                print(f"  Compiling {label} (clean) …", file=sys.stderr)
+                clean_tex = latex_dir / f"{label}-clean.tex"
+                clean_svg = games_dir / f"{label}-clean.svg"
+                try:
+                    _compile_game_to_svg(
+                        f"{label}-clean",
+                        clean_tex.resolve(),
+                        proof.macros,
+                        proof_dir,
+                        clean_svg,
+                    )
+                except (RuntimeError, EnvironmentError) as exc:
+                    print(f"    Warning: could not render {label} (clean): {exc}",
+                          file=sys.stderr)
+                    clean_svg.write_text(
+                        _placeholder_svg.format(label=f"{label}-clean"),
+                        encoding="utf-8",
+                    )
 
     # Step 3: assemble the site.
     game_names = {g.label: g.latex_name for g in proof.games}
@@ -534,6 +535,7 @@ def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
             "commentary": _expand_tfgamename(
                 proof.commentary.get(game.label, ""), game_names
             ),
+            "reduction": game.reduction,
         })
 
     nav_items = "\n".join(

@@ -13,6 +13,7 @@ games:
   - label: Red1
     latex_name: '\bdv_1'
     description: 'Reduction against $\KEM$ security.'
+    reduction: true
   - label: G2
     latex_name: 'G_2'
     description: 'Use random key.'

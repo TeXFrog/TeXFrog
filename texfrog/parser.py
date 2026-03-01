@@ -157,6 +157,7 @@ def parse_proof(yaml_path: Path) -> Proof:
                 label=entry["label"],
                 latex_name=entry["latex_name"],
                 description=entry["description"],
+                reduction=bool(entry.get("reduction", False)),
             )
         )
     ordered_labels = [g.label for g in games]

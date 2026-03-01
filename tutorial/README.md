@@ -75,7 +75,11 @@ games:
   - label: Red1
     latex_name: '\Bdversary_1'
     description: '...'
+    reduction: true
 ```
+
+The optional `reduction: true` flag marks an entry as a reduction. In the HTML viewer,
+reductions are displayed alone rather than side-by-side with the previous game.
 
 The `latex_name` is math-mode content without `$` delimiters. TeXFrog wraps it in `\ensuremath` (LaTeX) or `$...$` (HTML/MathJax) automatically. You can reference any game's name in commentary or your paper with `\tfgamename{G1}`.
 

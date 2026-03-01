@@ -29,6 +29,7 @@ games:
   - label: Red1
     latex_name: '\Bdversary_1'
     description: 'Reduction against PRF security, simulating Games \tfgamename{G0} and \tfgamename{G1} via an external PRF challenger.'
+    reduction: true
 
 commentary:
   G0: |

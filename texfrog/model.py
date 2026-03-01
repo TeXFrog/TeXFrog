@@ -12,6 +12,7 @@ class Game:
     label: str        # Internal label, e.g. "G0", "Red2"
     latex_name: str   # Math-mode LaTeX for the name (no $ delimiters), e.g. r'\indcca_\QSH^\adv.\REAL()'
     description: str  # One-sentence LaTeX description
+    reduction: bool = False  # True for reductions (shown alone, not side-by-side)
 
 
 @dataclass

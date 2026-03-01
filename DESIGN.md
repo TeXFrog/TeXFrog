@@ -63,6 +63,7 @@ class Game:
     label: str        # e.g. "G0", "Red2" — used as filename stem and hash anchor
     latex_name: str   # Math-mode content without $ delimiters, e.g. r'\indcca_\QSH^\adv.\REAL()'
     description: str  # One-sentence LaTeX description (shown in HTML sidebar)
+    reduction: bool = False  # True for reductions (displayed alone in HTML, not side-by-side)
 
 @dataclass
 class SourceLine:
@@ -268,13 +269,26 @@ output_dir/
 ├── style.css
 ├── app.js           # showGame(), navigate(), keyboard nav (arrow keys)
 └── games/
-    ├── G0.svg
+    ├── G0.svg           # highlighted version
+    ├── G0-clean.svg     # clean version (no \tfchanged highlights)
     ├── G1.svg
+    ├── G1-clean.svg
     └── ...
 ```
 
+Each game is compiled twice: once with `\tfchanged` highlighting (for the current-game
+panel) and once without (for the previous-game panel in side-by-side view). The last
+game does not need a clean SVG since it never appears as a "previous" game.
+
 HTML features: MathJax for LaTeX names, URL hash navigation (`#G1`), keyboard arrows,
-commentary panel, prev/next buttons.
+commentary panel, prev/next buttons, side-by-side game comparison.
+
+### Side-by-Side Display
+
+After the first game, the HTML viewer shows the previous game (clean, no highlights)
+next to the current game (with highlights), making it easy to see what changed.
+Reductions (games with `reduction: true` in the YAML) are shown alone, not
+side-by-side.
 
 ---
 
@@ -325,9 +339,6 @@ case-decomposition (G3–G7) forms, interleaved with proper ordering.
 
 ## Known Limitations / Future Work
 
-- No support for side-by-side game+reduction figures in the HTML viewer
-  (each game is shown individually)
-- HTML animations between games are not implemented (only static SVG display)
 - The consolidated figure output (`fig_*.tex`) does not handle the `\\` separator
   stripping correctly for the annotated lines — this may need attention if the
   annotated lines end with `\\`
