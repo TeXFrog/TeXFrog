@@ -86,11 +86,17 @@ function showGame(idx) {
       }
     }
   } else if (idx > 0 && !g.reduction) {
-    // Regular game transition: show previous removed + current highlighted
-    const prev = games[idx - 1];
-    container.appendChild(
-      makePanel(prev.label, prev.latex_name, `games/${prev.label}-removed.svg`)
-    );
+    // Regular game transition: show previous non-reduction game with removed
+    // highlights alongside the current highlighted game.
+    let prev = null;
+    for (let j = idx - 1; j >= 0; j--) {
+      if (!games[j].reduction) { prev = games[j]; break; }
+    }
+    if (prev) {
+      container.appendChild(
+        makePanel(prev.label, prev.latex_name, `games/${prev.label}-removed.svg`)
+      );
+    }
     container.appendChild(
       makePanel(g.label, g.latex_name, `games/${g.label}.svg`)
     );

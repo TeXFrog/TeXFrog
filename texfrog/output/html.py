@@ -370,11 +370,14 @@ def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
         generate_latex(proof, latex_dir)
 
         # Generate removed-highlight .tex files for the side-by-side view.
-        # Each game except the last may appear as the "previous" panel, with
-        # red strikethrough on lines removed/changed in the next game.
-        for i, game in enumerate(proof.games[:-1]):
+        # Each non-reduction game (except the last one) may appear as the
+        # "previous" panel, with red strikethrough on lines removed/changed
+        # in the next non-reduction game.  Reductions are skipped since they
+        # use the related_games display instead.
+        non_red_games = [g for g in proof.games if not g.reduction]
+        for i, game in enumerate(non_red_games[:-1]):
             prev_lines = filter_for_game(proof.source_lines, game.label)
-            next_game = proof.games[i + 1]
+            next_game = non_red_games[i + 1]
             next_lines = filter_for_game(proof.source_lines, next_game.label)
             removed_indices = compute_removed_lines(prev_lines, next_lines)
             _write_game_file(
@@ -416,8 +419,9 @@ def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
                 None,
                 _WRAPPER_TEMPLATE,
             ))
-            # Removed (red strikethrough) version — needed for all but the last game.
-            if i < len(proof.games) - 1:
+            # Removed (red strikethrough) version — needed for non-reduction
+            # games that have a successor non-reduction game.
+            if not game.reduction and game in non_red_games[:-1]:
                 tasks.append((
                     f"{label}-removed",
                     (latex_dir / f"{label}-removed.tex").resolve(),
