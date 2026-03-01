@@ -20,8 +20,8 @@ body { display: flex; height: 100vh; font-family: sans-serif; }
 #controls button:hover { background: #e8e8e8; }
 #title-block { flex: 1; text-align: center; height: 3.8rem; display: flex;
                flex-direction: column; justify-content: center; }
-#game-title { font-size: 1.1rem; }
-#game-subtitle { font-size: 0.8rem; color: #666; margin-top: 0.4rem;
+#game-title { font-size: 1.1rem; padding-top: 1rem;}
+#game-subtitle { font-size: 0.9rem; color: #666; margin-top: 0.4rem;
                  line-height: 1.3; }
 #game-display { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex;
                 flex-direction: column; gap: 1.5rem; align-items: center; }
