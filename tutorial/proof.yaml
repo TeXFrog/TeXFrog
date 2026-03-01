@@ -11,7 +11,7 @@
 macros:
   - macros.tex
 
-source: source.tex
+source: games_source.tex
 
 games:
   - label: G0
@@ -19,7 +19,7 @@ games:
     description: 'The real IND-CPA game: the LR oracle encrypts using the actual PRF.'
 
   - label: G1
-    latex_name: 'Game~1'
+    latex_name: 'Game 1'
     description: 'Replace $\mathrm{PRF}(k, r)$ with a truly random value.'
 
   - label: G2
@@ -38,11 +38,10 @@ commentary:
     $(r, \mathrm{PRF}(k,r) \oplus m_b)$.
 
   G1: |
-    \begin{claim}
+    \textbf{Claim.}
       Games~0 and~1 are computationally indistinguishable assuming $\mathrm{PRF}$
       is a secure pseudorandom function, with advantage gap at most
       $\mathbf{Adv}^{\mathrm{PRF}}(\Bdversary_1)$.
-    \end{claim}
 
     Reduction $\Bdversary_1$ (shown separately) interacts with an external PRF challenger
     and simulates the LR oracle by forwarding nonces $r$ to that challenger.
@@ -50,9 +49,8 @@ commentary:
     Game~0; when it uses a random function, $\Bdversary_1$ exactly simulates Game~1.
 
   G2: |
-    \begin{claim}
+    \textbf{Claim.}
       Games~1 and~2 are perfectly indistinguishable.
-    \end{claim}
 
     In Game~1, each query samples a fresh nonce $r$ and then evaluates a random
     function at $r$, yielding a uniform $y$ independent of all previous queries

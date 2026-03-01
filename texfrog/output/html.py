@@ -223,6 +223,9 @@ _HTML_TEMPLATE = """\
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TeXFrog Proof Viewer</title>
   <link rel="stylesheet" href="style.css">
+  <script>
+  MathJax = {{ tex: {{ inlineMath: [['$', '$'], ['\\(', '\\)']] }} }};
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
 </head>
 <body>
@@ -279,7 +282,7 @@ body { display: flex; height: 100vh; font-family: sans-serif; }
 #game-title { flex: 1; text-align: center; font-size: 1.1rem; }
 #game-display { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex;
                 flex-direction: column; gap: 1.5rem; }
-#game-svg-container { text-align: center; }
+#game-svg-container { text-align: center; zoom: 1.2; }
 #game-svg-container img, #game-svg-container svg { max-width: 100%; }
 #commentary-box { background: #fafafa; border: 1px solid #ddd; border-radius: 6px;
                   padding: 1rem; font-size: 0.9rem; line-height: 1.6; }
@@ -295,7 +298,7 @@ function init(gamesData) {
   const list = document.getElementById('game-list');
   games.forEach((g, i) => {
     const li = document.createElement('li');
-    li.innerHTML = `<div class="game-label">\\\\(${g.latex_name}\\\\)</div>
+    li.innerHTML = `<div class="game-label">${g.latex_name}</div>
                     <div class="game-desc">${g.description}</div>`;
     li.onclick = () => showGame(i);
     list.appendChild(li);
@@ -320,7 +323,7 @@ function showGame(idx) {
   });
 
   // Update title
-  document.getElementById('game-title').innerHTML = `\\\\(${g.latex_name}\\\\)`;
+  document.getElementById('game-title').innerHTML = g.latex_name;
 
   // Update SVG
   const container = document.getElementById('game-svg-container');

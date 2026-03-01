@@ -35,7 +35,7 @@ uniform `y` is uniform regardless of `m_b`, so we can sample `c` directly.
 | File | Purpose |
 |------|---------|
 | `proof.yaml` | Declares the games, commentary, and figure specs |
-| `source.tex` | The single combined LaTeX source with `%:tags:` annotations |
+| `games_source.tex` | The single combined LaTeX source with `%:tags:` annotations |
 | `macros.tex` | Five short macros (no external dependencies) |
 
 ---
@@ -50,7 +50,7 @@ The YAML file has four active sections: `macros`, `source`, `games`, and `commen
 macros:
   - macros.tex
 
-source: source.tex
+source: games_source.tex
 ```
 
 `macros` lists LaTeX files that define your proof-specific commands; `source` points to the
@@ -112,7 +112,7 @@ side by side, with game-specific lines annotated by `\tfgamelabel`.
 
 ---
 
-## Step 2 — The Combined Source (`source.tex`)
+## Step 2 — The Combined Source (`games_source.tex`)
 
 All pseudocode for all games lives in this one file. TeXFrog filters it per game.
 
