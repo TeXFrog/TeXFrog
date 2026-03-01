@@ -261,6 +261,12 @@ Without `\ensuremath`, you get "! LaTeX Error: \mathsf allowed only in math mode
 `pdftocairo -svg input.pdf output.svg` writes to the **exact filename** specified —
 it does NOT append `.svg`. Pass the full `.svg` path directly.
 
+Commentary is also compiled through the same pipeline, producing `{label}_commentary.svg`
+files for each game that has commentary text. The wrapper preamble includes `\tfgamename`
+definitions so that commentary can reference game names. Any other commands or environments
+used in commentary (e.g., `\newtheorem{claim}{Claim}`) must be defined in the user's
+macros file.
+
 ### Site Structure
 
 ```
@@ -269,10 +275,12 @@ output_dir/
 ├── style.css
 ├── app.js           # showGame(), navigate(), keyboard nav (arrow keys)
 └── games/
-    ├── G0.svg           # highlighted version (blue on new/changed lines)
-    ├── G0-removed.svg   # removed version (red strikethrough on deleted/changed lines)
+    ├── G0.svg               # highlighted version (blue on new/changed lines)
+    ├── G0-removed.svg       # removed version (red strikethrough on deleted/changed lines)
+    ├── G0_commentary.svg    # rendered commentary (only if commentary was provided)
     ├── G1.svg
     ├── G1-removed.svg
+    ├── G1_commentary.svg
     └── ...
 ```
 
@@ -282,8 +290,9 @@ the previous-game panel in side-by-side view showing lines that will be removed 
 changed in the next game). The last game does not need a removed SVG since it never
 appears as a "previous" game.
 
-HTML features: MathJax for LaTeX names, URL hash navigation (`#G1`), keyboard arrows,
-commentary panel, prev/next buttons, side-by-side game comparison.
+HTML features: MathJax for LaTeX names and descriptions, URL hash navigation (`#G1`),
+keyboard arrows, commentary rendered as SVG via the LaTeX pipeline, prev/next buttons,
+side-by-side game comparison.
 
 ### Side-by-Side Display
 

@@ -49,8 +49,27 @@ _WRAPPER_TEMPLATE = r"""\documentclass{{article}}
 \newcommand{{\tfremoved}}[1]{{\textcolor{{red}}{{\sbox0{{\strut\ensuremath{{#1}}}}\rlap{{\usebox0}}\rule[0.4ex]{{\wd0}}{{0.5pt}}}}}}
 \newcommand{{\tfgamelabel}}[2]{{#2 \pccomment{{#1}}}}
 {macro_inputs}
+{gamename_defs}
 \pagestyle{{empty}}
 \begin{{document}}
+\input{{{game_file}}}
+\end{{document}}
+"""
+
+# Commentary wrapper: uses article class (same as game wrapper) with pdfcrop
+# to trim whitespace.  \raggedright avoids justified text filling to a fixed
+# \textwidth so the cropped result is tight around the prose.
+_COMMENTARY_WRAPPER_TEMPLATE = r"""\documentclass{{article}}
+\usepackage[letterpaper,margin=1in]{{geometry}}
+\usepackage[n,advantage,operators,sets,adversary,landau,probability,notions,logic,ff,mm,primitives,events,complexity,oracles,asymptotics,keys]{{cryptocode}}
+\usepackage{{amsfonts,amsmath,amsthm}}
+\usepackage{{adjustbox}}
+\usepackage[dvipsnames,table]{{xcolor}}
+{macro_inputs}
+{gamename_defs}
+\pagestyle{{empty}}
+\begin{{document}}
+\raggedright
 \input{{{game_file}}}
 \end{{document}}
 """
@@ -119,6 +138,8 @@ def _compile_game_to_svg(
     macro_paths: list[str],
     proof_dir: Path,
     svg_out_path: Path,
+    game_names: dict[str, str] | None = None,
+    wrapper_template: str = _WRAPPER_TEMPLATE,
 ) -> None:
     """Compile one game's LaTeX file to an SVG image.
 
@@ -128,6 +149,12 @@ def _compile_game_to_svg(
         macro_paths: Macro file paths (relative to proof_dir).
         proof_dir: Directory containing macro files.
         svg_out_path: Where to write the resulting SVG.
+        game_names: Optional mapping from game label to ``latex_name``.
+            When provided, ``\\tfgamename`` definitions are added to the
+            wrapper preamble so that commentary can reference game names.
+        wrapper_template: LaTeX wrapper template string. Defaults to
+            ``_WRAPPER_TEMPLATE``; use ``_COMMENTARY_WRAPPER_TEMPLATE``
+            for prose commentary (uses ``varwidth`` for tight cropping).
 
     Raises:
         RuntimeError: If pdflatex or SVG conversion fails.
@@ -163,8 +190,22 @@ def _compile_game_to_svg(
             macro_input_lines.append(f"\\input{{{local_name}}}")
         macro_inputs = "\n".join(macro_input_lines)
 
-        wrapper_src = _WRAPPER_TEMPLATE.format(
+        # Build \tfgamename definitions if game_names were provided.
+        if game_names:
+            gn_lines = [
+                r"\makeatletter",
+                r"\providecommand{\tfgamename}[1]{\ensuremath{\@nameuse{tfgn@#1}}}",
+            ]
+            for label, latex_name in game_names.items():
+                gn_lines.append(f"\\@namedef{{tfgn@{label}}}{{{latex_name}}}")
+            gn_lines.append(r"\makeatother")
+            gamename_defs = "\n".join(gn_lines)
+        else:
+            gamename_defs = ""
+
+        wrapper_src = wrapper_template.format(
             macro_inputs=macro_inputs,
+            gamename_defs=gamename_defs,
             game_file="game.tex",
         )
 
@@ -290,15 +331,16 @@ body { display: flex; height: 100vh; font-family: sans-serif; }
 #game-subtitle { font-size: 0.8rem; color: #666; margin-top: 0.4rem;
                  line-height: 1.3; }
 #game-display { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex;
-                flex-direction: column; gap: 1.5rem; }
+                flex-direction: column; gap: 1.5rem; align-items: center; }
 #game-svg-container { display: flex; gap: 0.5rem; justify-content: center;
                       overflow-x: auto; }
 .game-panel { text-align: center; flex-shrink: 0; }
 .game-panel-header { font-size: 1rem; margin-bottom: 0.25rem; color: #333; }
-.game-panel img { zoom: 1.33; }
+.game-panel img { zoom: 1.25; }
 #commentary-box { background: #fafafa; border: 1px solid #ddd; border-radius: 6px;
-                  padding: 1rem; font-size: 0.9rem; line-height: 1.6; }
+                  padding: 1rem; text-align: center; display: inline-block; }
 #commentary-box:empty { display: none; }
+#commentary-box img { height: auto; display: inline-block; zoom: 1.33; }
 """
 
 _JS = """\
@@ -369,9 +411,17 @@ function showGame(idx) {
     makePanel(g.label, g.latex_name, `games/${g.label}.svg`)
   );
 
-  // Update commentary
+  // Update commentary (rendered as SVG image)
   const box = document.getElementById('commentary-box');
-  box.innerHTML = g.commentary || '';
+  if (g.has_commentary) {
+    const img = new Image();
+    img.alt = g.label + ' commentary';
+    img.src = `games/${g.label}_commentary.svg`;
+    box.innerHTML = '';
+    box.appendChild(img);
+  } else {
+    box.innerHTML = '';
+  }
 
   // Re-typeset MathJax
   if (window.MathJax) {
@@ -379,7 +429,6 @@ function showGame(idx) {
       document.getElementById('game-title'),
       document.getElementById('game-subtitle'),
       document.getElementById('game-svg-container'),
-      document.getElementById('commentary-box'),
       document.getElementById('nav'),
     ]).catch(console.error);
   }
@@ -540,6 +589,34 @@ def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
                         encoding="utf-8",
                     )
 
+        # Step 2b: compile commentary to SVG.
+        game_names = {g.label: g.latex_name for g in proof.games}
+        for game in proof.games:
+            commentary = proof.commentary.get(game.label, "")
+            if not commentary.strip():
+                continue
+            label = game.label
+            print(f"  Compiling {label} commentary …", file=sys.stderr)
+            commentary_tex = latex_dir / f"{label}_commentary.tex"
+            commentary_svg = games_dir / f"{label}_commentary.svg"
+            try:
+                _compile_game_to_svg(
+                    f"{label}_commentary",
+                    commentary_tex.resolve(),
+                    proof.macros,
+                    proof_dir,
+                    commentary_svg,
+                    game_names=game_names,
+                    wrapper_template=_COMMENTARY_WRAPPER_TEMPLATE,
+                )
+            except (RuntimeError, EnvironmentError) as exc:
+                print(f"    Warning: could not render {label} commentary: {exc}",
+                      file=sys.stderr)
+                commentary_svg.write_text(
+                    _placeholder_svg.format(label=f"{label}_commentary"),
+                    encoding="utf-8",
+                )
+
     # Step 3: assemble the site.
     game_names = {g.label: g.latex_name for g in proof.games}
     games_data = []
@@ -548,9 +625,7 @@ def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
             "label": game.label,
             "latex_name": game.latex_name,
             "description": _expand_tfgamename(game.description, game_names),
-            "commentary": _expand_tfgamename(
-                proof.commentary.get(game.label, ""), game_names
-            ),
+            "has_commentary": bool(proof.commentary.get(game.label, "").strip()),
             "reduction": game.reduction,
         })
 

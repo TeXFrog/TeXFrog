@@ -83,6 +83,8 @@ commentary:
 
 Use YAML's literal block scalar (`|`) to preserve newlines. LaTeX environments, math, and display equations all work here. You can use `\tfgamename{G1}` to reference a game's `latex_name` — see [latex-integration.md](latex-integration.md).
 
+**HTML viewer:** Commentary is compiled through the same LaTeX → PDF → SVG pipeline as game pseudocode, so any LaTeX commands or environments used in commentary (e.g., `\newtheorem{claim}{Claim}`) must be defined in your macros file. The packages available in the HTML compilation wrapper are: `cryptocode`, `amsfonts`, `amsmath`, `amsthm`, `adjustbox`, and `xcolor`.
+
 ### `figures` (optional)
 
 A list of consolidated figures showing multiple games side by side, for use as comparison tables in your paper.

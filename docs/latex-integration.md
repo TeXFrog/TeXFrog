@@ -100,7 +100,7 @@ $x = \tfgamename{G1}$
 
 The macro is defined using `\providecommand`, so you can override it before `\input`-ing the harness. If you call `\tfgamename` with an undefined label, it silently produces no output.
 
-In the HTML viewer, `\tfgamename{label}` in `description` and `commentary` fields is automatically expanded to `$latex_name$` before MathJax rendering.
+In the HTML viewer, `\tfgamename{label}` in `description` fields is automatically expanded to `$latex_name$` for MathJax rendering. In commentary, `\tfgamename` is compiled natively by LaTeX (the HTML wrapper defines the macro), so no pre-expansion is needed.
 
 ## Including Individual Games
 
@@ -160,9 +160,11 @@ Running `texfrog html build` or `texfrog html serve` produces a standalone HTML 
 - Highlights changed lines with a colored box
 - Displays game names (rendered with MathJax) and descriptions in the sidebar
 - Supports keyboard navigation (left/right arrow keys) and URL hash links (`#G1`)
-- Shows your commentary text below each game
+- Renders commentary as SVG images using the same LaTeX → PDF → SVG pipeline as game pseudocode
 
 The HTML output is self-contained in its directory and can be served from any static file host, or opened directly in a browser.
+
+**Commentary rendering:** Because commentary is compiled through LaTeX (not MathJax), any commands or environments used in commentary must be defined in your macros file. For example, if your commentary uses `\begin{claim}...\end{claim}`, your macros file must include `\newtheorem{claim}{Claim}`. The packages available in the HTML compilation wrapper are: `cryptocode`, `amsfonts`, `amsmath`, `amsthm`, `adjustbox`, and `xcolor`.
 
 ### System Requirements for HTML
 

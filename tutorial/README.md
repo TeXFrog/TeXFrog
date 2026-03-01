@@ -105,6 +105,10 @@ commentary:
 Each entry is raw LaTeX written to `{label}_commentary.tex` and `\input`-ed by the harness
 immediately after the game pseudocode. Use YAML's `|` (literal block) to preserve newlines.
 
+In the HTML viewer, commentary is compiled through the same LaTeX → PDF → SVG pipeline as
+game pseudocode, so any custom environments (e.g., `\newtheorem{claim}{Claim}`) must be
+defined in your macros file.
+
 ### `figures`
 
 ```yaml
