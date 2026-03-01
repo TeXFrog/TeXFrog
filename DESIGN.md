@@ -61,7 +61,7 @@ TeXFrog/
 @dataclass
 class Game:
     label: str        # e.g. "G0", "Red2" — used as filename stem and hash anchor
-    latex_name: str   # e.g. r'$\indcca_\QSH^\adv.\REAL()$' — rendered by MathJax in HTML
+    latex_name: str   # Math-mode content without $ delimiters, e.g. r'\indcca_\QSH^\adv.\REAL()'
     description: str  # One-sentence LaTeX description (shown in HTML sidebar)
 
 @dataclass
@@ -98,10 +98,10 @@ source: games_source.tex       # relative to this yaml file
 
 games:
   - label: G0
-    latex_name: '$\indcca_\QSH^\adv.\REAL()$'
+    latex_name: '\indcca_\QSH^\adv.\REAL()'
     description: 'The starting game (real IND-CCA game).'
   - label: G1
-    latex_name: 'Game~1'
+    latex_name: 'G_1'
     description: 'Replace $\key_2$ with a fresh $\key_2^*$.'
   # ... more games ...
 
@@ -208,18 +208,19 @@ Generated only if commentary text is non-empty. Contains verbatim YAML commentar
 
 ### Harness: `proof_harness.tex`
 
-- Defines `\tfchanged` (via `\providecommand`) and `\tfgamelabel`
+- Defines `\tfchanged` (via `\providecommand`), `\tfgamelabel`, and `\tfgamename`
+- `\tfgamename{label}` expands to `\ensuremath{latex_name}` via `\@namedef`/`\@nameuse`
 - `\input`s each macro file
 - `\input`s each game file, then its commentary file, in order
 
-The `\providecommand` means authors can override `\tfchanged` in their paper preamble.
-Default: `\colorbox{blue!15}{$#1$}` (works in math mode).
+The `\providecommand` means authors can override macros in their paper preamble.
+Default `\tfchanged`: `\colorbox{blue!15}{$#1$}` (works in math mode).
 
 ### Consolidated figures: `fig_{label}.tex`
 
 For each source line:
 - In ALL selected games → output verbatim
-- In SUBSET of selected games → `\tfgamelabel{G1,G3}{line content}`
+- In SUBSET of selected games → `\tfgamelabel{\tfgamename{G1},\tfgamename{G3}}{line content}`
 - In NO selected games → skip
 
 ---
@@ -287,7 +288,7 @@ texfrog html build INPUT.yaml [-o DIR]
 texfrog html serve INPUT.yaml [-o DIR] [--port 8080] [--no-browser]
 ```
 
-Default output dirs: `texfrog_output/` (latex) and `texfrog_html/` (html), both
+Default output dirs: `texfrog_latex/` (latex) and `texfrog_html/` (html), both
 created next to the input YAML file.
 
 ---

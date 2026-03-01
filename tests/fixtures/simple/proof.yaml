@@ -5,16 +5,16 @@ source: source.tex
 
 games:
   - label: G0
-    latex_name: '$\indcca.\REAL()$'
+    latex_name: '\indcca.\REAL()'
     description: 'The starting game.'
   - label: G1
-    latex_name: 'Game~1'
+    latex_name: 'G_1'
     description: 'Use cached key.'
   - label: Red1
-    latex_name: 'Reduction $\bdv_1$'
+    latex_name: '\bdv_1'
     description: 'Reduction against $\KEM$ security.'
   - label: G2
-    latex_name: 'Game~2'
+    latex_name: 'G_2'
     description: 'Use random key.'
 
 commentary:

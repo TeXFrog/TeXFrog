@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from texfrog.model import Figure, Game, Proof, SourceLine
+from texfrog.output.html import _expand_tfgamename
 from texfrog.output.latex import generate_latex
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "simple"
@@ -15,9 +16,9 @@ FIXTURE_DIR = Path(__file__).parent / "fixtures" / "simple"
 def make_proof() -> Proof:
     """Build a small synthetic Proof for output tests."""
     games = [
-        Game(label="G0", latex_name=r"$\REAL()$", description="Starting game."),
-        Game(label="G1", latex_name="Game~1", description="Modified game."),
-        Game(label="G2", latex_name="Game~2", description="Final game."),
+        Game(label="G0", latex_name=r"\REAL()", description="Starting game."),
+        Game(label="G1", latex_name="G_1", description="Modified game."),
+        Game(label="G2", latex_name="G_2", description="Final game."),
     ]
     source_lines = [
         SourceLine(r"\begin{procedure}", None, r"\begin{procedure}"),
@@ -287,6 +288,118 @@ def test_consolidated_trailing_backslash_outside_macro(tmp_path):
     assert r"\tfgamelabel" in line
     # \\ must appear after the closing } of \tfgamelabel's second argument
     assert r"tagged} \\" in line
+
+
+# ---------------------------------------------------------------------------
+# Game name macro (\tfgamename)
+# ---------------------------------------------------------------------------
+
+def test_harness_defines_tfgamename_dispatcher(tmp_path):
+    proof = make_proof()
+    generate_latex(proof, tmp_path)
+    text = (tmp_path / "proof_harness.tex").read_text()
+    assert r"\providecommand{\tfgamename}[1]{\ensuremath{\@nameuse{tfgn@#1}}}" in text
+
+
+def test_harness_tfgamename_entries_for_all_games(tmp_path):
+    proof = make_proof()
+    generate_latex(proof, tmp_path)
+    text = (tmp_path / "proof_harness.tex").read_text()
+    assert r"\@namedef{tfgn@G0}{\REAL()}" in text
+    assert r"\@namedef{tfgn@G1}{G_1}" in text
+    assert r"\@namedef{tfgn@G2}{G_2}" in text
+
+
+def test_harness_tfgamename_wrapped_in_makeatletter(tmp_path):
+    proof = make_proof()
+    generate_latex(proof, tmp_path)
+    text = (tmp_path / "proof_harness.tex").read_text()
+    start = text.index(r"\makeatletter")
+    end = text.index(r"\makeatother")
+    assert start < end
+    assert r"\@namedef{tfgn@G0}" in text[start:end]
+    assert r"\tfgamename" in text[start:end]
+
+
+def test_harness_tfgamename_with_braces_in_latex_name(tmp_path):
+    """Ensure latex_name values with nested braces are emitted correctly."""
+    games = [
+        Game(label="G0", latex_name=r"\indcca_{\QSH}^\adv.\REAL()", description="test"),
+    ]
+    proof = Proof(macros=[], games=games, source_lines=[], commentary={}, figures=[])
+    generate_latex(proof, tmp_path)
+    text = (tmp_path / "proof_harness.tex").read_text()
+    assert r"\@namedef{tfgn@G0}{\indcca_{\QSH}^\adv.\REAL()}" in text
+
+
+# ---------------------------------------------------------------------------
+# HTML game name expansion
+# ---------------------------------------------------------------------------
+
+def test_expand_tfgamename_replaces_known_labels():
+    names = {"G0": r"\REAL()", "G1": "G_1"}
+    text = r"In \tfgamename{G0}, we start. Then \tfgamename{G1} modifies."
+    result = _expand_tfgamename(text, names)
+    assert result == r"In $\REAL()$, we start. Then $G_1$ modifies."
+
+
+def test_expand_tfgamename_preserves_unknown_labels():
+    names = {"G0": r"\REAL()"}
+    text = r"See \tfgamename{G99} for details."
+    result = _expand_tfgamename(text, names)
+    assert result == r"See \tfgamename{G99} for details."
+
+
+def test_expand_tfgamename_no_op_without_macro():
+    names = {"G0": r"\REAL()"}
+    text = "No macro references here."
+    result = _expand_tfgamename(text, names)
+    assert result == text
+
+
+def test_expand_tfgamename_inside_dollar_math():
+    r"""Don't double-wrap when \tfgamename is already inside $...$."""
+    names = {"G0": "G_0"}
+    text = r"The starting game is $\tfgamename{G0} = \mathrm{Real}$."
+    result = _expand_tfgamename(text, names)
+    assert result == r"The starting game is $G_0 = \mathrm{Real}$."
+
+
+def test_expand_tfgamename_mixed_math_and_text():
+    """Handle both in-math and text-mode occurrences in the same string."""
+    names = {"G0": "G_0", "G1": "G_1"}
+    text = r"Game $\tfgamename{G0}$ equals \tfgamename{G1}."
+    result = _expand_tfgamename(text, names)
+    assert result == r"Game $G_0$ equals $G_1$."
+
+
+def test_expand_tfgamename_inside_paren_math():
+    r"""Don't double-wrap when \tfgamename is inside \(...\)."""
+    names = {"G0": "G_0"}
+    text = r"See \(\tfgamename{G0} = X\) for details."
+    result = _expand_tfgamename(text, names)
+    assert result == r"See \(G_0 = X\) for details."
+
+
+def test_expand_tfgamename_inside_bracket_math():
+    r"""Don't double-wrap when \tfgamename is inside \[...\]."""
+    names = {"G0": "G_0"}
+    text = r"Display: \[\tfgamename{G0} = X\]"
+    result = _expand_tfgamename(text, names)
+    assert result == r"Display: \[G_0 = X\]"
+
+
+def test_expand_tfgamename_comment_with_dollar():
+    r"""A $ inside a LaTeX comment should not affect math-mode tracking."""
+    names = {"G0": "G_0"}
+    text = "Some text % comment with a $\n\\tfgamename{G0} here."
+    result = _expand_tfgamename(text, names)
+    assert result == "Some text % comment with a $\n$G_0$ here."
+
+
+# ---------------------------------------------------------------------------
+# Consolidated figures — LaTeX correctness (continued)
+# ---------------------------------------------------------------------------
 
 
 def test_consolidated_last_line_variants_separator_added(tmp_path):

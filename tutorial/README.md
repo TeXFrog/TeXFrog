@@ -61,21 +61,23 @@ combined pseudocode file. Both paths are relative to the YAML file.
 ```yaml
 games:
   - label: G0
-    latex_name: '$\INDCPA_\Enc^\Adversary.\mathsf{Real}()$'
-    description: 'The real IND-CPA game: ...'
+    latex_name: 'G_0'
+    description: '...'
 
   - label: G1
-    latex_name: 'Game~1'
+    latex_name: 'G_1'
     description: '...'
 
   - label: G2
-    latex_name: '$\INDCPA_\Enc^\Adversary.\mathsf{Ideal}()$'
+    latex_name: 'G_2'
     description: '...'
 
   - label: Red1
-    latex_name: 'Reduction $\Bdversary_1^{\OPRF}$'
+    latex_name: '\Bdversary_1'
     description: '...'
 ```
+
+The `latex_name` is math-mode content without `$` delimiters. TeXFrog wraps it in `\ensuremath` (LaTeX) or `$...$` (HTML/MathJax) automatically. You can reference any game's name in commentary or your paper with `\tfgamename{G1}`.
 
 The order here matters in two ways:
 
@@ -167,10 +169,10 @@ Lines ending with `{` are treated as procedure headers. They are never wrapped i
 header in consolidated figures.
 
 ```latex
-\procedure[linenumbering]{$\INDCPA_\Enc^\Adversary.\mathsf{Real}()$}{ %:tags: G0
-\procedure[linenumbering]{Game~1}{ %:tags: G1
-\procedure[linenumbering]{$\INDCPA_\Enc^\Adversary.\mathsf{Ideal}()$}{ %:tags: G2
-\procedure[linenumbering]{Reduction $\Bdversary_1^{\OPRF}$}{ %:tags: Red1
+\procedure[linenumbering]{\tfgamename{G0}}{ %:tags: G0
+\procedure[linenumbering]{\tfgamename{G1}}{ %:tags: G1
+\procedure[linenumbering]{\tfgamename{G2}}{ %:tags: G2
+\procedure[linenumbering]{\tfgamename{Red1}}{ %:tags: Red1
 ```
 
 Each game sees exactly one of these four headers.
@@ -223,16 +225,15 @@ fig_all_games.tex   — consolidated figure with all four games annotated
 all four games are printed verbatim; lines that appear in only some are annotated:
 
 ```latex
-\tfgamelabel{G0,G1,G2}{        k \getsr \{0,1\}^\lambda} \\
-\tfgamelabel{G0}{        y \gets \mathrm{PRF}(k, r)} \\
-\tfgamelabel{G1}{        y \getsr \{0,1\}^\lambda} \\
-\tfgamelabel{Red1}{        y \gets \OPRF(r)} \\
-\tfgamelabel{G0,G1,Red1}{        c \gets y \oplus m_b} \\
-\tfgamelabel{G2}{        c \getsr \{0,1\}^\lambda} \\
+\tfgamelabel{\tfgamename{G0},\tfgamename{G1},\tfgamename{G2}}{        k \getsr \{0,1\}^\lambda} \\
+\tfgamelabel{\tfgamename{G0}}{        y \gets \mathrm{PRF}(k, r)} \\
+\tfgamelabel{\tfgamename{G1}}{        y \getsr \{0,1\}^\lambda} \\
+\tfgamelabel{\tfgamename{Red1}}{        y \gets \OPRF(r)} \\
+\tfgamelabel{\tfgamename{G0},\tfgamename{G1},\tfgamename{Red1}}{        c \gets y \oplus m_b} \\
+\tfgamelabel{\tfgamename{G2}}{        c \getsr \{0,1\}^\lambda} \\
 ```
 
-The default `\tfgamelabel` definition appends the game name as a pseudocode comment.
-Override it in your paper to match your house style.
+The first argument of `\tfgamelabel` uses `\tfgamename` to display the rendered game names (e.g., `$G_0$` instead of the raw label `G0`). The default `\tfgamelabel` definition appends these names as a pseudocode comment. Override it in your paper to match your house style.
 
 ### Using the output in your paper
 
@@ -259,6 +260,7 @@ Or `\input` individual game files and figures as needed. See
 | Reduction sharing structure | Red1 main body is identical to G0/G1/G2 except `k` is absent |
 | Changed-line highlighting | `y ←$ {0,1}^λ` highlighted in G1; `c ←$ {0,1}^λ` highlighted in G2 |
 | Consolidated figure | `fig_all_games.tex` annotates every game-specific line |
+| `\tfgamename` | Commentary uses `\tfgamename{G0}` to reference game names portably |
 
 ---
 

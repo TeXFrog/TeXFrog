@@ -39,25 +39,25 @@ Each entry has three fields:
 | Field | Required | Description |
 |-------|----------|-------------|
 | `label` | yes | Short identifier used in `%:tags:` comments and as the output filename stem (e.g. `G0`, `Red2`) |
-| `latex_name` | yes | How the game is rendered in LaTeX and the HTML sidebar (e.g. `'Game~1'` or `'$\indcca_\QSH^\adv.\REAL()$'`) |
+| `latex_name` | yes | Math-mode LaTeX for the game name, without `$` delimiters (e.g. `'G_1'` or `'\indcca_\QSH^\adv.\REAL()'`). Rendered via `\ensuremath` in LaTeX and `$...$` in the HTML viewer. |
 | `description` | yes | A one-sentence LaTeX description shown in the HTML viewer |
 
 ```yaml
 games:
   - label: G0
-    latex_name: '$\indcca_\QSH^\adv.\REAL()$'
+    latex_name: '\indcca_\QSH^\adv.\REAL()'
     description: 'The starting game (real IND-CCA game).'
 
   - label: G1
-    latex_name: 'Game~1'
+    latex_name: 'G_1'
     description: 'Replace $\key_2$ with a fresh $\key_2^*$ from encapsulation.'
 
   - label: Red2
-    latex_name: 'Reduction $\bdv_2$'
+    latex_name: '\bdv_2'
     description: 'Reduction against $\indcca$ security of $\KEM_2$.'
 
   - label: G2
-    latex_name: 'Game~2'
+    latex_name: 'G_2'
     description: 'Replace challenge key $\key_2^*$ with a uniformly random value.'
 ```
 
@@ -79,7 +79,7 @@ commentary:
     This follows by inlining the decapsulation result.
 ```
 
-Use YAML's literal block scalar (`|`) to preserve newlines. LaTeX environments, math, and display equations all work here.
+Use YAML's literal block scalar (`|`) to preserve newlines. LaTeX environments, math, and display equations all work here. You can use `\tfgamename{G1}` to reference a game's `latex_name` — see [latex-integration.md](latex-integration.md).
 
 ### `figures` (optional)
 

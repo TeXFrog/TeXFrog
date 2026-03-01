@@ -12,7 +12,7 @@ pip install -e ".[dev]"          # if reinstall needed
 
 **Run tests:**
 ```bash
-.venv/bin/pytest tests/ -q       # 56 tests, should all pass
+.venv/bin/pytest tests/ -q       # 68 tests, should all pass
 ```
 
 **Try the tool:**
@@ -31,6 +31,8 @@ System requirements (not pip): `pdflatex`, `pdftocairo` (or `pdf2svg`), `pdfcrop
   the tool filters but never reorders.
 - **`\tfchanged` wrapping skips**: lines ending with `{` (procedure headers) and
   pure comment lines (starting with `%`).
+- **`latex_name` is math-mode content** without `$` delimiters. `\tfgamename{label}`
+  wraps it in `\ensuremath` (LaTeX) or `$...$` (HTML/MathJax).
 - **Blank lines are stripped** from per-game `.tex` output to avoid `varwidth`
   dimension errors inside `pcvstack` environments.
 

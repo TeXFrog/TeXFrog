@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import http.server
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -224,7 +225,7 @@ _HTML_TEMPLATE = """\
   <title>TeXFrog Proof Viewer</title>
   <link rel="stylesheet" href="style.css">
   <script>
-  MathJax = {{ tex: {{ inlineMath: [['$', '$'], ['\\(', '\\)']] }} }};
+  MathJax = {{ tex: {{ inlineMath: [['$', '$'], ['\\\\(', '\\\\)']] }} }};
   </script>
   <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
 </head>
@@ -301,7 +302,7 @@ function init(gamesData) {
   const list = document.getElementById('game-list');
   games.forEach((g, i) => {
     const li = document.createElement('li');
-    li.innerHTML = `<div class="game-label">${g.latex_name}</div>
+    li.innerHTML = `<div class="game-label">$${g.latex_name}$</div>
                     <div class="game-desc">${g.description}</div>`;
     li.onclick = () => showGame(i);
     list.appendChild(li);
@@ -326,7 +327,7 @@ function showGame(idx) {
   });
 
   // Update title
-  document.getElementById('game-title').innerHTML = g.latex_name;
+  document.getElementById('game-title').innerHTML = `$${g.latex_name}$`;
 
   // Update SVG with crossfade
   const container = document.getElementById('game-svg-container');
@@ -419,6 +420,63 @@ document.addEventListener('keydown', e => {
 """
 
 
+def _expand_tfgamename(text: str, game_names: dict[str, str]) -> str:
+    r"""Replace ``\tfgamename{LABEL}`` with the game's ``latex_name``.
+
+    MathJax does not support ``\csname``/``\@nameuse``, so we pre-expand
+    game-name references before the text reaches the HTML viewer.
+    When a ``\tfgamename`` appears outside math mode the replacement is
+    wrapped in ``$…$``; inside an existing math context (``$…$``,
+    ``\(…\)``, or ``\[…\]``) the bare ``latex_name`` is emitted to
+    avoid creating invalid nested delimiters.
+
+    LaTeX comments (``%`` to end-of-line) are passed through without
+    affecting math-mode tracking.
+
+    Args:
+        text: Raw LaTeX/commentary string.
+        game_names: Mapping from game label to ``latex_name``.
+
+    Returns:
+        The text with all recognised ``\tfgamename{…}`` occurrences replaced.
+    """
+    _TOKEN = re.compile(
+        r"(?<!\\)%[^\n]*"              # LaTeX comment: % to end-of-line
+        r"|(?<!\\)\$"                   # unescaped $
+        r"|\\[(\[]"                     # \( or \[
+        r"|\\[)\]]"                     # \) or \]
+        r"|\\tfgamename\{([^}]+)\}"
+    )
+    parts: list[str] = []
+    last_end = 0
+    in_math = False
+    for m in _TOKEN.finditer(text):
+        tok = m.group(0)
+        parts.append(text[last_end:m.start()])
+        if tok.startswith("%"):
+            parts.append(tok)           # pass comment through unchanged
+        elif tok == "$":
+            in_math = not in_math
+            parts.append(tok)
+        elif tok in (r"\(", r"\["):
+            in_math = True
+            parts.append(tok)
+        elif tok in (r"\)", r"\]"):
+            in_math = False
+            parts.append(tok)
+        else:
+            # \tfgamename match
+            label = m.group(1)
+            name = game_names.get(label)
+            if name is None:
+                parts.append(tok)       # leave unrecognised labels unchanged
+            else:
+                parts.append(name if in_math else f"${name}$")
+        last_end = m.end()
+    parts.append(text[last_end:])
+    return "".join(parts)
+
+
 def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
     """Build the interactive HTML proof viewer.
 
@@ -466,18 +524,21 @@ def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
                 )
 
     # Step 3: assemble the site.
+    game_names = {g.label: g.latex_name for g in proof.games}
     games_data = []
     for game in proof.games:
         games_data.append({
             "label": game.label,
             "latex_name": game.latex_name,
-            "description": game.description,
-            "commentary": proof.commentary.get(game.label, ""),
+            "description": _expand_tfgamename(game.description, game_names),
+            "commentary": _expand_tfgamename(
+                proof.commentary.get(game.label, ""), game_names
+            ),
         })
 
     nav_items = "\n".join(
         f'      <li onclick="showGame({i})">'
-        f'<div class="game-label">\\({g["latex_name"]}\\)</div>'
+        f'<div class="game-label">${g["latex_name"]}$</div>'
         f'<div class="game-desc">{g["description"]}</div></li>'
         for i, g in enumerate(games_data)
     )

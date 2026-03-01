@@ -15,56 +15,56 @@ source: games_source.tex
 
 games:
   - label: G0
-    latex_name: '$\INDCPA_\Enc^\Adversary.\mathsf{Real}()$'
-    description: 'The real IND-CPA game: the LR oracle encrypts using the actual PRF.'
+    latex_name: 'G_0'
+    description: '$\INDCPA_\Enc^\Adversary.\mathsf{Real}()$: the real IND-CPA game. The LR oracle encrypts using the actual PRF.'
 
   - label: G1
-    latex_name: 'Game 1'
+    latex_name: 'G_1'
     description: 'Replace $\mathrm{PRF}(k, r)$ with a truly random value.'
 
   - label: G2
-    latex_name: '$\INDCPA_\Enc^\Adversary.\mathsf{Ideal}()$'
-    description: 'The ideal IND-CPA game: ciphertext is uniformly random, independent of $m_b$.'
+    latex_name: 'G_2'
+    description: '$\INDCPA_\Enc^\Adversary.\mathsf{Ideal}()$: the ideal IND-CPA game. Ciphertext is uniformly random, independent of $m_b$.'
 
   - label: Red1
-    latex_name: 'Reduction $\Bdversary_1^{\OPRF}$'
-    description: 'Reduction against PRF security, simulating Games~0 and~1 via an external PRF challenger.'
+    latex_name: '\Bdversary_1'
+    description: 'Reduction against PRF security, simulating Games \tfgamename{G0} and \tfgamename{G1} via an external PRF challenger.'
 
 commentary:
   G0: |
-    The starting game is $\INDCPA_\Enc^\Adversary.\mathsf{Real}()$.
+    The starting game is $\tfgamename{G0} = \INDCPA_\Enc^\Adversary.\mathsf{Real}()$.
     The challenger samples a uniform key $k$ and challenge bit $b$, then
     answers each $\mathsf{LR}(m_0, m_1)$ query with a fresh encryption
     $(r, \mathrm{PRF}(k,r) \oplus m_b)$.
 
   G1: |
     \textbf{Claim.}
-      Games~0 and~1 are computationally indistinguishable assuming $\mathrm{PRF}$
+      Games \tfgamename{G0} and \tfgamename{G1} are computationally indistinguishable assuming $\mathrm{PRF}$
       is a secure pseudorandom function, with advantage gap at most
       $\mathbf{Adv}^{\mathrm{PRF}}(\Bdversary_1)$.
 
-    Reduction $\Bdversary_1$ (shown separately) interacts with an external PRF challenger
+    Reduction \tfgamename{Red1} (shown separately) interacts with an external PRF challenger
     and simulates the LR oracle by forwarding nonces $r$ to that challenger.
-    When the external challenger uses the real PRF, $\Bdversary_1$ exactly simulates
-    Game~0; when it uses a random function, $\Bdversary_1$ exactly simulates Game~1.
+    When the external challenger uses the real PRF, \tfgamename{Red1} exactly simulates
+    \tfgamename{G0}; when it uses a random function, \tfgamename{Red1} exactly simulates \tfgamename{G1}.
 
   G2: |
     \textbf{Claim.}
-      Games~1 and~2 are perfectly indistinguishable.
+      Games \tfgamename{G1} and \tfgamename{G2} are perfectly indistinguishable.
 
-    In Game~1, each query samples a fresh nonce $r$ and then evaluates a random
+    In \tfgamename{G1}, each query samples a fresh nonce $r$ and then evaluates a random
     function at $r$, yielding a uniform $y$ independent of all previous queries
     (with overwhelming probability over the choice of $r$).  Since $c = y \oplus m_b$
     with uniform $y$, the ciphertext $c$ is uniformly distributed regardless of $m_b$.
-    Game~2 makes this explicit by sampling $c$ directly.
+    Game \tfgamename{G2} makes this explicit by sampling $c$ directly.
 
-    In Game~2 the adversary's view is identically distributed for $b = 0$ and $b = 1$,
+    In Game \tfgamename{G2} the adversary's view is identically distributed for $b = 0$ and $b = 1$,
     so $\Pr[b' = b] = \tfrac{1}{2}$ and the IND-CPA advantage is~$0$.
 
   Red1: |
-    The reduction $\Bdversary_1$ receives no PRF key; instead it routes each nonce $r$
+    The reduction \tfgamename{Red1} receives no PRF key; instead it routes each nonce $r$
     to the external PRF oracle $\OPRF$.  All other bookkeeping (sampling $b$,
-    running $\Adversary$, checking the guess) is identical to Games~0 and~1.
+    running $\Adversary$, checking the guess) is identical to Games \tfgamename{G0} and \tfgamename{G1}.
 
 figures:
   - label: all_games

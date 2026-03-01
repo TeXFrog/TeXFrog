@@ -26,7 +26,7 @@ The simplest way to include the full proof in your paper is to `\input` the harn
 ```
 
 The harness automatically:
-1. Defines the `\tfchanged` and `\tfgamelabel` macros (using `\providecommand`, so you can override them)
+1. Defines the `\tfchanged`, `\tfgamelabel`, and `\tfgamename` macros (using `\providecommand`, so you can override them)
 2. `\input`s your macro files
 3. `\input`s each game file and its commentary, in order
 
@@ -80,6 +80,28 @@ This appends a `\pccomment` with the game labels after the line content. Overrid
 \input{output/proof_harness.tex}
 ```
 
+## Referencing Game Names
+
+TeXFrog generates a `\tfgamename{label}` macro that expands to the `latex_name` defined in your YAML config, wrapped in `\ensuremath`. Use it anywhere in your paper to reference a game by its label:
+
+```latex
+In \tfgamename{G1}, we replace the PRF call with a uniformly random value.
+```
+
+This works in both text mode and math mode:
+
+```latex
+% Text mode — \ensuremath enters math for you:
+The advantage gap between \tfgamename{G0} and \tfgamename{G1} is bounded by \ldots
+
+% Math mode — \ensuremath is a no-op:
+$x = \tfgamename{G1}$
+```
+
+The macro is defined using `\providecommand`, so you can override it before `\input`-ing the harness. If you call `\tfgamename` with an undefined label, it silently produces no output.
+
+In the HTML viewer, `\tfgamename{label}` in `description` and `commentary` fields is automatically expanded to `$latex_name$` before MathJax rendering.
+
 ## Including Individual Games
 
 If you want finer control over where each game appears (e.g., interleaved with your own theorem and proof environments), include games individually instead of using the harness. Macro definitions need to come first:
@@ -89,7 +111,9 @@ If you want finer control over where each game appears (e.g., interleaved with y
 \usepackage{xcolor}
 \newcommand{\tfchanged}[1]{\colorbox{blue!15}{$#1$}}
 \newcommand{\tfgamelabel}[2]{#2 \pccomment{#1}}
-\input{macros.tex}         % your macro files
+\input{output/proof_harness.tex}  % defines \tfgamename and \inputs macros
+% Or define macros manually:
+% \input{macros.tex}
 
 % Then, where you want each game:
 \input{output/G0.tex}

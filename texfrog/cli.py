@@ -26,7 +26,7 @@ def main() -> None:
     "-o", "--output-dir",
     metavar="DIR",
     default=None,
-    help="Output directory (default: texfrog_output/ next to INPUT.yaml).",
+    help="Output directory (default: texfrog_latex/ next to INPUT.yaml).",
 )
 def latex_cmd(input_yaml: str, output_dir: str | None) -> None:
     """Generate LaTeX output for all games, commentaries, harness, and figures.
@@ -35,7 +35,7 @@ def latex_cmd(input_yaml: str, output_dir: str | None) -> None:
     """
     yaml_path = Path(input_yaml).resolve()
     if output_dir is None:
-        out = yaml_path.parent / "texfrog_output"
+        out = yaml_path.parent / "texfrog_latex"
     else:
         out = Path(output_dir).resolve()
 

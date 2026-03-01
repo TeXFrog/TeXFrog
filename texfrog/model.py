@@ -10,7 +10,7 @@ from typing import Optional
 class Game:
     """A single game or reduction in the proof sequence."""
     label: str        # Internal label, e.g. "G0", "Red2"
-    latex_name: str   # LaTeX for rendering the name, e.g. r'$\indcca_\QSH^\adv.\REAL()$'
+    latex_name: str   # Math-mode LaTeX for the name (no $ delimiters), e.g. r'\indcca_\QSH^\adv.\REAL()'
     description: str  # One-sentence LaTeX description
 
 

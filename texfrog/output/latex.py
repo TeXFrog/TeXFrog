@@ -76,6 +76,15 @@ def _write_harness_file(proof: Proof, output_dir: Path, out_path: Path) -> None:
         "% Default game label macro for consolidated figures:\n",
         r"\providecommand{\tfgamelabel}[2]{#2 \pccomment{#1}}" + "\n",
         "%\n",
+        "% Game name lookup macro (use \\tfgamename{label} in your paper):\n",
+        r"\makeatletter" + "\n",
+        r"\providecommand{\tfgamename}[1]{\ensuremath{\@nameuse{tfgn@#1}}}" + "\n",
+    ]
+    for game in proof.games:
+        lines.append(f"\\@namedef{{tfgn@{game.label}}}{{{game.latex_name}}}\n")
+    lines += [
+        r"\makeatother" + "\n",
+        "%\n",
     ]
 
     # Macro files (paths relative to harness location)
@@ -169,7 +178,9 @@ def _write_consolidated_figure(
             # Present in only some games — annotate.
             # Build a partial macro including the label arg so that
             # wrap_changed_line can place any trailing \\ *outside* the braces.
-            label_str = ",".join(present_in)
+            label_str = ",".join(
+                rf"\tfgamename{{{lbl}}}" for lbl in present_in
+            )
             partial_macro = f"{_GAMELABEL_MACRO}{{{label_str}}}"
             output_parts.append(wrap_changed_line(sl.content, partial_macro) + "\n")
 

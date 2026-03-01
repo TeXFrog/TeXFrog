@@ -2,3 +2,8 @@
 .venv
 **/__pycache__
 texfrog.egg-info
+.texpadtmp
+example/
+**/texfrog_html/
+**/texfrog_latex/
+
