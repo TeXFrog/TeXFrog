@@ -12,9 +12,11 @@ System requirements (not installed via pip):
 
 from __future__ import annotations
 
+import concurrent.futures
 import http.server
 import importlib.resources
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -141,6 +143,7 @@ def _compile_game_to_svg(
     svg_out_path: Path,
     game_names: dict[str, str] | None = None,
     wrapper_template: str = _WRAPPER_TEMPLATE,
+    converter: str | None = None,
 ) -> None:
     """Compile one game's LaTeX file to an SVG image.
 
@@ -156,12 +159,15 @@ def _compile_game_to_svg(
         wrapper_template: LaTeX wrapper template string. Defaults to
             ``_WRAPPER_TEMPLATE``; use ``_COMMENTARY_WRAPPER_TEMPLATE``
             for prose commentary (uses ``varwidth`` for tight cropping).
+        converter: SVG converter tool name ('pdf2svg' or 'pdftocairo').
+            If ``None``, auto-detected via ``_find_svg_converter()``.
 
     Raises:
         RuntimeError: If pdflatex or SVG conversion fails.
         EnvironmentError: If required tools are not found.
     """
-    converter = _find_svg_converter()
+    if converter is None:
+        converter = _find_svg_converter()
     if converter is None:
         raise EnvironmentError(
             "Neither pdf2svg nor pdftocairo found on PATH. "
@@ -345,6 +351,19 @@ def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
     games_dir = output_dir / "games"
     games_dir.mkdir(exist_ok=True)
 
+    # Check required tools upfront (once) before spawning worker threads.
+    converter = _find_svg_converter()
+    if converter is None:
+        raise EnvironmentError(
+            "Neither pdf2svg nor pdftocairo found on PATH. "
+            "Install one of them to generate the HTML site."
+        )
+    if shutil.which("pdflatex") is None:
+        raise EnvironmentError(
+            "pdflatex not found on PATH. "
+            "Install a TeX distribution (e.g. TeX Live or MacTeX)."
+        )
+
     # Step 1: generate LaTeX files in a temp directory.
     with tempfile.TemporaryDirectory() as tmp:
         latex_dir = Path(tmp)
@@ -364,80 +383,70 @@ def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
                 macro=r"\tfremoved",
             )
 
-        # Step 2: compile each game to SVG (highlighted + clean).
+        # Step 2: compile all games to SVG in parallel.
         _placeholder_svg = (
             '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="60">'
             '<text x="10" y="40" font-family="monospace" font-size="14">'
             '[SVG render failed for {label}]</text></svg>'
         )
+        game_names = {g.label: g.latex_name for g in proof.games}
+
+        # Collect all compilation tasks as (task_label, tex_path, svg_path,
+        # game_names_arg, wrapper_template) tuples.
+        tasks: list[tuple[str, Path, Path, dict[str, str] | None, str]] = []
         for i, game in enumerate(proof.games):
             label = game.label
             # Highlighted version
-            print(f"  Compiling {label} …", file=sys.stderr)
-            game_tex = latex_dir / f"{label}.tex"
-            svg_path = games_dir / f"{label}.svg"
-            try:
-                _compile_game_to_svg(
-                    label,
-                    game_tex.resolve(),
-                    proof.macros,
-                    proof_dir,
-                    svg_path,
-                )
-            except (RuntimeError, EnvironmentError) as exc:
-                print(f"    Warning: could not render {label}: {exc}", file=sys.stderr)
-                svg_path.write_text(
-                    _placeholder_svg.format(label=label), encoding="utf-8",
-                )
-
+            tasks.append((
+                label,
+                (latex_dir / f"{label}.tex").resolve(),
+                games_dir / f"{label}.svg",
+                None,
+                _WRAPPER_TEMPLATE,
+            ))
             # Removed (red strikethrough) version — needed for all but the last game.
             if i < len(proof.games) - 1:
-                print(f"  Compiling {label} (removed) …", file=sys.stderr)
-                removed_tex = latex_dir / f"{label}-removed.tex"
-                removed_svg = games_dir / f"{label}-removed.svg"
-                try:
-                    _compile_game_to_svg(
-                        f"{label}-removed",
-                        removed_tex.resolve(),
-                        proof.macros,
-                        proof_dir,
-                        removed_svg,
-                    )
-                except (RuntimeError, EnvironmentError) as exc:
-                    print(f"    Warning: could not render {label} (removed): {exc}",
-                          file=sys.stderr)
-                    removed_svg.write_text(
-                        _placeholder_svg.format(label=f"{label}-removed"),
-                        encoding="utf-8",
-                    )
+                tasks.append((
+                    f"{label}-removed",
+                    (latex_dir / f"{label}-removed.tex").resolve(),
+                    games_dir / f"{label}-removed.svg",
+                    None,
+                    _WRAPPER_TEMPLATE,
+                ))
+            # Commentary
+            commentary = proof.commentary.get(label, "")
+            if commentary.strip():
+                tasks.append((
+                    f"{label}_commentary",
+                    (latex_dir / f"{label}_commentary.tex").resolve(),
+                    games_dir / f"{label}_commentary.svg",
+                    game_names,
+                    _COMMENTARY_WRAPPER_TEMPLATE,
+                ))
 
-        # Step 2b: compile commentary to SVG.
-        game_names = {g.label: g.latex_name for g in proof.games}
-        for game in proof.games:
-            commentary = proof.commentary.get(game.label, "")
-            if not commentary.strip():
-                continue
-            label = game.label
-            print(f"  Compiling {label} commentary …", file=sys.stderr)
-            commentary_tex = latex_dir / f"{label}_commentary.tex"
-            commentary_svg = games_dir / f"{label}_commentary.svg"
+        def _compile_task(
+            task: tuple[str, Path, Path, dict[str, str] | None, str],
+        ) -> None:
+            task_label, tex_path, svg_path, gn, tmpl = task
+            print(f"  Compiling {task_label} …", file=sys.stderr)
             try:
                 _compile_game_to_svg(
-                    f"{label}_commentary",
-                    commentary_tex.resolve(),
-                    proof.macros,
-                    proof_dir,
-                    commentary_svg,
-                    game_names=game_names,
-                    wrapper_template=_COMMENTARY_WRAPPER_TEMPLATE,
+                    task_label, tex_path, proof.macros, proof_dir,
+                    svg_path, game_names=gn, wrapper_template=tmpl,
+                    converter=converter,
                 )
             except (RuntimeError, EnvironmentError) as exc:
-                print(f"    Warning: could not render {label} commentary: {exc}",
-                      file=sys.stderr)
-                commentary_svg.write_text(
-                    _placeholder_svg.format(label=f"{label}_commentary"),
-                    encoding="utf-8",
+                print(
+                    f"    Warning: could not render {task_label}: {exc}",
+                    file=sys.stderr,
                 )
+                svg_path.write_text(
+                    _placeholder_svg.format(label=task_label), encoding="utf-8",
+                )
+
+        max_workers = min(len(tasks), os.cpu_count() or 4)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
+            list(pool.map(_compile_task, tasks))
 
     # Step 3: assemble the site.
     game_names = {g.label: g.latex_name for g in proof.games}
