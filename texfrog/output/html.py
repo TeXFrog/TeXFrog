@@ -282,8 +282,9 @@ body { display: flex; height: 100vh; font-family: sans-serif; }
 #game-title { flex: 1; text-align: center; font-size: 1.1rem; }
 #game-display { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex;
                 flex-direction: column; gap: 1.5rem; }
-#game-svg-container { text-align: center; zoom: 1.2; }
-#game-svg-container img, #game-svg-container svg { max-width: 100%; }
+#game-svg-container { text-align: center; zoom: 1.2; display: grid; }
+.svg-layer { grid-area: 1 / 1; transition: opacity 1s ease; }
+.svg-layer img, .svg-layer svg { max-width: 100%; }
 #commentary-box { background: #fafafa; border: 1px solid #ddd; border-radius: 6px;
                   padding: 1rem; font-size: 0.9rem; line-height: 1.6; }
 #commentary-box:empty { display: none; }
@@ -292,6 +293,8 @@ body { display: flex; height: 100vh; font-family: sans-serif; }
 _JS = """\
 let currentIndex = 0;
 let games = [];
+let isFirstLoad = true;
+let fadeTimer = null;
 
 function init(gamesData) {
   games = gamesData;
@@ -325,9 +328,67 @@ function showGame(idx) {
   // Update title
   document.getElementById('game-title').innerHTML = g.latex_name;
 
-  // Update SVG
+  // Update SVG with crossfade
   const container = document.getElementById('game-svg-container');
-  container.innerHTML = `<img src="games/${g.label}.svg" alt="${g.label}">`;
+
+  // Cancel any in-progress transition cleanup
+  if (fadeTimer !== null) {
+    clearTimeout(fadeTimer);
+    fadeTimer = null;
+  }
+
+  // Remove all layers except the most recent one (handles rapid clicking)
+  const existingLayers = Array.from(container.querySelectorAll('.svg-layer'));
+  if (existingLayers.length > 1) {
+    for (let i = 0; i < existingLayers.length - 1; i++) {
+      existingLayers[i].remove();
+    }
+  }
+  const oldLayer = container.querySelector('.svg-layer');
+
+  // Create the new layer
+  const newLayer = document.createElement('div');
+  newLayer.className = 'svg-layer';
+  const img = new Image();
+  img.alt = g.label;
+  img.src = `games/${g.label}.svg`;
+
+  if (isFirstLoad || !oldLayer) {
+    // First load or empty container: show immediately, no animation
+    newLayer.style.opacity = '1';
+    newLayer.appendChild(img);
+    container.appendChild(newLayer);
+    isFirstLoad = false;
+  } else {
+    // Crossfade transition
+    newLayer.style.opacity = '0';
+    newLayer.appendChild(img);
+    container.appendChild(newLayer);
+
+    const startFade = () => {
+      // Double rAF ensures the browser has painted opacity:0 before transitioning
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          newLayer.style.opacity = '1';
+          oldLayer.style.opacity = '0';
+          fadeTimer = setTimeout(() => {
+            oldLayer.remove();
+            fadeTimer = null;
+          }, 1050);
+        });
+      });
+    };
+
+    if (img.complete) {
+      startFade();
+    } else {
+      img.onload = startFade;
+      img.onerror = () => {
+        newLayer.style.opacity = '1';
+        if (oldLayer) oldLayer.remove();
+      };
+    }
+  }
 
   // Update commentary
   const box = document.getElementById('commentary-box');
