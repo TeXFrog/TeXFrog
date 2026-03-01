@@ -6,4 +6,4 @@ texfrog.egg-info
 example/
 **/texfrog_html/
 **/texfrog_latex/
-
+bundle_preview.sh
