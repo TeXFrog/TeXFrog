@@ -69,10 +69,10 @@ Or suppress highlighting entirely (useful for the final paper version where you 
 In consolidated figures, lines that appear in only some of the selected games are annotated with `\tfgamelabel{labels}{content}`. The default:
 
 ```latex
-\providecommand{\tfgamelabel}[2]{#2\;{\scriptsize\textit{[#1]}}}
+\providecommand{\tfgamelabel}[2]{#2 \pccomment{#1}}
 ```
 
-This appends a small italic label like `[G1,G3]` after the line content. Override before the harness to change the appearance:
+This appends a `\pccomment` with the game labels after the line content. Override before the harness to change the appearance:
 
 ```latex
 % Use a margin note instead:
@@ -88,7 +88,7 @@ If you want finer control over where each game appears (e.g., interleaved with y
 % In your preamble:
 \usepackage{xcolor}
 \newcommand{\tfchanged}[1]{\colorbox{blue!15}{$#1$}}
-\newcommand{\tfgamelabel}[2]{#2\;{\scriptsize\textit{[#1]}}}
+\newcommand{\tfgamelabel}[2]{#2 \pccomment{#1}}
 \input{macros.tex}         % your macro files
 
 % Then, where you want each game:

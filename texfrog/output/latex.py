@@ -74,7 +74,7 @@ def _write_harness_file(proof: Proof, output_dir: Path, out_path: Path) -> None:
         "% Default highlight macro for changed lines:\n",
         r"\providecommand{\tfchanged}[1]{\colorbox{blue!15}{$#1$}}" + "\n",
         "% Default game label macro for consolidated figures:\n",
-        r"\providecommand{\tfgamelabel}[2]{#2\;{\scriptsize\textit{[#1]}}}" + "\n",
+        r"\providecommand{\tfgamelabel}[2]{#2 \pccomment{#1}}" + "\n",
         "%\n",
     ]
 
@@ -124,19 +124,19 @@ def _write_consolidated_figure(
     """
     n = len(game_labels)
 
-    # Build per-game filtered line sets for membership testing.
-    # We use a list of frozensets of content strings for each game.
-    per_game_lines: list[list[str]] = [
-        filter_for_game(proof.source_lines, lbl) for lbl in game_labels
-    ]
-
     # For the consolidated view, iterate over the UNION of all included lines
     # in their original source order.
     output_parts: list[str] = [
         f"% TeXFrog consolidated figure: {figure_label} ({', '.join(game_labels)})\n"
     ]
 
-    # Track which source lines are included by at least one game.
+    # Procedure headers (lines ending with "{") require special handling: a
+    # \procedure environment can only be opened once, so consecutive game-specific
+    # header variants must collapse to a single line.  We track whether the
+    # previous emitted-or-skipped line was a procedure header; when it was, any
+    # further procedure-header variant is silently dropped.
+    last_was_proc_header = False
+
     for sl in proof.source_lines:
         # Determine which of the selected games include this line.
         present_in: list[str] = []
@@ -147,17 +147,64 @@ def _write_consolidated_figure(
         if not present_in:
             continue  # No selected game includes this line
 
-        if len(present_in) == n:
-            # Present in ALL selected games — no annotation needed.
+        # Skip blank lines — same reason as _write_game_file: varwidth inside
+        # pcvstack chokes on blank lines and raises "Dimension too large".
+        if not sl.content.strip():
+            continue
+
+        is_proc_header = sl.content.rstrip().endswith("{")
+
+        if is_proc_header and last_was_proc_header:
+            # Subsequent variant in a procedure-header slot — skip it so that
+            # only one \procedure command appears in the consolidated output.
+            continue
+
+        last_was_proc_header = is_proc_header
+
+        if len(present_in) == n or is_proc_header:
+            # Present in ALL selected games, or is a procedure header that must
+            # not be annotated — output verbatim.
             output_parts.append(sl.content + "\n")
         else:
             # Present in only some games — annotate.
+            # Build a partial macro including the label arg so that
+            # wrap_changed_line can place any trailing \\ *outside* the braces.
             label_str = ",".join(present_in)
-            output_parts.append(
-                f"{_GAMELABEL_MACRO}{{{label_str}}}{{{sl.content}}}\n"
-            )
+            partial_macro = f"{_GAMELABEL_MACRO}{{{label_str}}}"
+            output_parts.append(wrap_changed_line(sl.content, partial_macro) + "\n")
 
-    out_path.write_text("".join(output_parts), encoding="utf-8")
+    # Post-processing: insert \\ between consecutive procedure-body lines that
+    # lack one.  This can happen when multiple game-variant "last lines" (which
+    # have no \\ in the source, since they end their respective game's body)
+    # all appear together in the consolidated output.
+    final_parts: list[str] = []
+    for i, raw in enumerate(output_parts):
+        line = raw.rstrip("\n")
+        stripped = line.strip()
+
+        # Only consider adding \\ to lines that are pseudocode content:
+        # not empty, not a comment, not a structural brace/environment line,
+        # and not already ending with \\.
+        if (
+            stripped
+            and not stripped.startswith("%")
+            and stripped != "}"
+            and not stripped.startswith("\\begin{")
+            and not stripped.startswith("\\end{")
+            and not line.rstrip().endswith("{")
+            and not line.rstrip().endswith("\\\\")
+        ):
+            # Look ahead to the next non-comment content line.
+            for j in range(i + 1, len(output_parts)):
+                nc = output_parts[j].strip()
+                if nc and not nc.startswith("%"):
+                    if nc != "}" and not nc.startswith("\\end{"):
+                        line = line.rstrip() + " \\\\"
+                    break
+
+        final_parts.append(line + "\n")
+
+    out_path.write_text("".join(final_parts), encoding="utf-8")
 
 
 def generate_latex(proof: Proof, output_dir: Path) -> None:

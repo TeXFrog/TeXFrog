@@ -209,3 +209,104 @@ def test_consolidated_line_only_in_missing_game_skipped(tmp_path):
     # "only_g1" is tagged for G1 and G2; figure is G0,G2; so only_g1 appears for G2
     # It should still be included (annotated with G2)
     assert "only_g1" in text
+
+
+# ---------------------------------------------------------------------------
+# Consolidated figures — LaTeX correctness
+# ---------------------------------------------------------------------------
+
+
+def _make_figure_proof(source_lines, game_labels):
+    """Build a minimal Proof with one consolidated figure over the given games."""
+    games = [Game(label=lbl, latex_name=lbl, description="") for lbl in game_labels]
+    return Proof(
+        macros=[],
+        games=games,
+        source_lines=source_lines,
+        commentary={},
+        figures=[Figure(label="main", games=list(game_labels))],
+    )
+
+
+def test_consolidated_proc_headers_collapse_to_one(tmp_path):
+    """Game-specific \\procedure headers in a slot must collapse to a single line."""
+    source_lines = [
+        SourceLine(r"    \procedure{G0 title}{", frozenset({"G0"}), ""),
+        SourceLine(r"    \procedure{G1 title}{", frozenset({"G1"}), ""),
+        SourceLine(r"        body \\", None, ""),
+        SourceLine(r"    }", None, ""),
+    ]
+    proof = _make_figure_proof(source_lines, ["G0", "G1"])
+    generate_latex(proof, tmp_path)
+    text = (tmp_path / "fig_main.tex").read_text()
+    proc_lines = [l for l in text.splitlines() if r"\procedure" in l]
+    assert len(proc_lines) == 1
+
+
+def test_consolidated_proc_header_not_annotated(tmp_path):
+    """A game-specific \\procedure header must not be wrapped in \\tfgamelabel."""
+    source_lines = [
+        SourceLine(r"    \procedure{G0 title}{", frozenset({"G0"}), ""),
+        SourceLine(r"    \procedure{G1 title}{", frozenset({"G1"}), ""),
+        SourceLine(r"        body \\", None, ""),
+        SourceLine(r"    }", None, ""),
+    ]
+    proof = _make_figure_proof(source_lines, ["G0", "G1"])
+    generate_latex(proof, tmp_path)
+    text = (tmp_path / "fig_main.tex").read_text()
+    proc_lines = [l for l in text.splitlines() if r"\procedure" in l]
+    assert proc_lines
+    assert r"\tfgamelabel" not in proc_lines[0]
+
+
+def test_consolidated_blank_lines_skipped(tmp_path):
+    """Blank source lines must not appear in the consolidated figure output."""
+    source_lines = [
+        SourceLine(r"    body \\", None, ""),
+        SourceLine("", None, ""),  # blank
+        SourceLine(r"    end", None, ""),
+    ]
+    proof = _make_figure_proof(source_lines, ["G0", "G1"])
+    generate_latex(proof, tmp_path)
+    text = (tmp_path / "fig_main.tex").read_text()
+    assert "\n\n" not in text
+
+
+def test_consolidated_trailing_backslash_outside_macro(tmp_path):
+    r"""Trailing \\ must be placed outside \tfgamelabel{}{}, not inside the braces."""
+    source_lines = [
+        SourceLine(r"    tagged \\", frozenset({"G0"}), ""),
+        SourceLine(r"    end", None, ""),
+    ]
+    proof = _make_figure_proof(source_lines, ["G0", "G1"])
+    generate_latex(proof, tmp_path)
+    text = (tmp_path / "fig_main.tex").read_text()
+    tagged_lines = [l for l in text.splitlines() if "tagged" in l]
+    assert tagged_lines
+    line = tagged_lines[0]
+    assert r"\tfgamelabel" in line
+    # \\ must appear after the closing } of \tfgamelabel's second argument
+    assert r"tagged} \\" in line
+
+
+def test_consolidated_last_line_variants_separator_added(tmp_path):
+    r"""Variant 'last lines' with no \\ in source get \\ inserted between them."""
+    source_lines = [
+        SourceLine(r"    \procedure{Title}{", None, ""),
+        SourceLine(r"        body \\", None, ""),
+        SourceLine(r"        \pcreturn A", frozenset({"G0"}), ""),  # no \\
+        SourceLine(r"        \pcreturn B", frozenset({"G1"}), ""),  # no \\
+        SourceLine(r"    }", None, ""),
+    ]
+    proof = _make_figure_proof(source_lines, ["G0", "G1"])
+    generate_latex(proof, tmp_path)
+    text = (tmp_path / "fig_main.tex").read_text()
+    lines = text.splitlines()
+
+    g0_line = next((l for l in lines if "pcreturn A" in l), None)
+    g1_line = next((l for l in lines if "pcreturn B" in l), None)
+    assert g0_line is not None and g1_line is not None
+    # G0's return is followed by more content → needs \\
+    assert g0_line.rstrip().endswith("\\\\")
+    # G1's return is the last before } → no \\
+    assert not g1_line.rstrip().endswith("\\\\")

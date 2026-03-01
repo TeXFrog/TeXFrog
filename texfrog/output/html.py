@@ -45,7 +45,7 @@ _WRAPPER_TEMPLATE = r"""\documentclass{{article}}
 \newcommand{{\graybox}}[1]{{\adjustbox{{cframe=black!15, bgcolor=black!15}}{{\strut #1}}}}
 \newcommand{{\highlightbox}}[2][RoyalBlue!20]{{\adjustbox{{cframe=#1, bgcolor=#1}}{{\strut #2}}}}
 \newcommand{{\tfchanged}}[1]{{\highlightbox{{\ensuremath{{#1}}}}}}
-\newcommand{{\tfgamelabel}}[2]{{#2\;{{\scriptsize\textit{{[#1]}}}}}}
+\newcommand{{\tfgamelabel}}[2]{{#2 \pccomment{{#1}}}}
 {macro_inputs}
 \pagestyle{{empty}}
 \begin{{document}}
@@ -233,7 +233,6 @@ _HTML_TEMPLATE = """\
   <div id="nav">
     <h2>Games</h2>
     <ul id="game-list">
-      {nav_items}
     </ul>
   </div>
   <div id="main">

@@ -1,0 +1,73 @@
+# TeXFrog tutorial proof: IND-CPA security of PRF-based symmetric encryption.
+#
+# Scheme: Enc(k, m) = (r, PRF(k, r) xor m),  r fresh per encryption.
+#
+# This tutorial example has 3 games and 1 reduction.  It illustrates:
+#   - Lines that appear in every game (no %:tags: comment in source.tex)
+#   - Lines that appear only in some games (with %:tags:)
+#   - Tag ranges: G0-G2 means G0, G1, G2 (resolved by position in the list below)
+#   - A reduction that shares pseudocode structure with its adjacent games
+
+macros:
+  - macros.tex
+
+source: source.tex
+
+games:
+  - label: G0
+    latex_name: '$\INDCPA_\Enc^\Adversary.\mathsf{Real}()$'
+    description: 'The real IND-CPA game: the LR oracle encrypts using the actual PRF.'
+
+  - label: G1
+    latex_name: 'Game~1'
+    description: 'Replace $\mathrm{PRF}(k, r)$ with a truly random value.'
+
+  - label: G2
+    latex_name: '$\INDCPA_\Enc^\Adversary.\mathsf{Ideal}()$'
+    description: 'The ideal IND-CPA game: ciphertext is uniformly random, independent of $m_b$.'
+
+  - label: Red1
+    latex_name: 'Reduction $\Bdversary_1^{\OPRF}$'
+    description: 'Reduction against PRF security, simulating Games~0 and~1 via an external PRF challenger.'
+
+commentary:
+  G0: |
+    The starting game is $\INDCPA_\Enc^\Adversary.\mathsf{Real}()$.
+    The challenger samples a uniform key $k$ and challenge bit $b$, then
+    answers each $\mathsf{LR}(m_0, m_1)$ query with a fresh encryption
+    $(r, \mathrm{PRF}(k,r) \oplus m_b)$.
+
+  G1: |
+    \begin{claim}
+      Games~0 and~1 are computationally indistinguishable assuming $\mathrm{PRF}$
+      is a secure pseudorandom function, with advantage gap at most
+      $\mathbf{Adv}^{\mathrm{PRF}}(\Bdversary_1)$.
+    \end{claim}
+
+    Reduction $\Bdversary_1$ (shown separately) interacts with an external PRF challenger
+    and simulates the LR oracle by forwarding nonces $r$ to that challenger.
+    When the external challenger uses the real PRF, $\Bdversary_1$ exactly simulates
+    Game~0; when it uses a random function, $\Bdversary_1$ exactly simulates Game~1.
+
+  G2: |
+    \begin{claim}
+      Games~1 and~2 are perfectly indistinguishable.
+    \end{claim}
+
+    In Game~1, each query samples a fresh nonce $r$ and then evaluates a random
+    function at $r$, yielding a uniform $y$ independent of all previous queries
+    (with overwhelming probability over the choice of $r$).  Since $c = y \oplus m_b$
+    with uniform $y$, the ciphertext $c$ is uniformly distributed regardless of $m_b$.
+    Game~2 makes this explicit by sampling $c$ directly.
+
+    In Game~2 the adversary's view is identically distributed for $b = 0$ and $b = 1$,
+    so $\Pr[b' = b] = \tfrac{1}{2}$ and the IND-CPA advantage is~$0$.
+
+  Red1: |
+    The reduction $\Bdversary_1$ receives no PRF key; instead it routes each nonce $r$
+    to the external PRF oracle $\OPRF$.  All other bookkeeping (sampling $b$,
+    running $\Adversary$, checking the guess) is identical to Games~0 and~1.
+
+figures:
+  - label: all_games
+    games: "G0,G1,G2,Red1"
