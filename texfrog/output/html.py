@@ -13,6 +13,7 @@ System requirements (not installed via pip):
 from __future__ import annotations
 
 import http.server
+import importlib.resources
 import json
 import re
 import shutil
@@ -24,7 +25,7 @@ import webbrowser
 from pathlib import Path
 from typing import Optional
 
-from jinja2 import Environment, PackageLoader, select_autoescape
+from jinja2 import Environment, PackageLoader
 
 from ..filter import compute_removed_lines, filter_for_game
 from ..model import Proof
@@ -258,195 +259,16 @@ def _extract_mathjax_macros(macro_paths: list[str], proof_dir: Path) -> str:
     return "\n".join(collected)
 
 
-_HTML_TEMPLATE = """\
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TeXFrog Proof Viewer</title>
-  <link rel="stylesheet" href="style.css">
-  <script>
-  MathJax = {{ tex: {{ inlineMath: [['$', '$'], ['\\\\(', '\\\\)']] }} }};
-  </script>
-  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
-</head>
-<body>
-  <!-- Hidden block so MathJax learns user-defined macros before rendering -->
-  <div id="mathjax-macros" style="display:none">\\[
-{mathjax_macros}
-  \\]</div>
-  <div id="nav">
-    <h2>Games</h2>
-    <ul id="game-list">
-    </ul>
-  </div>
-  <div id="main">
-    <div id="controls">
-      <button id="btn-prev" onclick="navigate(-1)">&#8592; Prev</button>
-      <div id="title-block">
-        <span id="game-title"></span>
-        <div id="game-subtitle"></div>
-      </div>
-      <button id="btn-next" onclick="navigate(+1)">Next &#8594;</button>
-    </div>
-    <div id="game-display">
-      <div id="game-svg-container"></div>
-      <div id="commentary-box"></div>
-    </div>
-  </div>
-  <script src="app.js"></script>
-  <script>
-    const GAMES = {games_json};
-    init(GAMES);
-  </script>
-</body>
-</html>
-"""
+_jinja_env = Environment(
+    loader=PackageLoader("texfrog.output", "templates"),
+    autoescape=False,
+)
 
-_CSS = """\
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { display: flex; height: 100vh; font-family: sans-serif; }
-#nav { width: 260px; min-width: 200px; background: #f4f4f4; border-right: 1px solid #ccc;
-       overflow-y: auto; padding: 1rem; }
-#nav h2 { font-size: 1rem; margin-bottom: 0.75rem; color: #555; text-transform: uppercase;
-           letter-spacing: 0.05em; }
-#game-list { list-style: none; }
-#game-list li { cursor: pointer; padding: 0.5rem 0.75rem; border-radius: 4px;
-                margin-bottom: 0.25rem; transition: background 0.15s; }
-#game-list li:hover { background: #e0e0e0; }
-#game-list li.active { background: #4a90d9; color: #fff; }
-#game-list .game-label { font-weight: bold; font-size: 0.9rem; }
-#game-list .game-desc { font-size: 0.75rem; color: inherit; opacity: 0.8;
-                         margin-top: 0.2rem; }
-#main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-#controls { display: flex; align-items: center; padding: 0.75rem 1rem;
-            border-bottom: 1px solid #ccc; gap: 1rem; }
-#controls button { padding: 0.4rem 1rem; border: 1px solid #aaa; border-radius: 4px;
-                   background: #fff; cursor: pointer; font-size: 0.95rem; }
-#controls button:hover { background: #e8e8e8; }
-#title-block { flex: 1; text-align: center; height: 3.8rem; display: flex;
-               flex-direction: column; justify-content: center; }
-#game-title { font-size: 1.1rem; }
-#game-subtitle { font-size: 0.8rem; color: #666; margin-top: 0.4rem;
-                 line-height: 1.3; }
-#game-display { flex: 1; overflow-y: auto; padding: 1.5rem; display: flex;
-                flex-direction: column; gap: 1.5rem; align-items: center; }
-#game-svg-container { display: flex; gap: 0.5rem; justify-content: center;
-                      overflow-x: auto; }
-.game-panel { text-align: center; flex-shrink: 0; }
-.game-panel-header { font-size: 1rem; margin-bottom: 0.25rem; color: #333; }
-.game-panel img { zoom: 1.25; }
-#commentary-box { background: #fafafa; border: 1px solid #ddd; border-radius: 6px;
-                  padding: 1rem; text-align: center; display: inline-block; }
-#commentary-box:empty { display: none; }
-#commentary-box img { height: auto; display: inline-block; zoom: 1.33; }
-"""
 
-_JS = """\
-let currentIndex = 0;
-let games = [];
-
-function init(gamesData) {
-  games = gamesData;
-  const list = document.getElementById('game-list');
-  games.forEach((g, i) => {
-    const li = document.createElement('li');
-    li.innerHTML = `<div class="game-label">$${g.latex_name}$</div>
-                    <div class="game-desc">${g.description}</div>`;
-    li.onclick = () => showGame(i);
-    list.appendChild(li);
-  });
-  // Navigate to hash or first game
-  const hash = window.location.hash.slice(1);
-  const idx = hash ? games.findIndex(g => g.label === hash) : -1;
-  showGame(idx >= 0 ? idx : 0);
-}
-
-function makePanel(label, latexName, svgSrc) {
-  const panel = document.createElement('div');
-  panel.className = 'game-panel';
-  const header = document.createElement('div');
-  header.className = 'game-panel-header';
-  header.innerHTML = `$${latexName}$`;
-  panel.appendChild(header);
-  const img = new Image();
-  img.alt = label;
-  img.src = svgSrc;
-  panel.appendChild(img);
-  return panel;
-}
-
-function showGame(idx) {
-  if (idx < 0 || idx >= games.length) return;
-  currentIndex = idx;
-
-  const g = games[idx];
-  window.location.hash = g.label;
-
-  // Update nav highlight
-  document.querySelectorAll('#game-list li').forEach((li, i) => {
-    li.classList.toggle('active', i === idx);
-    if (i === idx) li.scrollIntoView({ block: 'nearest' });
-  });
-
-  // Update title and subtitle
-  document.getElementById('game-title').innerHTML = `$${g.latex_name}$`;
-  document.getElementById('game-subtitle').innerHTML = g.description || '';
-
-  // Build side-by-side display
-  const container = document.getElementById('game-svg-container');
-  container.innerHTML = '';
-
-  if (idx > 0 && !g.reduction) {
-    // Show previous game (with red strikethrough on removed lines) on the left
-    const prev = games[idx - 1];
-    container.appendChild(
-      makePanel(prev.label, prev.latex_name, `games/${prev.label}-removed.svg`)
-    );
-  }
-
-  // Current game (with highlights) on the right, or alone for first game / reductions
-  container.appendChild(
-    makePanel(g.label, g.latex_name, `games/${g.label}.svg`)
-  );
-
-  // Update commentary (rendered as SVG image)
-  const box = document.getElementById('commentary-box');
-  if (g.has_commentary) {
-    const img = new Image();
-    img.alt = g.label + ' commentary';
-    img.src = `games/${g.label}_commentary.svg`;
-    box.innerHTML = '';
-    box.appendChild(img);
-  } else {
-    box.innerHTML = '';
-  }
-
-  // Re-typeset MathJax
-  if (window.MathJax) {
-    MathJax.typesetPromise([
-      document.getElementById('game-title'),
-      document.getElementById('game-subtitle'),
-      document.getElementById('game-svg-container'),
-      document.getElementById('nav'),
-    ]).catch(console.error);
-  }
-
-  // Update buttons
-  document.getElementById('btn-prev').disabled = (idx === 0);
-  document.getElementById('btn-next').disabled = (idx === games.length - 1);
-}
-
-function navigate(delta) {
-  showGame(currentIndex + delta);
-}
-
-document.addEventListener('keydown', e => {
-  if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') navigate(-1);
-  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') navigate(+1);
-});
-"""
+def _load_template_resource(filename: str) -> str:
+    """Read a static file from the templates package."""
+    ref = importlib.resources.files("texfrog.output.templates").joinpath(filename)
+    return ref.read_text(encoding="utf-8")
 
 
 def _expand_tfgamename(text: str, game_names: dict[str, str]) -> str:
@@ -629,22 +451,19 @@ def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
             "reduction": game.reduction,
         })
 
-    nav_items = "\n".join(
-        f'      <li onclick="showGame({i})">'
-        f'<div class="game-label">${g["latex_name"]}$</div>'
-        f'<div class="game-desc">{g["description"]}</div></li>'
-        for i, g in enumerate(games_data)
-    )
-
-    html = _HTML_TEMPLATE.format(
-        nav_items=nav_items,
+    template = _jinja_env.get_template("index.html.j2")
+    html = template.render(
         games_json=json.dumps(games_data, ensure_ascii=False, indent=2),
         mathjax_macros=_extract_mathjax_macros(proof.macros, proof_dir),
     )
 
     (output_dir / "index.html").write_text(html, encoding="utf-8")
-    (output_dir / "style.css").write_text(_CSS, encoding="utf-8")
-    (output_dir / "app.js").write_text(_JS, encoding="utf-8")
+    (output_dir / "style.css").write_text(
+        _load_template_resource("style.css"), encoding="utf-8"
+    )
+    (output_dir / "app.js").write_text(
+        _load_template_resource("app.js"), encoding="utf-8"
+    )
 
 
 def serve_html(html_dir: Path, port: int = 8080, open_browser: bool = True) -> None:

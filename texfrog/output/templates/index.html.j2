@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TeXFrog Proof Viewer</title>
+  <link rel="stylesheet" href="style.css">
+  <script>
+  MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] } };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async></script>
+</head>
+<body>
+  <!-- Hidden block so MathJax learns user-defined macros before rendering -->
+  <div id="mathjax-macros" style="display:none">\[
+{{ mathjax_macros }}
+  \]</div>
+  <div id="nav">
+    <h2>Games</h2>
+    <ul id="game-list">
+    </ul>
+  </div>
+  <div id="main">
+    <div id="controls">
+      <button id="btn-prev" onclick="navigate(-1)">&#8592; Prev</button>
+      <div id="title-block">
+        <span id="game-title"></span>
+        <div id="game-subtitle"></div>
+      </div>
+      <button id="btn-next" onclick="navigate(+1)">Next &#8594;</button>
+    </div>
+    <div id="game-display">
+      <div id="game-svg-container"></div>
+      <div id="commentary-box"></div>
+    </div>
+  </div>
+  <script src="app.js"></script>
+  <script>
+    const GAMES = {{ games_json }};
+    init(GAMES);
+  </script>
+</body>
+</html>
