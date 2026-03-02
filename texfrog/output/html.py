@@ -487,7 +487,7 @@ def generate_html(
                 label,
                 (latex_dir / f"{label}.tex").resolve(),
                 games_dir / f"{label}.svg",
-                None,
+                game_names,
                 wrapper_template,
             ))
             # Removed (red strikethrough) version — needed for non-reduction
@@ -497,7 +497,7 @@ def generate_html(
                     f"{label}-removed",
                     (latex_dir / f"{label}-removed.tex").resolve(),
                     games_dir / f"{label}-removed.svg",
-                    None,
+                    game_names,
                     wrapper_template,
                 ))
             # Clean (no-highlight) version — needed for related_games display.
@@ -506,7 +506,7 @@ def generate_html(
                     f"{label}-clean",
                     (latex_dir / f"{label}-clean.tex").resolve(),
                     games_dir / f"{label}-clean.svg",
-                    None,
+                    game_names,
                     wrapper_template,
                 ))
             # Commentary
