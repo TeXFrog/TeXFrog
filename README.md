@@ -180,4 +180,4 @@ TeXFrog was originally created by Douglas Stebila, based on discussions with man
 
 ## License
 
-TBD
+Apache License 2.0. See [LICENSE.txt](LICENSE.txt) for details.
