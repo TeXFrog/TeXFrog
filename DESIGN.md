@@ -45,7 +45,7 @@ TeXFrog/
 │   ├── test_parser.py
 │   ├── test_filter.py
 │   └── test_latex_output.py
-├── tutorial/
+├── tutorial-cryptocode/
 │   ├── proof.yaml              # IND-CPA tutorial proof (4 games/reductions, cryptocode)
 │   └── games_source.tex        # Combined tagged source for the tutorial
 ├── tutorial-nicodemus/
@@ -372,10 +372,10 @@ System requirements (not pip-installable):
 
 ## Tutorials and Example Proofs
 
-### `tutorial/` and `tutorial-nicodemus/` — IND-CPA (cryptocode & nicodemus)
+### `tutorial-cryptocode/` and `tutorial-nicodemus/` — IND-CPA (cryptocode & nicodemus)
 
 Both tutorials implement the same small IND-CPA proof (4 entries: G0, G1, Red1, G2)
-for PRF-based symmetric encryption. `tutorial/` uses `package: cryptocode` (default);
+for PRF-based symmetric encryption. `tutorial-cryptocode/` uses `package: cryptocode` (default);
 `tutorial-nicodemus/` uses `package: nicodemus`. Comparing the two shows the syntax
 differences between packages: `\procedure` vs `\begin{nicodemus}`, `\\` vs `\item`,
 `\pcreturn` vs plain `Return`, math-mode content vs text-mode content.

@@ -195,13 +195,13 @@ From the repo root:
 
 ```bash
 # Generate per-game LaTeX files
-texfrog latex tutorial/proof.yaml -o /tmp/tf_tutorial
+texfrog latex tutorial-cryptocode/proof.yaml -o /tmp/tf_tutorial
 
 # Build an interactive HTML viewer
-texfrog html build tutorial/proof.yaml -o /tmp/tf_tutorial_html
+texfrog html build tutorial-cryptocode/proof.yaml -o /tmp/tf_tutorial_html
 
 # Or build and open immediately in your browser
-texfrog html serve tutorial/proof.yaml
+texfrog html serve tutorial-cryptocode/proof.yaml
 ```
 
 ---

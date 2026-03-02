@@ -1,8 +1,8 @@
 # TeXFrog Tutorial (nicodemus)
 
-> **Note:** This tutorial uses the `nicodemus` package. For the same proof using `cryptocode` (the default), see [tutorial/](../tutorial/).
+> **Note:** This tutorial uses the `nicodemus` package. For the same proof using `cryptocode` (the default), see [tutorial-cryptocode/](../tutorial-cryptocode/).
 
-This tutorial contains the same IND-CPA proof as the `tutorial/` directory, rewritten
+This tutorial contains the same IND-CPA proof as the `tutorial-cryptocode/` directory, rewritten
 for the `nicodemus` pseudocode package. Comparing the two shows the key syntax differences.
 
 ## The Proof Scenario
@@ -150,7 +150,7 @@ the highlight macro wraps content directly. The `\item` prefix is kept **outside
 
 - Read [docs/writing-proofs.md](../docs/writing-proofs.md) for the complete reference on
   `proof.yaml` syntax and source-file constraints.
-- See [tutorial/](../tutorial/) for the same proof using the `cryptocode` package (with a
+- See [tutorial-cryptocode/](../tutorial-cryptocode/) for the same proof using the `cryptocode` package (with a
   more detailed walkthrough of all TeXFrog concepts).
 - See [example/](../example/) for a larger proof: a QSH IND-CCA argument with 12 games
   and reductions (using `cryptocode`).

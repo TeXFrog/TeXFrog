@@ -225,9 +225,9 @@ The repository includes tutorials and a larger example:
 
 ### Tutorials (cryptocode and nicodemus)
 
-The `tutorial/` and `tutorial-nicodemus/` directories implement the same small IND-CPA proof (4 games/reductions) using `cryptocode` and `nicodemus` respectively. Comparing the two shows the syntax differences between packages.
+The `tutorial-cryptocode/` and `tutorial-nicodemus/` directories implement the same small IND-CPA proof (4 games/reductions) using `cryptocode` and `nicodemus` respectively. Comparing the two shows the syntax differences between packages.
 
-- [tutorial/proof.yaml](../tutorial/proof.yaml) — cryptocode version
+- [tutorial-cryptocode/proof.yaml](../tutorial-cryptocode/proof.yaml) — cryptocode version
 - [tutorial-nicodemus/proof.yaml](../tutorial-nicodemus/proof.yaml) — nicodemus version with `package: nicodemus`
 
 ### Larger example (cryptocode)
@@ -240,8 +240,8 @@ The `example/` directory contains a QSH IND-CCA proof with 12 entries (G0–G9, 
 To try these:
 
 ```bash
-texfrog latex tutorial/proof.yaml -o /tmp/tf_tutorial
+texfrog latex tutorial-cryptocode/proof.yaml -o /tmp/tf_tutorial
 texfrog latex tutorial-nicodemus/proof.yaml -o /tmp/tf_tutorial_nic
 texfrog latex example/proof.yaml -o /tmp/tf_latex
-texfrog html serve tutorial/proof.yaml
+texfrog html serve tutorial-cryptocode/proof.yaml
 ```

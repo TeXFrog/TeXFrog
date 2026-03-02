@@ -19,7 +19,7 @@ pip install -e ".[dev]"          # if reinstall needed
 ```bash
 .venv/bin/texfrog latex example/proof.yaml -o /tmp/tflatex
 .venv/bin/texfrog html build example/proof.yaml -o /tmp/tfhtml
-.venv/bin/texfrog latex tutorial/proof.yaml -o /tmp/tflatex-tutorial
+.venv/bin/texfrog latex tutorial-cryptocode/proof.yaml -o /tmp/tflatex-tutorial
 .venv/bin/texfrog latex tutorial-nicodemus/proof.yaml -o /tmp/tflatex-tutorial-nic
 ```
 

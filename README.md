@@ -47,7 +47,7 @@ Run TeXFrog on one of the included examples:
 
 ```bash
 # Tutorial: IND-CPA proof (4 games/reductions, available in cryptocode and nicodemus)
-texfrog latex tutorial/proof.yaml -o /tmp/tf_tutorial
+texfrog latex tutorial-cryptocode/proof.yaml -o /tmp/tf_tutorial
 texfrog latex tutorial-nicodemus/proof.yaml -o /tmp/tf_tutorial_nic
 
 # Larger example: QSH IND-CCA proof (12 games/reductions, uses cryptocode)
