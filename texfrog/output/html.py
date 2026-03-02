@@ -589,8 +589,16 @@ def serve_html(html_dir: Path, port: int = 8080, open_browser: bool = True) -> N
         def log_message(self, fmt, *args):
             pass  # silence per-request logging
 
-    server = http.server.HTTPServer(("127.0.0.1", port), _Handler)
-    url = f"http://127.0.0.1:{port}/"
+    for attempt_port in range(port, port + 100):
+        try:
+            server = http.server.HTTPServer(("127.0.0.1", attempt_port), _Handler)
+            break
+        except OSError:
+            continue
+    else:
+        raise RuntimeError(f"Could not find an available port in range {port}–{port + 99}")
+
+    url = f"http://127.0.0.1:{attempt_port}/"
     print(f"Serving proof viewer at {url}  (Ctrl-C to stop)")
 
     if open_browser:
