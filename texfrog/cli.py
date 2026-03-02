@@ -10,12 +10,24 @@ import click
 from .parser import parse_proof, validate_tags
 from .output.latex import generate_latex
 from .templates import get_templates
+from .validate import validate_proof
 
 
 def _show_tag_warnings(proof) -> None:
     """Emit tag validation warnings to stderr."""
     for msg in validate_tags(proof):
         click.echo(f"Warning: {msg}", err=True)
+
+
+def _show_warnings(proof, base_dir) -> list[str]:
+    """Run all validation checks and emit warnings to stderr.
+
+    Returns the list of warning strings.
+    """
+    warnings = validate_proof(proof, base_dir)
+    for msg in warnings:
+        click.echo(f"Warning: {msg}", err=True)
+    return warnings
 
 
 def _resolve_yaml_path(input_path: str) -> Path:
@@ -86,6 +98,53 @@ def init_cmd(directory: str, package: str) -> None:
             f"  2. Run: texfrog latex {directory}/proof.yaml\n"
             f"  3. Run: texfrog html serve {directory}/proof.yaml"
         )
+
+
+# ---------------------------------------------------------------------------
+# texfrog check
+# ---------------------------------------------------------------------------
+
+@main.command("check")
+@click.argument("input_yaml", metavar="INPUT", type=click.Path(exists=True))
+@click.option(
+    "--strict",
+    is_flag=True,
+    default=False,
+    help="Exit with code 1 if there are any warnings.",
+)
+def check_cmd(input_yaml: str, strict: bool) -> None:
+    """Validate a proof without generating any output.
+
+    INPUT is a proof YAML file or a directory containing proof.yaml.
+    Checks YAML structure, file existence, tag consistency, and game
+    references.  Prints a summary and exits with code 0 if valid (or if
+    only warnings are found and --strict is not set), or code 1 on errors.
+    """
+    yaml_path = _resolve_yaml_path(input_yaml)
+
+    click.echo(f"Parsing {yaml_path} …")
+    try:
+        proof = parse_proof(yaml_path)
+    except Exception as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+
+    warnings = _show_warnings(proof, yaml_path.parent)
+
+    n_games = sum(1 for g in proof.games if not g.reduction)
+    n_reductions = sum(1 for g in proof.games if g.reduction)
+    n_figs = len(proof.figures)
+
+    if warnings:
+        click.echo(f"Proof has {len(warnings)} warning(s).")
+        if strict:
+            sys.exit(1)
+    else:
+        parts = []
+        parts.append(f"{n_games} game{'s' if n_games != 1 else ''}")
+        parts.append(f"{n_reductions} reduction{'s' if n_reductions != 1 else ''}")
+        parts.append(f"{n_figs} figure{'s' if n_figs != 1 else ''}")
+        click.echo(f"Proof is valid ({', '.join(parts)}).")
 
 
 # ---------------------------------------------------------------------------

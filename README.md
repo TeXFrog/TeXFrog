@@ -90,6 +90,14 @@ texfrog init [DIRECTORY] [--package cryptocode|nicodemus]
 
 Creates starter files in DIRECTORY (default: current directory). The `--package` option selects the pseudocode package (default: `cryptocode`). Existing files are never overwritten.
 
+### Validate a proof
+
+```bash
+texfrog check proof.yaml [--strict]
+```
+
+Parses the proof and runs all validation checks (YAML structure, file existence, tag consistency, empty games, commentary references) without generating any output. Prints a summary and exits with code 0 if valid. With `--strict`, exits with code 1 if there are any warnings.
+
 ### Generate LaTeX output
 
 ```bash

@@ -95,8 +95,13 @@ def parse_source_line(raw_line: str, ordered_labels: list[str]) -> SourceLine:
     """
     match = _TAG_RE.search(raw_line)
     if match:
-        tag_str = match.group(1)
         content = raw_line[: match.start()]
+        # Skip tag parsing on pure comment lines: if the content before the
+        # %:tags: marker is itself a LaTeX comment (starts with %), the
+        # %:tags: is documentation text, not an actual tag annotation.
+        if content.lstrip().startswith("%"):
+            return SourceLine(content=raw_line, tags=None, original=raw_line)
+        tag_str = match.group(1)
         tags: Optional[frozenset[str]] = resolve_tag_ranges(tag_str, ordered_labels)
     else:
         content = raw_line

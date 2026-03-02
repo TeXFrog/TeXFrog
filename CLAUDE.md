@@ -17,6 +17,8 @@ pip install -e ".[dev]"          # if reinstall needed
 
 **Try the tool:**
 ```bash
+.venv/bin/texfrog check tutorial-cryptocode/proof.yaml     # validate without building
+.venv/bin/texfrog check --strict example/proof.yaml       # strict mode (warnings → exit 1)
 .venv/bin/texfrog init /tmp/tfinit                        # scaffold a new proof
 .venv/bin/texfrog init /tmp/tfinit-nic --package nicodemus # nicodemus variant
 .venv/bin/texfrog latex example/proof.yaml -o /tmp/tflatex
