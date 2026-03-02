@@ -162,7 +162,7 @@ Ranges are resolved **positionally** — by the order games appear in the YAML f
 
 This lets you insert reductions (e.g. `Red2`) between games without breaking range syntax.
 
-Unknown labels in tags are silently ignored, so a typo like `%:tags: G10` when `G10` doesn't exist will simply cause the line to appear in no game.
+Unknown labels in tags are silently ignored, so a typo like `%:tags: G10` when `G10` doesn't exist will simply cause the line to appear in no game. Run `texfrog check --strict` to catch these — see [Troubleshooting](troubleshooting.md#lines-are-missing-from-a-game).
 
 ### Source Ordering Constraint
 
@@ -202,7 +202,7 @@ When generating the LaTeX output, TeXFrog wraps changed lines in `\tfchanged{}` 
 \procedure[linenumbering]{Game~2}{ %:tags: G2
 ```
 
-**Avoid blank lines between tagged variants.** Only untagged blank lines appear in the output; tagged blank lines are excluded with their game. Blank lines in output are stripped regardless to prevent `varwidth` dimension errors in pseudocode environments like `pcvstack`.
+**Avoid blank lines between tagged variants.** Only untagged blank lines appear in the output; tagged blank lines are excluded with their game. Blank lines in output are stripped regardless to prevent `varwidth` dimension errors in pseudocode environments like `pcvstack`. See [Troubleshooting](troubleshooting.md#dimension-too-large-from-pdflatex) for more on this error.
 
 ## Package-Specific Notes
 

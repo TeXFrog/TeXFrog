@@ -172,6 +172,8 @@ The HTML output is self-contained in its directory and can be served from any st
 
 ### Troubleshooting HTML Build
 
+For a full list of common errors and solutions, see [Troubleshooting & FAQ](troubleshooting.md#html-build-issues).
+
 **"Dimension too large" errors:** Do not use `\usepackage[active,tightpage]{preview}` in your macro files — it conflicts with `varwidth`, which is used internally by cryptocode's `pcvstack`. Similarly, do not use `\documentclass{standalone}`. (This is primarily a cryptocode issue.)
 
 **Math mode errors in changed lines:** For `cryptocode`, the HTML wrapper defines `\tfchanged` using `\ensuremath{#1}` to handle math-mode content inside text-mode boxes. If you see errors like `\mathsf allowed only in math mode`, ensure your macro files do not redefine `\tfchanged` without `\ensuremath`. For `nicodemus`, content is text-mode so `\ensuremath` is not needed.
