@@ -55,7 +55,7 @@ needs_html_tools = pytest.mark.skipif(
 @pytest.mark.parametrize("tutorial_name", _TUTORIAL_NAMES)
 def test_texfrog_latex(tmp_path, tutorial_name):
     """``texfrog latex`` generates files and pdflatex compiles them."""
-    tutorial_dir = _PROJECT_ROOT / tutorial_name
+    tutorial_dir = _PROJECT_ROOT / "examples" / tutorial_name
     yaml_path = tutorial_dir / "proof.yaml"
     proof = parse_proof(yaml_path)
     game_labels = [g.label for g in proof.games]
@@ -103,7 +103,7 @@ def test_texfrog_latex(tmp_path, tutorial_name):
 @pytest.mark.parametrize("tutorial_name", _TUTORIAL_NAMES)
 def test_texfrog_html_build(tmp_path, tutorial_name):
     """``texfrog html build`` produces a complete site with SVGs."""
-    tutorial_dir = _PROJECT_ROOT / tutorial_name
+    tutorial_dir = _PROJECT_ROOT / "examples" / tutorial_name
     yaml_path = tutorial_dir / "proof.yaml"
     proof = parse_proof(yaml_path)
     game_labels = [g.label for g in proof.games]

@@ -17,15 +17,15 @@ pip install -e ".[dev]"          # if reinstall needed
 
 **Try the tool:**
 ```bash
-.venv/bin/texfrog check tutorial-cryptocode/proof.yaml     # validate without building
-.venv/bin/texfrog check --strict example/proof.yaml       # strict mode (warnings → exit 1)
+.venv/bin/texfrog check examples/tutorial-cryptocode/proof.yaml     # validate without building
+.venv/bin/texfrog check --strict examples/example-compositekems/proof.yaml  # strict mode (warnings → exit 1)
 .venv/bin/texfrog init /tmp/tfinit                        # scaffold a new proof
 .venv/bin/texfrog init /tmp/tfinit-nic --package nicodemus # nicodemus variant
-.venv/bin/texfrog latex example/proof.yaml -o /tmp/tflatex
-.venv/bin/texfrog html build example/proof.yaml -o /tmp/tfhtml
-.venv/bin/texfrog latex tutorial-cryptocode/proof.yaml -o /tmp/tflatex-tutorial
-.venv/bin/texfrog latex tutorial-nicodemus/proof.yaml -o /tmp/tflatex-tutorial-nic
-.venv/bin/texfrog html serve --live-reload tutorial-cryptocode/proof.yaml -o /tmp/tfhtml
+.venv/bin/texfrog latex examples/example-compositekems/proof.yaml -o /tmp/tflatex
+.venv/bin/texfrog html build examples/example-compositekems/proof.yaml -o /tmp/tfhtml
+.venv/bin/texfrog latex examples/tutorial-cryptocode/proof.yaml -o /tmp/tflatex-tutorial
+.venv/bin/texfrog latex examples/tutorial-nicodemus/proof.yaml -o /tmp/tflatex-tutorial-nic
+.venv/bin/texfrog html serve --live-reload examples/tutorial-cryptocode/proof.yaml -o /tmp/tfhtml
 ```
 
 System requirements (not pip): `pdflatex`, `pdftocairo` (or `pdf2svg`), `pdfcrop`.

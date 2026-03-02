@@ -89,18 +89,18 @@ class TestCheckCommand:
 
     def test_tutorial_cryptocode_strict(self):
         """The cryptocode tutorial should pass in strict mode."""
-        tutorial = REPO_ROOT / "tutorial-cryptocode" / "proof.yaml"
+        tutorial = REPO_ROOT / "examples" / "tutorial-cryptocode" / "proof.yaml"
         if not tutorial.exists():
-            pytest.skip("tutorial-cryptocode not found")
+            pytest.skip("examples/tutorial-cryptocode not found")
         runner = CliRunner()
         result = runner.invoke(main, ["check", "--strict", str(tutorial)])
         assert result.exit_code == 0, result.output
 
     def test_tutorial_nicodemus_strict(self):
         """The nicodemus tutorial should pass in strict mode."""
-        tutorial = REPO_ROOT / "tutorial-nicodemus" / "proof.yaml"
+        tutorial = REPO_ROOT / "examples" / "tutorial-nicodemus" / "proof.yaml"
         if not tutorial.exists():
-            pytest.skip("tutorial-nicodemus not found")
+            pytest.skip("examples/tutorial-nicodemus not found")
         runner = CliRunner()
         result = runner.invoke(main, ["check", "--strict", str(tutorial)])
         assert result.exit_code == 0, result.output

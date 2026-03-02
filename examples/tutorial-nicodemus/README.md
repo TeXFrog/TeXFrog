@@ -109,13 +109,13 @@ From the repo root:
 
 ```bash
 # Generate per-game LaTeX files
-texfrog latex tutorial-nicodemus/proof.yaml -o /tmp/tf_tutorial_nic
+texfrog latex examples/tutorial-nicodemus/proof.yaml -o /tmp/tf_tutorial_nic
 
 # Build an interactive HTML viewer
-texfrog html build tutorial-nicodemus/proof.yaml -o /tmp/tf_tutorial_nic_html
+texfrog html build examples/tutorial-nicodemus/proof.yaml -o /tmp/tf_tutorial_nic_html
 
 # Or build and open in your browser with live reload
-texfrog html serve tutorial-nicodemus/proof.yaml --live-reload
+texfrog html serve examples/tutorial-nicodemus/proof.yaml --live-reload
 ```
 
 ---
@@ -138,6 +138,6 @@ No `$...$` wrapping — unlike cryptocode, nicodemus content is text-mode. The `
 
 ## Next Steps
 
-- [Writing a proof](../docs/writing-proofs.md) — full reference for `proof.yaml` and source file syntax
+- [Writing a proof](../../docs/writing-proofs.md) — full reference for `proof.yaml` and source file syntax
 - [tutorial-cryptocode/](../tutorial-cryptocode/) — the same proof using `cryptocode` (with a more detailed walkthrough)
-- [LaTeX integration](../docs/latex-integration.md) — customizing `\tfchanged` and `\tfgamelabel`
+- [LaTeX integration](../../docs/latex-integration.md) — customizing `\tfchanged` and `\tfgamelabel`

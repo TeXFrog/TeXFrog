@@ -3,8 +3,8 @@
 **/__pycache__
 texfrog.egg-info
 .texpadtmp
-example/
 **/texfrog_html/
 **/texfrog_latex/
 bundle_preview.sh
-example-ntor/
+examples/example-compositekems/
+examples/example-ntor/

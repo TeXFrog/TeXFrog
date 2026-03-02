@@ -47,16 +47,17 @@ TeXFrog/
 │   ├── test_parser.py
 │   ├── test_filter.py
 │   └── test_latex_output.py
-├── tutorial-cryptocode/
-│   ├── proof.yaml              # IND-CPA tutorial proof (4 games/reductions, cryptocode)
-│   └── games_source.tex        # Combined tagged source for the tutorial
-├── tutorial-nicodemus/
-│   ├── proof.yaml              # Same IND-CPA tutorial proof using nicodemus
-│   ├── games_source.tex        # Combined tagged source (nicodemus syntax)
-│   └── nicodemus.sty           # The nicodemus package
-├── example/
-│   ├── proof.yaml              # QSH IND-CCA proof config (12 games/reductions, cryptocode)
-│   └── games_source.tex        # Combined tagged source for the example
+├── examples/
+│   ├── tutorial-cryptocode/
+│   │   ├── proof.yaml          # IND-CPA tutorial proof (4 games/reductions, cryptocode)
+│   │   └── games_source.tex    # Combined tagged source for the tutorial
+│   ├── tutorial-nicodemus/
+│   │   ├── proof.yaml          # Same IND-CPA tutorial proof using nicodemus
+│   │   ├── games_source.tex    # Combined tagged source (nicodemus syntax)
+│   │   └── nicodemus.sty       # The nicodemus package
+│   └── example-compositekems/
+│       ├── proof.yaml          # QSH IND-CCA proof config (12 games/reductions, cryptocode)
+│       └── games_source.tex    # Combined tagged source for the example
 └── CompositeKEMs/              # Reference only — NOT part of the Python package
     ├── simple_extract.tex      # Original 562-line proof (reference/inspiration)
     └── macros.tex              # Crypto macros used by the example
@@ -421,20 +422,20 @@ System requirements (not pip-installable):
 
 ## Tutorials and Example Proofs
 
-### `tutorial-cryptocode/` and `tutorial-nicodemus/` — IND-CPA (cryptocode & nicodemus)
+### `examples/tutorial-cryptocode/` and `examples/tutorial-nicodemus/` — IND-CPA (cryptocode & nicodemus)
 
 Both tutorials implement the same small IND-CPA proof (4 entries: G0, G1, Red1, G2)
-for PRF-based symmetric encryption. `tutorial-cryptocode/` uses `package: cryptocode` (default);
-`tutorial-nicodemus/` uses `package: nicodemus`. Comparing the two shows the syntax
+for PRF-based symmetric encryption. `examples/tutorial-cryptocode/` uses `package: cryptocode` (default);
+`examples/tutorial-nicodemus/` uses `package: nicodemus`. Comparing the two shows the syntax
 differences between packages: `\procedure` vs `\begin{nicodemus}`, `\\` vs `\item`,
 `\pcreturn` vs plain `Return`, math-mode content vs text-mode content.
 
-### `example/` — QSH IND-CCA (cryptocode)
+### `examples/example-compositekems/` — QSH IND-CCA (cryptocode)
 
-`example/proof.yaml` + `example/games_source.tex` implements the QSH IND-CCA proof
-from `CompositeKEMs/simple_extract.tex`, with 12 entries: G0–G9, Red2, Red5.
-Uses `package: cryptocode` (default). The source file uses `\begin{pcvstack}[boxed]`
-with two `\procedure` environments (main body + oracle).
+`examples/example-compositekems/proof.yaml` + `examples/example-compositekems/games_source.tex`
+implements the QSH IND-CCA proof from `CompositeKEMs/simple_extract.tex`, with 12
+entries: G0–G9, Red2, Red5. Uses `package: cryptocode` (default). The source file uses
+`\begin{pcvstack}[boxed]` with two `\procedure` environments (main body + oracle).
 
 ---
 

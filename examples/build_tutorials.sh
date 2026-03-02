@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-TEXFROG="${SCRIPT_DIR}/.venv/bin/texfrog"
+TEXFROG="${SCRIPT_DIR}/../.venv/bin/texfrog"
 
 for tutorial in tutorial-cryptocode tutorial-nicodemus; do
     echo "=========================================="

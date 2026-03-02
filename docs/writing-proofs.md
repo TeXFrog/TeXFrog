@@ -1,6 +1,6 @@
 # Writing a Proof
 
-This is the reference guide for TeXFrog's two input files: a YAML configuration (`proof.yaml`) and a combined LaTeX source (`games_source.tex`). For a hands-on introduction, start with the [cryptocode tutorial](../tutorial-cryptocode/) or the [nicodemus tutorial](../tutorial-nicodemus/) instead.
+This is the reference guide for TeXFrog's two input files: a YAML configuration (`proof.yaml`) and a combined LaTeX source (`games_source.tex`). For a hands-on introduction, start with the [cryptocode tutorial](../examples/tutorial-cryptocode/) or the [nicodemus tutorial](../examples/tutorial-nicodemus/) instead.
 
 > **Tip:** Run `texfrog init` to scaffold a starter proof with commented templates, then modify the generated files. Use `texfrog init --package nicodemus` for nicodemus-flavored templates.
 
@@ -227,5 +227,5 @@ When generating the LaTeX output, TeXFrog wraps changed lines in `\tfchanged{}` 
 
 The repository includes worked examples you can study and run:
 
-- [tutorial-cryptocode/](../tutorial-cryptocode/) — small IND-CPA proof (4 games/reductions) with a detailed walkthrough
-- [tutorial-nicodemus/](../tutorial-nicodemus/) — same proof using `nicodemus`, showing the syntax differences
+- [tutorial-cryptocode/](../examples/tutorial-cryptocode/) — small IND-CPA proof (4 games/reductions) with a detailed walkthrough
+- [tutorial-nicodemus/](../examples/tutorial-nicodemus/) — same proof using `nicodemus`, showing the syntax differences

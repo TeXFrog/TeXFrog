@@ -163,13 +163,13 @@ From the repo root:
 
 ```bash
 # Generate per-game LaTeX files
-texfrog latex tutorial-cryptocode/proof.yaml -o /tmp/tf_tutorial
+texfrog latex examples/tutorial-cryptocode/proof.yaml -o /tmp/tf_tutorial
 
 # Build an interactive HTML viewer
-texfrog html build tutorial-cryptocode/proof.yaml -o /tmp/tf_tutorial_html
+texfrog html build examples/tutorial-cryptocode/proof.yaml -o /tmp/tf_tutorial_html
 
 # Or build and open in your browser with live reload
-texfrog html serve tutorial-cryptocode/proof.yaml --live-reload
+texfrog html serve examples/tutorial-cryptocode/proof.yaml --live-reload
 ```
 
 ---
@@ -189,7 +189,7 @@ proof_harness.tex   — \inputs macros, then each game + commentary in order
 fig_all_games.tex   — consolidated figure with all four games annotated
 ```
 
-Include the harness in your paper with `\input{output/proof_harness.tex}`, or include individual game files and figures as needed. See [LaTeX integration](../docs/latex-integration.md) for details.
+Include the harness in your paper with `\input{output/proof_harness.tex}`, or include individual game files and figures as needed. See [LaTeX integration](../../docs/latex-integration.md) for details.
 
 ---
 
@@ -210,6 +210,6 @@ Include the harness in your paper with `\input{output/proof_harness.tex}`, or in
 
 ## Next Steps
 
-- [Writing a proof](../docs/writing-proofs.md) — full reference for `proof.yaml` and source file syntax
+- [Writing a proof](../../docs/writing-proofs.md) — full reference for `proof.yaml` and source file syntax
 - [tutorial-nicodemus/](../tutorial-nicodemus/) — the same proof using the `nicodemus` package
-- [LaTeX integration](../docs/latex-integration.md) — customizing `\tfchanged` and `\tfgamelabel`
+- [LaTeX integration](../../docs/latex-integration.md) — customizing `\tfchanged` and `\tfgamelabel`

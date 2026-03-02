@@ -88,13 +88,13 @@ TeXFrog also ships with tutorials you can study:
 
 ```bash
 # Tutorial: IND-CPA proof (4 games/reductions)
-texfrog latex tutorial-cryptocode/proof.yaml -o /tmp/tf_tutorial
+texfrog latex examples/tutorial-cryptocode/proof.yaml -o /tmp/tf_tutorial
 
 # Same tutorial using the nicodemus package
-texfrog latex tutorial-nicodemus/proof.yaml -o /tmp/tf_tutorial_nic
+texfrog latex examples/tutorial-nicodemus/proof.yaml -o /tmp/tf_tutorial_nic
 
 # Interactive HTML viewer with live reload
-texfrog html serve tutorial-cryptocode/proof.yaml --live-reload
+texfrog html serve examples/tutorial-cryptocode/proof.yaml --live-reload
 ```
 
 ## Usage
@@ -152,8 +152,8 @@ See [Writing a proof](docs/writing-proofs.md) for a full guide, and the [tutoria
 
 | Directory | Description | Package |
 |-----------|-------------|---------|
-| [`tutorial-cryptocode/`](tutorial-cryptocode/) | Small IND-CPA proof walkthrough (4 games/reductions) | `cryptocode` |
-| [`tutorial-nicodemus/`](tutorial-nicodemus/) | Same proof using `nicodemus` syntax | `nicodemus` |
+| [`examples/tutorial-cryptocode/`](examples/tutorial-cryptocode/) | Small IND-CPA proof walkthrough (4 games/reductions) | `cryptocode` |
+| [`examples/tutorial-nicodemus/`](examples/tutorial-nicodemus/) | Same proof using `nicodemus` syntax | `nicodemus` |
 
 Comparing the two tutorials side by side shows the syntax differences between pseudocode packages.
 
