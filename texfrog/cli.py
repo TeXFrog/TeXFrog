@@ -228,7 +228,14 @@ def html_build_cmd(input_yaml: str, output_dir: str | None, keep_tmp: bool) -> N
     INPUT is a proof YAML file or a directory containing proof.yaml.
     Requires pdflatex and pdf2svg (or pdftocairo) to be installed.
     """
+    from .deps import MissingDependencyError, check_html_deps
     from .output.html import generate_html
+
+    try:
+        check_html_deps()
+    except MissingDependencyError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
 
     yaml_path = _resolve_yaml_path(input_yaml)
     if output_dir is None:
@@ -291,7 +298,14 @@ def html_serve_cmd(
 
     INPUT is a proof YAML file or a directory containing proof.yaml.
     """
+    from .deps import MissingDependencyError, check_html_deps
     from .output.html import generate_html, serve_html
+
+    try:
+        check_html_deps()
+    except MissingDependencyError as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
 
     yaml_path = _resolve_yaml_path(input_yaml)
     if output_dir is None:

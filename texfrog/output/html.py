@@ -197,14 +197,10 @@ def _compile_game_to_svg(
     if converter is None:
         converter = _find_svg_converter()
     if converter is None:
-        raise EnvironmentError(
-            "Neither pdf2svg nor pdftocairo found on PATH. "
-            "Install one of them to generate the HTML site."
-        )
-    if shutil.which("pdflatex") is None:
-        raise EnvironmentError(
-            "pdflatex not found on PATH. "
-            "Install a TeX distribution (e.g. TeX Live or MacTeX)."
+        from ..deps import MissingDependencyError
+        raise MissingDependencyError(
+            "Neither pdftocairo nor pdf2svg found on PATH. "
+            "Install Poppler (includes pdftocairo) or pdf2svg."
         )
 
     with contextlib.ExitStack() as stack:
@@ -405,17 +401,8 @@ def generate_html(
     games_dir.mkdir(exist_ok=True)
 
     # Check required tools upfront (once) before spawning worker threads.
-    converter = _find_svg_converter()
-    if converter is None:
-        raise EnvironmentError(
-            "Neither pdf2svg nor pdftocairo found on PATH. "
-            "Install one of them to generate the HTML site."
-        )
-    if shutil.which("pdflatex") is None:
-        raise EnvironmentError(
-            "pdflatex not found on PATH. "
-            "Install a TeX distribution (e.g. TeX Live or MacTeX)."
-        )
+    from ..deps import check_html_deps
+    converter = check_html_deps()
 
     # Build wrapper templates from the proof's package profile.
     profile = get_profile(proof.package)
