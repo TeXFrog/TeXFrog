@@ -144,7 +144,7 @@ def safe_rebuild(
     Returns:
         ``True`` if the rebuild succeeded, ``False`` otherwise.
     """
-    from .parser import parse_proof
+    from .parser import parse_proof, validate_tags
     from .output.html import generate_html
 
     logger.info("Rebuilding …")
@@ -155,6 +155,9 @@ def safe_rebuild(
     except Exception as exc:
         logger.error("Parse error (keeping existing site): %s", exc)
         return False
+
+    for msg in validate_tags(proof):
+        logger.warning(msg)
 
     staging_dir = Path(tempfile.mkdtemp(
         prefix="texfrog_live_", dir=output_dir.parent,

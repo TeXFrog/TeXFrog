@@ -7,9 +7,15 @@ from pathlib import Path
 
 import click
 
-from .parser import parse_proof
+from .parser import parse_proof, validate_tags
 from .output.latex import generate_latex
 from .templates import get_templates
+
+
+def _show_tag_warnings(proof) -> None:
+    """Emit tag validation warnings to stderr."""
+    for msg in validate_tags(proof):
+        click.echo(f"Warning: {msg}", err=True)
 
 
 def _resolve_yaml_path(input_path: str) -> Path:
@@ -111,6 +117,7 @@ def latex_cmd(input_yaml: str, output_dir: str | None) -> None:
     except Exception as exc:
         click.echo(f"Error parsing input: {exc}", err=True)
         sys.exit(1)
+    _show_tag_warnings(proof)
 
     click.echo(f"Generating LaTeX in {out} …")
     try:
@@ -170,6 +177,7 @@ def html_build_cmd(input_yaml: str, output_dir: str | None, keep_tmp: bool) -> N
     except Exception as exc:
         click.echo(f"Error parsing input: {exc}", err=True)
         sys.exit(1)
+    _show_tag_warnings(proof)
 
     click.echo(f"Building HTML site in {out} …")
     try:
@@ -229,6 +237,7 @@ def html_serve_cmd(
     except Exception as exc:
         click.echo(f"Error parsing input: {exc}", err=True)
         sys.exit(1)
+    _show_tag_warnings(proof)
 
     click.echo(f"Building HTML site in {out} …")
     try:

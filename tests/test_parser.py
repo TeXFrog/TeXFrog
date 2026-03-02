@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from texfrog.parser import parse_proof, parse_source_line, resolve_tag_ranges
+from texfrog.parser import parse_proof, parse_source_line, resolve_tag_ranges, validate_tags
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "simple"
 
@@ -401,3 +401,109 @@ def test_source_path_traversal_raises(tmp_path):
     yaml_path.write_text(yaml.dump(data))
     with pytest.raises(ValueError, match="outside the proof directory"):
         parse_proof(yaml_path)
+
+
+# ---------------------------------------------------------------------------
+# validate_tags
+# ---------------------------------------------------------------------------
+
+def test_validate_tags_no_warnings():
+    """Clean proof should produce no warnings."""
+    proof = parse_proof(FIXTURE_DIR / "proof.yaml")
+    assert validate_tags(proof) == []
+
+
+def test_validate_tags_unrecognized_tag(tmp_path):
+    """A tag in the source that doesn't match any game label triggers a warning."""
+    import yaml
+    data = {
+        "macros": [],
+        "source": "source.tex",
+        "games": [
+            {"label": "G0", "latex_name": "G_0", "description": "test"},
+            {"label": "G1", "latex_name": "G_1", "description": "test"},
+        ],
+    }
+    yaml_path = tmp_path / "proof.yaml"
+    yaml_path.write_text(yaml.dump(data))
+    (tmp_path / "source.tex").write_text(
+        "common line\n"
+        "tagged line %:tags: G0,G01\n"  # G01 is a typo
+        "another line %:tags: G1\n"
+    )
+    proof = parse_proof(yaml_path)
+    warnings = validate_tags(proof)
+    assert any("G01" in w for w in warnings)
+    assert any("Typo" in w for w in warnings)
+
+
+def test_validate_tags_unused_game(tmp_path):
+    """A defined game with no tagged lines triggers a warning."""
+    import yaml
+    data = {
+        "macros": [],
+        "source": "source.tex",
+        "games": [
+            {"label": "G0", "latex_name": "G_0", "description": "test"},
+            {"label": "G1", "latex_name": "G_1", "description": "test"},
+            {"label": "G2", "latex_name": "G_2", "description": "test"},
+        ],
+    }
+    yaml_path = tmp_path / "proof.yaml"
+    yaml_path.write_text(yaml.dump(data))
+    (tmp_path / "source.tex").write_text(
+        "common line\n"
+        "tagged line %:tags: G0\n"
+        "another tagged %:tags: G1\n"
+        # G2 is never tagged — only gets common lines
+    )
+    proof = parse_proof(yaml_path)
+    warnings = validate_tags(proof)
+    assert any("G2" in w and "no tagged lines" in w for w in warnings)
+    # G0 and G1 should NOT be warned about
+    assert not any("G0" in w for w in warnings)
+    assert not any("G1" in w for w in warnings)
+
+
+def test_validate_tags_both_issues(tmp_path):
+    """Both unrecognized tags and unused games can appear together."""
+    import yaml
+    data = {
+        "macros": [],
+        "source": "source.tex",
+        "games": [
+            {"label": "G0", "latex_name": "G_0", "description": "test"},
+            {"label": "G1", "latex_name": "G_1", "description": "test"},
+        ],
+    }
+    yaml_path = tmp_path / "proof.yaml"
+    yaml_path.write_text(yaml.dump(data))
+    (tmp_path / "source.tex").write_text(
+        "line %:tags: G0,TYPO\n"
+        # G1 never tagged
+    )
+    proof = parse_proof(yaml_path)
+    warnings = validate_tags(proof)
+    assert any("TYPO" in w for w in warnings)
+    assert any("G1" in w for w in warnings)
+
+
+def test_validate_tags_all_common_lines(tmp_path):
+    """If source has no tags at all, all games are warned about."""
+    import yaml
+    data = {
+        "macros": [],
+        "source": "source.tex",
+        "games": [
+            {"label": "G0", "latex_name": "G_0", "description": "test"},
+            {"label": "G1", "latex_name": "G_1", "description": "test"},
+        ],
+    }
+    yaml_path = tmp_path / "proof.yaml"
+    yaml_path.write_text(yaml.dump(data))
+    (tmp_path / "source.tex").write_text("just a common line\n")
+    proof = parse_proof(yaml_path)
+    warnings = validate_tags(proof)
+    assert len(warnings) == 2
+    assert any("G0" in w for w in warnings)
+    assert any("G1" in w for w in warnings)

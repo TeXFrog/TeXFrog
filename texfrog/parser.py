@@ -121,6 +121,39 @@ def parse_source_file(path: Path, ordered_labels: list[str]) -> list[SourceLine]
     return lines
 
 
+def validate_tags(proof: Proof) -> list[str]:
+    """Check for unrecognized tags and unused game labels in the source.
+
+    Returns a list of human-readable warning strings (may be empty).
+    """
+    defined_labels = {g.label for g in proof.games}
+    referenced_labels: set[str] = set()
+
+    for line in proof.source_lines:
+        if line.tags is not None:
+            referenced_labels.update(line.tags)
+
+    warnings: list[str] = []
+
+    # Tags in source that don't match any defined game
+    unknown = sorted(referenced_labels - defined_labels)
+    for label in unknown:
+        warnings.append(
+            f"Tag '{label}' in source file does not match any game label. "
+            f"Typo?"
+        )
+
+    # Defined games that are never explicitly tagged
+    for game in proof.games:
+        if game.label not in referenced_labels:
+            warnings.append(
+                f"Game '{game.label}' has no tagged lines in the source "
+                f"(it only receives untagged common lines)."
+            )
+
+    return warnings
+
+
 def parse_proof(yaml_path: Path) -> Proof:
     """Parse a TeXFrog YAML proof config file.
 
