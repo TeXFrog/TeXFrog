@@ -70,6 +70,7 @@ def test_texfrog_latex(tmp_path, tutorial_name):
     assert result.returncode == 0, f"texfrog latex failed:\n{result.stderr}"
 
     # 2. Check expected output files exist.
+    assert (out / "texfrog.sty").exists()
     assert (out / "proof_harness.tex").exists()
     for label in game_labels:
         assert (out / f"{label}.tex").exists()

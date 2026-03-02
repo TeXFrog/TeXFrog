@@ -62,27 +62,27 @@ def _write_commentary_file(game_label: str, text: str, out_path: Path) -> None:
     out_path.write_text(content, encoding="utf-8")
 
 
-def _write_harness_file(proof: Proof, output_dir: Path, out_path: Path) -> None:
-    r"""Write the proof harness LaTeX file.
+def _write_sty_file(proof: Proof, out_path: Path) -> None:
+    r"""Write the ``texfrog.sty`` package file.
 
-    The harness:
-    * Defines default ``\tfchanged`` and ``\tfgamelabel`` macros.
-    * ``\input``s each macro file listed in the proof config.
-    * ``\input``s each game file and commentary file in order.
+    The package defines:
+    * ``\tfchanged`` — highlighting macro for changed lines.
+    * ``\tfgamelabel`` — annotation macro for consolidated figures.
+    * ``\tfgamename`` — game name lookup dispatcher.
+    * Any package-specific extras (e.g. ``\nicodemusheader``).
 
     Args:
         proof: The parsed proof.
-        output_dir: Directory where game/commentary files were written (used
-            to produce relative paths for ``\input``).
-        out_path: Destination file path for the harness.
+        out_path: Destination file path for the ``.sty`` file.
     """
     profile = get_profile(proof.package)
     lines: list[str] = [
-        "% TeXFrog proof harness — \\input this file in your main paper\n",
+        r"\NeedsTeXFormat{LaTeX2e}" + "\n",
+        r"\ProvidesPackage{texfrog}[TeXFrog proof macros]" + "\n",
         "%\n",
-        "% Default highlight macro for changed lines:\n",
+        "% Highlight macro for changed lines:\n",
         profile.harness_tfchanged() + "\n",
-        "% Default game label macro for consolidated figures:\n",
+        "% Game label macro for consolidated figures:\n",
         profile.harness_tfgamelabel() + "\n",
     ]
     proc_hdr_def = profile.procedure_header_def()
@@ -101,19 +101,28 @@ def _write_harness_file(proof: Proof, output_dir: Path, out_path: Path) -> None:
         lines.append(f"\\@namedef{{tfgn@{game.label}}}{{{game.latex_name}}}\n")
     lines += [
         r"\makeatother" + "\n",
+    ]
+    out_path.write_text("".join(lines), encoding="utf-8")
+
+
+def _write_harness_file(proof: Proof, output_dir: Path, out_path: Path) -> None:
+    r"""Write the proof harness LaTeX file.
+
+    The harness ``\input``s each game file and commentary file in order.
+    Macro definitions live in ``texfrog.sty`` (loaded via
+    ``\usepackage{texfrog}`` in the paper preamble).
+
+    Args:
+        proof: The parsed proof.
+        output_dir: Directory where game/commentary files were written (used
+            to produce relative paths for ``\input``).
+        out_path: Destination file path for the harness.
+    """
+    lines: list[str] = [
+        "% TeXFrog proof harness — \\input this file in your main paper\n",
+        "% (load \\usepackage{texfrog} in your preamble first)\n",
         "%\n",
     ]
-
-    # Macro files (paths relative to harness location).
-    # .sty/.cls files are loaded via \usepackage in the paper preamble,
-    # not via \input in the harness.
-    for macro_file in proof.macros:
-        suffix = Path(macro_file).suffix.lower()
-        if suffix in (".sty", ".cls"):
-            continue
-        lines.append(f"\\input{{{macro_file}}}\n")
-
-    lines.append("%\n")
 
     # Game files + commentary
     for game in proof.games:
@@ -256,9 +265,10 @@ def generate_latex(proof: Proof, output_dir: Path) -> None:
     """Generate all LaTeX output files for the proof.
 
     Creates:
+    * ``texfrog.sty`` — package with macro definitions.
     * ``{label}.tex`` for each game/reduction.
     * ``{label}_commentary.tex`` for each game with commentary.
-    * ``proof_harness.tex`` — the main harness file.
+    * ``proof_harness.tex`` — inputs game and commentary files in order.
     * ``fig_{label}.tex`` for each consolidated figure.
 
     Args:
@@ -315,6 +325,9 @@ def generate_latex(proof: Proof, output_dir: Path) -> None:
             _write_commentary_file(
                 label, commentary, output_dir / f"{label}_commentary.tex"
             )
+
+    # Write texfrog.sty.
+    _write_sty_file(proof, output_dir / "texfrog.sty")
 
     # Write harness.
     _write_harness_file(proof, output_dir, output_dir / "proof_harness.tex")

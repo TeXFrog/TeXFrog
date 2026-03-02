@@ -141,6 +141,12 @@ def test_harness_file_created(tmp_path):
     assert (tmp_path / "proof_harness.tex").exists()
 
 
+def test_sty_file_created(tmp_path):
+    proof = make_proof()
+    generate_latex(proof, tmp_path)
+    assert (tmp_path / "texfrog.sty").exists()
+
+
 def test_harness_inputs_all_games(tmp_path):
     proof = make_proof()
     generate_latex(proof, tmp_path)
@@ -158,17 +164,17 @@ def test_harness_inputs_commentaries(tmp_path):
     assert r"\input{G1_commentary.tex}" in text
 
 
-def test_harness_inputs_macros(tmp_path):
+def test_harness_does_not_input_macros(tmp_path):
     proof = make_proof()
     generate_latex(proof, tmp_path)
     text = (tmp_path / "proof_harness.tex").read_text()
-    assert r"\input{macros.tex}" in text
+    assert r"\input{macros.tex}" not in text
 
 
-def test_harness_defines_tfchanged(tmp_path):
+def test_sty_defines_tfchanged(tmp_path):
     proof = make_proof()
     generate_latex(proof, tmp_path)
-    text = (tmp_path / "proof_harness.tex").read_text()
+    text = (tmp_path / "texfrog.sty").read_text()
     assert r"\tfchanged" in text
 
 
@@ -304,26 +310,26 @@ def test_consolidated_trailing_backslash_outside_macro(tmp_path):
 # Game name macro (\tfgamename)
 # ---------------------------------------------------------------------------
 
-def test_harness_defines_tfgamename_dispatcher(tmp_path):
+def test_sty_defines_tfgamename_dispatcher(tmp_path):
     proof = make_proof()
     generate_latex(proof, tmp_path)
-    text = (tmp_path / "proof_harness.tex").read_text()
+    text = (tmp_path / "texfrog.sty").read_text()
     assert r"\providecommand{\tfgamename}[1]{\ensuremath{\@nameuse{tfgn@#1}}}" in text
 
 
-def test_harness_tfgamename_entries_for_all_games(tmp_path):
+def test_sty_tfgamename_entries_for_all_games(tmp_path):
     proof = make_proof()
     generate_latex(proof, tmp_path)
-    text = (tmp_path / "proof_harness.tex").read_text()
+    text = (tmp_path / "texfrog.sty").read_text()
     assert r"\@namedef{tfgn@G0}{\REAL()}" in text
     assert r"\@namedef{tfgn@G1}{G_1}" in text
     assert r"\@namedef{tfgn@G2}{G_2}" in text
 
 
-def test_harness_tfgamename_wrapped_in_makeatletter(tmp_path):
+def test_sty_tfgamename_wrapped_in_makeatletter(tmp_path):
     proof = make_proof()
     generate_latex(proof, tmp_path)
-    text = (tmp_path / "proof_harness.tex").read_text()
+    text = (tmp_path / "texfrog.sty").read_text()
     start = text.index(r"\makeatletter")
     end = text.index(r"\makeatother")
     assert start < end
@@ -331,14 +337,14 @@ def test_harness_tfgamename_wrapped_in_makeatletter(tmp_path):
     assert r"\tfgamename" in text[start:end]
 
 
-def test_harness_tfgamename_with_braces_in_latex_name(tmp_path):
+def test_sty_tfgamename_with_braces_in_latex_name(tmp_path):
     """Ensure latex_name values with nested braces are emitted correctly."""
     games = [
         Game(label="G0", latex_name=r"\indcca_{\QSH}^\adv.\REAL()", description="test"),
     ]
     proof = Proof(macros=[], games=games, source_lines=[], commentary={}, figures=[])
     generate_latex(proof, tmp_path)
-    text = (tmp_path / "proof_harness.tex").read_text()
+    text = (tmp_path / "texfrog.sty").read_text()
     assert r"\@namedef{tfgn@G0}{\indcca_{\QSH}^\adv.\REAL()}" in text
 
 
@@ -464,28 +470,28 @@ def _make_nicodemus_proof(source_lines=None, game_labels=None, figures=None):
     )
 
 
-def test_nicodemus_harness_no_ensuremath(tmp_path):
-    r"""Nicodemus harness \tfchanged should NOT use $..$ wrapping."""
+def test_nicodemus_sty_no_ensuremath(tmp_path):
+    r"""Nicodemus texfrog.sty \tfchanged should NOT use $..$ wrapping."""
     proof = _make_nicodemus_proof()
     generate_latex(proof, tmp_path)
-    text = (tmp_path / "proof_harness.tex").read_text()
+    text = (tmp_path / "texfrog.sty").read_text()
     assert r"\providecommand{\tfchanged}[1]{\colorbox{blue!15}{#1}}" in text
     assert "$#1$" not in text
 
 
-def test_nicodemus_harness_no_pccomment(tmp_path):
-    r"""Nicodemus harness \tfgamelabel should NOT use \pccomment."""
+def test_nicodemus_sty_no_pccomment(tmp_path):
+    r"""Nicodemus texfrog.sty \tfgamelabel should NOT use \pccomment."""
     proof = _make_nicodemus_proof()
     generate_latex(proof, tmp_path)
-    text = (tmp_path / "proof_harness.tex").read_text()
+    text = (tmp_path / "texfrog.sty").read_text()
     assert r"\pccomment" not in text
 
 
-def test_nicodemus_harness_codecomment(tmp_path):
-    r"""Nicodemus harness should define \codecomment and use it in \tfgamelabel."""
+def test_nicodemus_sty_codecomment(tmp_path):
+    r"""Nicodemus texfrog.sty should define \codecomment and use it in \tfgamelabel."""
     proof = _make_nicodemus_proof()
     generate_latex(proof, tmp_path)
-    text = (tmp_path / "proof_harness.tex").read_text()
+    text = (tmp_path / "texfrog.sty").read_text()
     assert r"\providecommand{\tfniccodecomment}" in text
     assert r"\providecommand{\tfniccommentseparator}" in text
     assert r"\tfniccodecomment{#1}" in text
@@ -585,8 +591,8 @@ def test_reduction_diffs_against_immediately_preceding(tmp_path):
     assert any(r"\tfchanged" in l for l in red_lines)
 
 
-def test_nicodemus_harness_skips_sty_files(tmp_path):
-    r""".sty files in macros should NOT get \input{} in the harness."""
+def test_nicodemus_harness_does_not_input_macros(tmp_path):
+    r"""No macro files should get \input{} in the harness."""
     games = [Game(label="G0", latex_name="G_0", description="")]
     proof = Proof(
         macros=["commands.tex", "nicodemus.sty", "bpmarker.sty"],
@@ -598,6 +604,6 @@ def test_nicodemus_harness_skips_sty_files(tmp_path):
     )
     generate_latex(proof, tmp_path)
     text = (tmp_path / "proof_harness.tex").read_text()
-    assert r"\input{commands.tex}" in text
+    assert r"\input{commands.tex}" not in text
     assert r"\input{nicodemus.sty}" not in text
     assert r"\input{bpmarker.sty}" not in text
