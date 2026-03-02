@@ -125,8 +125,11 @@ def check_cmd(input_yaml: str, strict: bool) -> None:
     click.echo(f"Parsing {yaml_path} …")
     try:
         proof = parse_proof(yaml_path)
-    except Exception as exc:
+    except (ValueError, FileNotFoundError) as exc:
         click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
+    except Exception as exc:
+        click.echo(f"Unexpected error parsing input: {type(exc).__name__}: {exc}", err=True)
         sys.exit(1)
 
     warnings = _show_warnings(proof, yaml_path.parent)
@@ -173,8 +176,11 @@ def latex_cmd(input_yaml: str, output_dir: str | None) -> None:
     click.echo(f"Parsing {yaml_path} …")
     try:
         proof = parse_proof(yaml_path)
+    except (ValueError, FileNotFoundError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
     except Exception as exc:
-        click.echo(f"Error parsing input: {exc}", err=True)
+        click.echo(f"Unexpected error parsing input: {type(exc).__name__}: {exc}", err=True)
         sys.exit(1)
     _show_tag_warnings(proof)
 
@@ -233,8 +239,11 @@ def html_build_cmd(input_yaml: str, output_dir: str | None, keep_tmp: bool) -> N
     click.echo(f"Parsing {yaml_path} …")
     try:
         proof = parse_proof(yaml_path)
+    except (ValueError, FileNotFoundError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
     except Exception as exc:
-        click.echo(f"Error parsing input: {exc}", err=True)
+        click.echo(f"Unexpected error parsing input: {type(exc).__name__}: {exc}", err=True)
         sys.exit(1)
     _show_tag_warnings(proof)
 
@@ -293,8 +302,11 @@ def html_serve_cmd(
     click.echo(f"Parsing {yaml_path} …")
     try:
         proof = parse_proof(yaml_path)
+    except (ValueError, FileNotFoundError) as exc:
+        click.echo(f"Error: {exc}", err=True)
+        sys.exit(1)
     except Exception as exc:
-        click.echo(f"Error parsing input: {exc}", err=True)
+        click.echo(f"Unexpected error parsing input: {type(exc).__name__}: {exc}", err=True)
         sys.exit(1)
     _show_tag_warnings(proof)
 

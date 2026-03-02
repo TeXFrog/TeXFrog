@@ -199,7 +199,10 @@ def parse_proof(yaml_path: Path) -> Proof:
                 f"Preamble path '{preamble_rel}' resolves outside the proof directory."
             )
         if not preamble_path.exists():
-            raise FileNotFoundError(f"Preamble file not found: {preamble_path}")
+            raise FileNotFoundError(
+                f"Preamble file '{preamble_rel}' not found (looked in {base_dir}/). "
+                f"Check the 'preamble' field in proof.yaml."
+            )
 
     # --- macros ---
     macros: list[str] = data.get("macros", [])
@@ -215,7 +218,18 @@ def parse_proof(yaml_path: Path) -> Proof:
     if not raw_games:
         raise ValueError("'games' list is required and must not be empty.")
     games: list[Game] = []
-    for entry in raw_games:
+    for i, entry in enumerate(raw_games, start=1):
+        if not isinstance(entry, dict):
+            raise ValueError(
+                f"Game entry {i} should be a mapping (label, latex_name, "
+                f"description), got {type(entry).__name__}."
+            )
+        for required in ("label", "latex_name", "description"):
+            if required not in entry:
+                raise ValueError(
+                    f"Game entry {i} is missing required field '{required}'. "
+                    f"Each game needs: label, latex_name, description."
+                )
         label = entry["label"]
         if not _SAFE_LABEL.match(label):
             raise ValueError(
@@ -263,7 +277,10 @@ def parse_proof(yaml_path: Path) -> Proof:
             f"Source path '{source_rel}' resolves outside the proof directory."
         )
     if not source_path.exists():
-        raise FileNotFoundError(f"Source file not found: {source_path}")
+        raise FileNotFoundError(
+            f"Source file '{source_rel}' not found (looked in {base_dir}/). "
+            f"Check the 'source' field in proof.yaml."
+        )
     source_lines = parse_source_file(source_path, ordered_labels)
 
     # --- commentary ---
@@ -272,7 +289,18 @@ def parse_proof(yaml_path: Path) -> Proof:
     # --- figures ---
     raw_figures = data.get("figures") or []
     figures: list[Figure] = []
-    for entry in raw_figures:
+    for i, entry in enumerate(raw_figures, start=1):
+        if not isinstance(entry, dict):
+            raise ValueError(
+                f"Figure entry {i} should be a mapping (label, games), "
+                f"got {type(entry).__name__}."
+            )
+        for required in ("label", "games"):
+            if required not in entry:
+                raise ValueError(
+                    f"Figure entry {i} is missing required field '{required}'. "
+                    f"Each figure needs: label, games."
+                )
         label = entry["label"]
         if not _SAFE_LABEL.match(label):
             raise ValueError(
