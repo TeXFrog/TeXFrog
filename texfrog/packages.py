@@ -95,13 +95,13 @@ class PackageProfile:
                 + r"{#1}}"
             )
         return (
-            r"\providecommand{\commentseparator}"
+            r"\providecommand{\tfniccommentseparator}"
             r"{{\color{black!65}\smash{\textbackslash\!\!\textbackslash\hspace{0.1em}}}}"
             "\n"
-            r"\providecommand{\codecomment}[1]"
-            r"{{\scriptsize{\hfill\commentseparator{#1}}}}"
+            r"\providecommand{\tfniccodecomment}[1]"
+            r"{{\scriptsize{\hfill\tfniccommentseparator{#1}}}}"
             "\n"
-            r"\providecommand{\tfgamelabel}[2]{#2 \codecomment{#1}}"
+            r"\providecommand{\tfgamelabel}[2]{#2 \tfniccodecomment{#1}}"
         )
 
     def procedure_header_def(self) -> str | None:
