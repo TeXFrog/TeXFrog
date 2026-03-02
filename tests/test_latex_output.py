@@ -481,6 +481,16 @@ def test_nicodemus_harness_no_pccomment(tmp_path):
     assert r"\pccomment" not in text
 
 
+def test_nicodemus_harness_codecomment(tmp_path):
+    r"""Nicodemus harness should define \codecomment and use it in \tfgamelabel."""
+    proof = _make_nicodemus_proof()
+    generate_latex(proof, tmp_path)
+    text = (tmp_path / "proof_harness.tex").read_text()
+    assert r"\providecommand{\tfniccodecomment}" in text
+    assert r"\providecommand{\tfniccommentseparator}" in text
+    assert r"\tfniccodecomment{#1}" in text
+
+
 def test_nicodemus_game_item_prefix_outside_tfchanged(tmp_path):
     r"""\item prefix must stay outside \tfchanged in per-game output."""
     proof = _make_nicodemus_proof()
