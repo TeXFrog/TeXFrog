@@ -11,6 +11,23 @@ from .parser import parse_proof
 from .output.latex import generate_latex
 
 
+def _resolve_yaml_path(input_path: str) -> Path:
+    """Resolve *input_path* to a YAML file.
+
+    If *input_path* is a directory, look for ``proof.yaml`` inside it.
+    """
+    p = Path(input_path).resolve()
+    if p.is_dir():
+        candidate = p / "proof.yaml"
+        if not candidate.exists():
+            raise click.BadParameter(
+                f"Directory '{p}' does not contain a proof.yaml file.",
+                param_hint="'INPUT'",
+            )
+        return candidate
+    return p
+
+
 @click.group()
 def main() -> None:
     """TeXFrog: organise and render cryptographic game-hopping proofs in LaTeX."""
@@ -71,7 +88,7 @@ def html_group() -> None:
 
 
 @html_group.command("build")
-@click.argument("input_yaml", metavar="INPUT.yaml", type=click.Path(exists=True, dir_okay=False))
+@click.argument("input_yaml", metavar="INPUT", type=click.Path(exists=True))
 @click.option(
     "-o", "--output-dir",
     metavar="DIR",
@@ -87,11 +104,12 @@ def html_group() -> None:
 def html_build_cmd(input_yaml: str, output_dir: str | None, keep_tmp: bool) -> None:
     """Build the interactive HTML proof viewer.
 
+    INPUT is a proof YAML file or a directory containing proof.yaml.
     Requires pdflatex and pdf2svg (or pdftocairo) to be installed.
     """
     from .output.html import generate_html
 
-    yaml_path = Path(input_yaml).resolve()
+    yaml_path = _resolve_yaml_path(input_yaml)
     if output_dir is None:
         out = yaml_path.parent / "texfrog_html"
     else:
@@ -115,7 +133,7 @@ def html_build_cmd(input_yaml: str, output_dir: str | None, keep_tmp: bool) -> N
 
 
 @html_group.command("serve")
-@click.argument("input_yaml", metavar="INPUT.yaml", type=click.Path(exists=True, dir_okay=False))
+@click.argument("input_yaml", metavar="INPUT", type=click.Path(exists=True))
 @click.option(
     "-o", "--output-dir",
     metavar="DIR",
@@ -137,10 +155,13 @@ def html_serve_cmd(
     no_browser: bool,
     keep_tmp: bool,
 ) -> None:
-    """Build and serve the interactive HTML proof viewer on localhost."""
+    """Build and serve the interactive HTML proof viewer on localhost.
+
+    INPUT is a proof YAML file or a directory containing proof.yaml.
+    """
     from .output.html import generate_html, serve_html
 
-    yaml_path = Path(input_yaml).resolve()
+    yaml_path = _resolve_yaml_path(input_yaml)
     if output_dir is None:
         out = yaml_path.parent / "texfrog_html"
     else:
