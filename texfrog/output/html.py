@@ -65,15 +65,13 @@ def _build_wrapper_template(
     parts: list[str] = [
         r"\documentclass{{article}}",
         r"\usepackage[letterpaper,margin=1in]{{geometry}}",
-    ]
-    for pkg_line in profile.preamble_lines:
-        # Double braces for .format() escaping
-        parts.append(pkg_line.replace("{", "{{").replace("}", "}}"))
-    parts += [
         r"\usepackage{{amsfonts,amsmath,amsthm}}",
         r"\usepackage{{adjustbox}}",
         r"\usepackage[dvipsnames,table]{{xcolor}}",
     ]
+    for pkg_line in profile.preamble_lines:
+        # Double braces for .format() escaping
+        parts.append(pkg_line.replace("{", "{{").replace("}", "}}"))
     if user_preamble_content:
         # Insert user preamble lines (already escaped for .format())
         parts.append(user_preamble_content.replace("{", "{{").replace("}", "}}"))
