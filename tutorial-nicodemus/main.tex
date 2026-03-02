@@ -8,12 +8,102 @@
 
 \input{macros.tex}
 
+\newtheorem{theorem}{Theorem}
+
+\title{IND-CPA Security of PRF-Based Symmetric Encryption\\
+{\large A TeXFrog Tutorial (using the \texttt{nicodemus} package)}}
+\author{}
+\date{}
+
 \begin{document}
 
-\input{proof_harness.tex}
+\maketitle
 
-\subsection*{A consolidated figure}
+\section{Construction}
 
+Let $\mathrm{PRF}\colon \{0,1\}^\lambda \times \{0,1\}^\lambda \to \{0,1\}^\lambda$
+be a pseudorandom function.
+Define a symmetric encryption scheme $\Pi = (\mathsf{KeyGen}, \mathsf{Enc}, \mathsf{Dec})$ as follows:
+\begin{itemize}
+  \item $\mathsf{KeyGen}()$: sample $k \getsr \{0,1\}^\lambda$ and return $k$.
+  \item $\mathsf{Enc}(k, m)$: sample $r \getsr \{0,1\}^\lambda$, compute
+    $c \gets \mathrm{PRF}(k, r) \oplus m$, and return $(r, c)$.
+  \item $\mathsf{Dec}(k, (r, c))$: return $\mathrm{PRF}(k, r) \oplus c$.
+\end{itemize}
+
+\section{Security}
+
+\begin{theorem}
+If\/ $\mathrm{PRF}$ is a secure pseudorandom function, then $\Pi$ is IND-CPA secure.
+Concretely, for any adversary $\mathcal{A}$ making $q$ queries to the
+left-or-right oracle,
+\[
+  \mathbf{Adv}^{\mathrm{IND\text{-}CPA}}_\Pi(\mathcal{A})
+  \;\leq\;
+  \mathbf{Adv}^{\mathrm{PRF}}_{\mathrm{PRF}}(\mathcal{B}_1) \,.
+\]
+\end{theorem}
+
+\noindent\textit{Proof.}\quad
+We proceed via a sequence of games. Figure~\ref{fig:all-games} shows all the games, and the games are also shown individually in subsequent figures.
+
+\begin{figure}[ht]
+\centering
 \input{fig_all_games.tex}
+\caption{Consolidated figure showing games $\tfgamename{G0}$--$\tfgamename{G2}$ and Reduction $\tfgamename{Red1}$.}
+\label{fig:all-games}
+\end{figure}
+
+\paragraph{Game~$\tfgamename{G0}$.}
+\input{G0_commentary.tex}
+
+\begin{figure}[ht]
+\centering
+\input{G0.tex}
+\caption{Game~$\tfgamename{G0}$: $\INDCPA_\Enc^\Adversary.\mathsf{Real}()$: the real IND-CPA game. The LR oracle encrypts using the actual PRF.}
+\label{fig:G0}
+\end{figure}
+
+\paragraph{Game~$\tfgamename{G1}$.}
+\input{G1_commentary.tex}
+
+\begin{figure}[ht]
+\centering
+\input{G1.tex}
+\caption{Game~$\tfgamename{G1}$: Replace $\mathrm{PRF}(k, r)$ with a truly random value.}
+\label{fig:G1}
+\end{figure}
+
+\paragraph{Reduction~$\tfgamename{Red1}$.}
+\input{Red1_commentary.tex}
+
+\begin{figure}[ht]
+\centering
+\input{Red1.tex}
+\caption{Reduction~$\tfgamename{Red1}$: Reduction against PRF security, simulating Games~\tfgamename{G0} and~\tfgamename{G1} via an external PRF challenger.}
+\label{fig:Red1}
+\end{figure}
+
+\paragraph{Game~$\tfgamename{G2}$.}
+\input{G2_commentary.tex}
+
+\begin{figure}[ht]
+\centering
+\input{G2.tex}
+\caption{Game~$\tfgamename{G2}$: $\INDCPA_\Enc^\Adversary.\mathsf{Ideal}()$: the ideal IND-CPA game. Ciphertext is uniformly random, independent of~$m_b$.}
+\label{fig:G2}
+\end{figure}
+
+\noindent
+Combining the bounds from each game hop, we obtain
+\[
+  \mathbf{Adv}^{\mathrm{IND\text{-}CPA}}_\Pi(\mathcal{A})
+  \;=\;
+  \bigl|\Pr[\mathsf{G}_0 = 1] - \tfrac{1}{2}\bigr|
+  \;\leq\;
+  \mathbf{Adv}^{\mathrm{PRF}}_{\mathrm{PRF}}(\mathcal{B}_1)
+  \;+\; 0 \,,
+\]
+which completes the proof.\hfill$\square$
 
 \end{document}

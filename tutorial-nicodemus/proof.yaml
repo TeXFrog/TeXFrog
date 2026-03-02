@@ -75,3 +75,4 @@ commentary:
 figures:
   - label: all_games
     games: "G0,G1,G2,Red1"
+    procedure_name: "Games $\\tfgamename{G0}$--$\\tfgamename{G2}$, Reduction $\\tfgamename{Red1}$"
