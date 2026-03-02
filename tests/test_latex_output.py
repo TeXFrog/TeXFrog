@@ -8,7 +8,11 @@ import pytest
 
 from texfrog.model import Figure, Game, Proof, SourceLine
 from texfrog.output.html import _expand_tfgamename
-from texfrog.output.latex import _write_game_file, generate_latex
+from texfrog.output.latex import (
+    _replace_proc_header_title,
+    _write_game_file,
+    generate_latex,
+)
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "simple"
 
@@ -607,3 +611,97 @@ def test_nicodemus_harness_does_not_input_macros(tmp_path):
     assert r"\input{commands.tex}" not in text
     assert r"\input{nicodemus.sty}" not in text
     assert r"\input{bpmarker.sty}" not in text
+
+
+# ---------------------------------------------------------------------------
+# _replace_proc_header_title
+# ---------------------------------------------------------------------------
+
+
+def test_replace_proc_header_title_cryptocode():
+    r"""Replace title in a cryptocode \procedure[opts]{TITLE}{ line."""
+    line = r"    \procedure[linenumbering]{Game $G_0$}{"
+    result = _replace_proc_header_title(line, r"Games $G_0$--$G_2$")
+    assert result == r"    \procedure[linenumbering]{Games $G_0$--$G_2$}{"
+
+
+def test_replace_proc_header_title_nested_braces():
+    r"""Title with nested braces (e.g. \tfgamename{G0}) is replaced correctly."""
+    line = r"    \procedure[linenumbering]{Game $\tfgamename{G0} = \REAL()$}{"
+    result = _replace_proc_header_title(line, r"Games $G_0$--$G_2$")
+    assert result == r"    \procedure[linenumbering]{Games $G_0$--$G_2$}{"
+
+
+def test_replace_proc_header_title_nicodemus():
+    r"""Replace title in a nicodemus \nicodemusheader{TITLE} line."""
+    line = r"		\nicodemusheader{Games $\game^b_0$-$\game^b_3$}"
+    result = _replace_proc_header_title(line, r"All games")
+    assert result == r"		\nicodemusheader{All games}"
+
+
+def test_replace_proc_header_title_no_options():
+    r"""Procedure without optional [...] arguments."""
+    line = r"    \procedure{Title}{"
+    result = _replace_proc_header_title(line, "New Title")
+    assert result == r"    \procedure{New Title}{"
+
+
+# ---------------------------------------------------------------------------
+# Consolidated figures — procedure_name
+# ---------------------------------------------------------------------------
+
+
+def test_consolidated_procedure_name_replaces_first_header(tmp_path):
+    """procedure_name on a figure replaces the first collapsed proc header title."""
+    source_lines = [
+        SourceLine(r"    \procedure[linenumbering]{Game $G_0$}{", frozenset({"G0"}), ""),
+        SourceLine(r"    \procedure[linenumbering]{Game $G_1$}{", frozenset({"G1"}), ""),
+        SourceLine(r"        body \\", None, ""),
+        SourceLine(r"    }", None, ""),
+    ]
+    proof = _make_figure_proof(source_lines, ["G0", "G1"])
+    proof.figures[0].procedure_name = r"Games $G_0$--$G_1$"
+    generate_latex(proof, tmp_path)
+    text = (tmp_path / "fig_main.tex").read_text()
+    proc_lines = [l for l in text.splitlines() if r"\procedure" in l]
+    assert len(proc_lines) == 1
+    assert r"Games $G_0$--$G_1$" in proc_lines[0]
+    assert r"Game $G_0$" not in proc_lines[0]
+
+
+def test_consolidated_procedure_name_only_affects_first(tmp_path):
+    """procedure_name replaces only the first proc header, not subsequent ones."""
+    source_lines = [
+        SourceLine(r"    \procedure{Game $G_0$}{", frozenset({"G0"}), ""),
+        SourceLine(r"    \procedure{Game $G_1$}{", frozenset({"G1"}), ""),
+        SourceLine(r"        body \\", None, ""),
+        SourceLine(r"    }", None, ""),
+        SourceLine(r"    \procedure{$\mathsf{LR}(m_0, m_1)$}{", None, ""),
+        SourceLine(r"        oracle body \\", None, ""),
+        SourceLine(r"    }", None, ""),
+    ]
+    proof = _make_figure_proof(source_lines, ["G0", "G1"])
+    proof.figures[0].procedure_name = "Custom Title"
+    generate_latex(proof, tmp_path)
+    text = (tmp_path / "fig_main.tex").read_text()
+    proc_lines = [l for l in text.splitlines() if r"\procedure" in l]
+    assert len(proc_lines) == 2
+    assert "Custom Title" in proc_lines[0]
+    # Second procedure header unchanged
+    assert r"$\mathsf{LR}(m_0, m_1)$" in proc_lines[1]
+
+
+def test_consolidated_no_procedure_name_preserves_original(tmp_path):
+    """Without procedure_name, the first game's header is used as before."""
+    source_lines = [
+        SourceLine(r"    \procedure{Game $G_0$}{", frozenset({"G0"}), ""),
+        SourceLine(r"    \procedure{Game $G_1$}{", frozenset({"G1"}), ""),
+        SourceLine(r"        body \\", None, ""),
+        SourceLine(r"    }", None, ""),
+    ]
+    proof = _make_figure_proof(source_lines, ["G0", "G1"])
+    generate_latex(proof, tmp_path)
+    text = (tmp_path / "fig_main.tex").read_text()
+    proc_lines = [l for l in text.splitlines() if r"\procedure" in l]
+    assert len(proc_lines) == 1
+    assert r"Game $G_0$" in proc_lines[0]

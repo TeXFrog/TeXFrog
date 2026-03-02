@@ -116,6 +116,7 @@ A list of consolidated figures showing multiple games side by side, for use as c
 figures:
   - label: start_end
     games: "G0,G9"
+    procedure_name: "Games $G_0$ and $G_9$"
 
   - label: main_proof
     games: "G0-G2,G8,G9"
@@ -124,6 +125,7 @@ figures:
 Each figure has:
 - `label` — used as the output filename: `fig_{label}.tex`
 - `games` — comma-separated list or range of game labels (same syntax as `%:tags:`)
+- `procedure_name` (optional) — custom title for the first procedure header in the consolidated output. Without this, the first game's header is used verbatim. Useful for showing a collective name like "Games $G_0$--$G_9$" instead of a single game's title.
 
 In the generated figure, lines that appear in all selected games are output verbatim. Lines that appear in only some games are annotated with `\tfgamelabel{G1,G3}{line content}`. See [latex-integration.md](latex-integration.md) for customizing the annotation macro.
 

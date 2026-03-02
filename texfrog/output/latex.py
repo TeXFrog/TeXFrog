@@ -142,11 +142,70 @@ def _write_harness_file(proof: Proof, output_dir: Path, out_path: Path) -> None:
     out_path.write_text("".join(lines), encoding="utf-8")
 
 
+def _replace_proc_header_title(line: str, new_title: str) -> str:
+    r"""Replace the title argument in a procedure header line.
+
+    Works for both cryptocode (``\procedure[opts]{TITLE}{``) and
+    nicodemus (``\nicodemusheader{TITLE}``) style headers.  Finds the
+    first mandatory ``{...}`` group (after the command name and any
+    optional ``[...]`` arguments) and replaces its content.
+
+    Args:
+        line: The full procedure header line.
+        new_title: Replacement text for the title.
+
+    Returns:
+        The line with the title replaced, or the original line unchanged
+        if parsing fails.
+    """
+    rstripped = line.rstrip()
+    n = len(rstripped)
+    i = 0
+
+    # Skip leading whitespace.
+    while i < n and rstripped[i] in " \t":
+        i += 1
+
+    # Skip command name: \word
+    if i < n and rstripped[i] == "\\":
+        i += 1
+        while i < n and rstripped[i].isalpha():
+            i += 1
+
+    # Skip optional [...] arguments.
+    while i < n and rstripped[i] == "[":
+        depth = 1
+        i += 1
+        while i < n and depth > 0:
+            if rstripped[i] == "[":
+                depth += 1
+            elif rstripped[i] == "]":
+                depth -= 1
+            i += 1
+
+    # Now at the '{' starting the title group.
+    if i < n and rstripped[i] == "{":
+        title_open = i
+        depth = 1
+        j = i + 1
+        while j < n and depth > 0:
+            if rstripped[j] == "{":
+                depth += 1
+            elif rstripped[j] == "}":
+                depth -= 1
+            j += 1
+        # j is one past the closing '}' of the title.
+        return rstripped[: title_open + 1] + new_title + rstripped[j - 1 :]
+
+    return line  # couldn't parse — return unchanged
+
+
 def _write_consolidated_figure(
     proof: Proof,
     figure_label: str,
     game_labels: list[str],
     out_path: Path,
+    procedure_name: str | None = None,
 ) -> None:
     r"""Write a consolidated figure showing multiple games side by side.
 
@@ -161,6 +220,9 @@ def _write_consolidated_figure(
         figure_label: Internal label for the figure (used in leading comment).
         game_labels: Ordered list of game labels to include in this figure.
         out_path: Destination file path.
+        procedure_name: If set, replaces the title of the first collapsed
+            procedure header (e.g. to show "Games $G_0$--$G_2$" instead
+            of the first game's header).
     """
     profile = get_profile(proof.package)
     proc_hdr_cmd = profile.procedure_header_cmd
@@ -179,6 +241,7 @@ def _write_consolidated_figure(
     # previous emitted-or-skipped line was a procedure header; when it was, any
     # further procedure-header variant is silently dropped.
     last_was_proc_header = False
+    first_proc_header_replaced = False
 
     for sl in proof.source_lines:
         # Determine which of the selected games include this line.
@@ -209,8 +272,16 @@ def _write_consolidated_figure(
 
         if len(present_in) == n or is_proc_header:
             # Present in ALL selected games, or is a procedure header that must
-            # not be annotated — output verbatim.
-            output_parts.append(sl.content + "\n")
+            # not be annotated — output verbatim (with optional title override).
+            content = sl.content
+            if (
+                is_proc_header
+                and procedure_name is not None
+                and not first_proc_header_replaced
+            ):
+                content = _replace_proc_header_title(content, procedure_name)
+                first_proc_header_replaced = True
+            output_parts.append(content + "\n")
         else:
             # Present in only some games — annotate.
             # Build a partial macro including the label arg so that
@@ -339,4 +410,5 @@ def generate_latex(proof: Proof, output_dir: Path) -> None:
             figure.label,
             figure.games,
             output_dir / f"fig_{figure.label}.tex",
+            procedure_name=figure.procedure_name,
         )

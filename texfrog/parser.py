@@ -216,7 +216,11 @@ def parse_proof(yaml_path: Path) -> Proof:
         resolved = list(resolve_tag_ranges(games_str, ordered_labels))
         # Preserve the order from ordered_labels for deterministic output
         ordered_figure_games = [l for l in ordered_labels if l in resolved]
-        figures.append(Figure(label=label, games=ordered_figure_games))
+        figures.append(Figure(
+            label=label,
+            games=ordered_figure_games,
+            procedure_name=entry.get("procedure_name"),
+        ))
 
     return Proof(
         macros=macros,

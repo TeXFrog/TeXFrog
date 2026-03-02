@@ -117,10 +117,15 @@ defined in your macros file.
 figures:
   - label: all_games
     games: "G0,G1,G2,Red1"
+    procedure_name: "Games $\\tfgamename{G0}$--$\\tfgamename{G2}$, Reduction $\\tfgamename{Red1}$"
 ```
 
 This produces `fig_all_games.tex`: a single consolidated block showing all four games
 side by side, with game-specific lines annotated by `\tfgamelabel`.
+
+The optional `procedure_name` field controls the title of the first procedure header in the
+consolidated figure. Without it, the first game's header would be used (e.g., "Game $G_0 = \ldots$").
+Here we override it to show a collective name for the figure.
 
 ---
 

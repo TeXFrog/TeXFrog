@@ -86,6 +86,7 @@ class SourceLine:
 class Figure:
     label: str        # e.g. "start_end" → output file fig_start_end.tex
     games: list[str]  # Ordered game labels to include (ordered per proof.games)
+    procedure_name: Optional[str] = None  # Custom title for the first procedure header
 
 @dataclass
 class Proof:
@@ -138,6 +139,7 @@ commentary:                    # optional
 figures:                       # optional
   - label: start_end
     games: "G0,G9"
+    procedure_name: "Games $G_0$--$G_9$"   # custom title for first procedure header
   - label: game2_reduction
     games: "G1-Red2"           # range: all games from G1 to Red2 inclusive
 ```
@@ -249,6 +251,11 @@ For each source line:
 - In ALL selected games → output verbatim
 - In SUBSET of selected games → `\tfgamelabel{\tfgamename{G1},\tfgamename{G3}}{line content}`
 - In NO selected games → skip
+
+If `procedure_name` is set on the figure, the title of the first procedure header
+in the output is replaced with the given text. This lets consolidated figures show
+e.g. "Games $G_0$--$G_9$" instead of the first game's specific header. Subsequent
+procedure headers (e.g. oracle definitions) are unaffected.
 
 ---
 

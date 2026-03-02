@@ -29,6 +29,7 @@ class Figure:
     """A consolidated figure showing several games side by side."""
     label: str         # Internal label, e.g. "fig_start_end"
     games: list[str]   # Ordered list of game labels to include
+    procedure_name: Optional[str] = None  # Custom title for the first procedure header
 
 
 @dataclass
