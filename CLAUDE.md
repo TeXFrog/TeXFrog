@@ -19,7 +19,8 @@ pip install -e ".[dev]"          # if reinstall needed
 ```bash
 .venv/bin/texfrog latex example/proof.yaml -o /tmp/tflatex
 .venv/bin/texfrog html build example/proof.yaml -o /tmp/tfhtml
-.venv/bin/texfrog latex example-ntor/proof.yaml -o /tmp/tflatex-ntor
+.venv/bin/texfrog latex tutorial/proof.yaml -o /tmp/tflatex-tutorial
+.venv/bin/texfrog latex tutorial-nicodemus/proof.yaml -o /tmp/tflatex-tutorial-nic
 ```
 
 System requirements (not pip): `pdflatex`, `pdftocairo` (or `pdf2svg`), `pdfcrop`.

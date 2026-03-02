@@ -46,13 +46,14 @@ pip install -e ".[dev]"
 Run TeXFrog on one of the included examples:
 
 ```bash
-# Example 1: QSH IND-CCA proof (12 games/reductions, uses cryptocode)
+# Tutorial: IND-CPA proof (4 games/reductions, available in cryptocode and nicodemus)
+texfrog latex tutorial/proof.yaml -o /tmp/tf_tutorial
+texfrog latex tutorial-nicodemus/proof.yaml -o /tmp/tf_tutorial_nic
+
+# Larger example: QSH IND-CCA proof (12 games/reductions, uses cryptocode)
 texfrog latex example/proof.yaml -o /tmp/tf_latex
 texfrog html build example/proof.yaml -o /tmp/tf_html
 texfrog html serve example/proof.yaml --port 8080
-
-# Example 2: Signed-DH (ntor) IND proof (6 games/reductions, uses nicodemus)
-texfrog latex example-ntor/proof.yaml -o /tmp/tf_ntor
 ```
 
 ## Usage

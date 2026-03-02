@@ -1,0 +1,55 @@
+% TeXFrog tutorial source: IND-CPA proof for PRF-based symmetric encryption.
+% (nicodemus package version)
+%
+% Scheme: Enc(k, m) = (r, PRF(k, r) xor m),  where r is sampled fresh each call.
+%
+% Tag syntax: %:tags: label1,label2-label3
+% - Lines with no %:tags: comment appear in every game/reduction.
+% - Lines tagged with one or more labels appear only in those games/reductions.
+% - Ranges like G0-G2 are resolved by POSITION in the 'games:' list, not alphabetically.
+% - Variant lines for the same "slot" must be consecutive in this file.
+
+\begin{tabular}[t]{l}
+	\nicodemusboxNew{250pt}{%
+
+%%% -- Challenge experiment procedure header (one per game/reduction) -------------
+
+		\textbf{$\INDCPA_\Enc^\Adversary.\mathsf{Real}()$} %:tags: G0
+		\textbf{Game~1} %:tags: G1
+		\textbf{$\INDCPA_\Enc^\Adversary.\mathsf{Ideal}()$} %:tags: G2
+		\textbf{Reduction $\Bdversary_1^{\OPRF}$} %:tags: Red1
+
+%%% -- Challenge experiment body -------------------------------------------------
+
+		\begin{nicodemus}
+			% PRF key: G0, G1, G2 only (Red1 uses an external PRF oracle, not a local key)
+			\item $k \getsr \{0,1\}^\lambda$ %:tags: G0-G2
+			% Challenge bit (all games)
+			\item $b \getsr \{0,1\}$
+			% Run adversary with access to the LR encryption oracle (all games)
+			\item $b' \gets \Adversary^{\mathsf{LR}}()$
+			\item Return $(b' = b)$
+		\end{nicodemus}%
+		\medskip
+
+%%% -- Left-or-Right encryption oracle -------------------------------------------
+
+		\textbf{Oracle $\mathsf{LR}(m_0, m_1)$}
+		\begin{nicodemus}
+			% Fresh nonce for every query (all games)
+			\item $r \getsr \{0,1\}^\lambda$
+			% G0: compute the PRF output using the secret key
+			\item $y \gets \mathrm{PRF}(k, r)$ %:tags: G0
+			% G1: use a truly random value instead of the PRF output
+			\item $y \getsr \{0,1\}^\lambda$ %:tags: G1
+			% Red1: query the external PRF oracle (no local key)
+			\item $y \gets \OPRF(r)$ %:tags: Red1
+			% G0, G1, Red1: XOR with the chosen message
+			\item $c \gets y \oplus m_b$ %:tags: G0,G1,Red1
+			% G2: ciphertext is uniformly random, independent of m_b
+			\item $c \getsr \{0,1\}^\lambda$ %:tags: G2
+			\item Return $(r, c)$
+		\end{nicodemus}%
+
+	}%
+\end{tabular}%

@@ -219,28 +219,29 @@ When generating the LaTeX output, TeXFrog wraps changed lines in `\tfchanged{}` 
 - Consolidated figures do NOT insert `\\` between lines
 - `\tfgamelabel` outputs the content without a comment macro
 
-## Complete Example
+## Complete Examples
 
-The repository includes two worked examples:
+The repository includes tutorials and a larger example:
 
-### cryptocode example
+### Tutorials (cryptocode and nicodemus)
+
+The `tutorial/` and `tutorial-nicodemus/` directories implement the same small IND-CPA proof (4 games/reductions) using `cryptocode` and `nicodemus` respectively. Comparing the two shows the syntax differences between packages.
+
+- [tutorial/proof.yaml](../tutorial/proof.yaml) — cryptocode version
+- [tutorial-nicodemus/proof.yaml](../tutorial-nicodemus/proof.yaml) — nicodemus version with `package: nicodemus`
+
+### Larger example (cryptocode)
 
 The `example/` directory contains a QSH IND-CCA proof with 12 entries (G0–G9, Red2, Red5), using the `cryptocode` package (default).
 
 - [example/proof.yaml](../example/proof.yaml) — the YAML config
 - [example/games_source.tex](../example/games_source.tex) — the combined source
 
-### nicodemus example
-
-The `example-ntor/` directory contains a signed-DH (ntor) IND proof with 6 entries (G0–G3, RedSig, RedCDH), using the `nicodemus` package.
-
-- [example-ntor/proof.yaml](../example-ntor/proof.yaml) — the YAML config with `package: nicodemus`
-- [example-ntor/games_source.tex](../example-ntor/games_source.tex) — the combined source with `\item`-based lines
-
-To try either:
+To try these:
 
 ```bash
+texfrog latex tutorial/proof.yaml -o /tmp/tf_tutorial
+texfrog latex tutorial-nicodemus/proof.yaml -o /tmp/tf_tutorial_nic
 texfrog latex example/proof.yaml -o /tmp/tf_latex
-texfrog latex example-ntor/proof.yaml -o /tmp/tf_ntor
-texfrog html serve example/proof.yaml
+texfrog html serve tutorial/proof.yaml
 ```

@@ -1,7 +1,7 @@
 """Integration tests that invoke the CLI and compile LaTeX.
 
 These tests run ``texfrog latex`` and ``texfrog html build`` on the
-tutorial proof exactly as a user would, catching issues like package
+tutorial proofs exactly as a user would, catching issues like package
 load order, missing macros, and environment conflicts that unit tests
 cannot detect.
 
@@ -18,21 +18,19 @@ from pathlib import Path
 import pytest
 
 from texfrog.output.html import _find_svg_converter
+from texfrog.parser import parse_proof
 
 # ---------------------------------------------------------------------------
 # Paths
 # ---------------------------------------------------------------------------
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
-TUTORIAL_DIR = _PROJECT_ROOT / "tutorial"
-TUTORIAL_YAML = TUTORIAL_DIR / "proof.yaml"
-TUTORIAL_MAIN_TEX = TUTORIAL_DIR / "texfrog_latex" / "main.tex"
 
 # The texfrog entrypoint lives next to the running Python interpreter.
 TEXFROG = str(Path(sys.executable).parent / "texfrog")
 
-# Game labels defined in tutorial/proof.yaml.
-TUTORIAL_GAMES = ["G0", "G1", "Red1", "G2"]
+# Tutorial directories to test.  Add new entries here as tutorials are created.
+_TUTORIAL_NAMES = ["tutorial", "tutorial-nicodemus"]
 
 # ---------------------------------------------------------------------------
 # Skip markers
@@ -54,28 +52,40 @@ needs_html_tools = pytest.mark.skipif(
 
 
 @needs_pdflatex
-def test_texfrog_latex(tmp_path):
+@pytest.mark.parametrize("tutorial_name", _TUTORIAL_NAMES)
+def test_texfrog_latex(tmp_path, tutorial_name):
     """``texfrog latex`` generates files and pdflatex compiles them."""
+    tutorial_dir = _PROJECT_ROOT / tutorial_name
+    yaml_path = tutorial_dir / "proof.yaml"
+    proof = parse_proof(yaml_path)
+    game_labels = [g.label for g in proof.games]
+
     out = tmp_path / "latex"
 
     # 1. Run the CLI command.
     result = subprocess.run(
-        [TEXFROG, "latex", str(TUTORIAL_YAML), "-o", str(out)],
+        [TEXFROG, "latex", str(yaml_path), "-o", str(out)],
         capture_output=True, text=True,
     )
     assert result.returncode == 0, f"texfrog latex failed:\n{result.stderr}"
 
     # 2. Check expected output files exist.
     assert (out / "proof_harness.tex").exists()
-    for label in TUTORIAL_GAMES:
+    for label in game_labels:
         assert (out / f"{label}.tex").exists()
-    assert (out / "fig_all_games.tex").exists()
+    for figure in proof.figures:
+        assert (out / f"fig_{figure.label}.tex").exists()
 
-    # 3. Copy the standalone main.tex into the output dir and compile.
-    shutil.copy2(TUTORIAL_MAIN_TEX, out / "main.tex")
-    shutil.copy2(TUTORIAL_DIR / "macros.tex", out / "macros.tex")
+    # 3. Copy the standalone main.tex and macro files into the output dir.
+    main_tex = tutorial_dir / "main.tex"
+    shutil.copy2(main_tex, out / "main.tex")
+    for macro_file in proof.macros:
+        src = tutorial_dir / macro_file
+        shutil.copy2(src, out / Path(macro_file).name)
+
+    # 4. Compile with pdflatex.
     result = subprocess.run(
-        ["pdflatex", "-interaction=nonstopmode", "main.tex"],
+        ["pdflatex", "main.tex"],
         cwd=out, capture_output=True, text=True,
     )
     assert (out / "main.pdf").exists(), (
@@ -89,12 +99,18 @@ def test_texfrog_latex(tmp_path):
 
 
 @needs_html_tools
-def test_texfrog_html_build(tmp_path):
+@pytest.mark.parametrize("tutorial_name", _TUTORIAL_NAMES)
+def test_texfrog_html_build(tmp_path, tutorial_name):
     """``texfrog html build`` produces a complete site with SVGs."""
+    tutorial_dir = _PROJECT_ROOT / tutorial_name
+    yaml_path = tutorial_dir / "proof.yaml"
+    proof = parse_proof(yaml_path)
+    game_labels = [g.label for g in proof.games]
+
     out = tmp_path / "html"
 
     result = subprocess.run(
-        [TEXFROG, "html", "build", str(TUTORIAL_YAML), "-o", str(out)],
+        [TEXFROG, "html", "build", str(yaml_path), "-o", str(out)],
         capture_output=True, text=True, timeout=120,
     )
     assert result.returncode == 0, f"texfrog html build failed:\n{result.stderr}"
@@ -106,7 +122,7 @@ def test_texfrog_html_build(tmp_path):
 
     # Every game should have a non-empty SVG.
     games_dir = out / "games"
-    for label in TUTORIAL_GAMES:
+    for label in game_labels:
         svg = games_dir / f"{label}.svg"
         assert svg.exists(), f"SVG not produced for {label}"
         assert svg.stat().st_size > 100, f"SVG suspiciously small for {label}"

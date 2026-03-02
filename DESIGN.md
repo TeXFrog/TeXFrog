@@ -45,16 +45,16 @@ TeXFrog/
 │   ├── test_parser.py
 │   ├── test_filter.py
 │   └── test_latex_output.py
+├── tutorial/
+│   ├── proof.yaml              # IND-CPA tutorial proof (4 games/reductions, cryptocode)
+│   └── games_source.tex        # Combined tagged source for the tutorial
+├── tutorial-nicodemus/
+│   ├── proof.yaml              # Same IND-CPA tutorial proof using nicodemus
+│   ├── games_source.tex        # Combined tagged source (nicodemus syntax)
+│   └── nicodemus.sty           # The nicodemus package
 ├── example/
 │   ├── proof.yaml              # QSH IND-CCA proof config (12 games/reductions, cryptocode)
 │   └── games_source.tex        # Combined tagged source for the example
-├── example-ntor/
-│   ├── proof.yaml              # Signed-DH (ntor) IND proof config (6 games/reductions, nicodemus)
-│   ├── games_source.tex        # Combined tagged source
-│   ├── preamble.tex            # Extra \usepackage lines for HTML build
-│   ├── commands.tex            # Proof-specific macros
-│   ├── nicodemus.sty           # The nicodemus package
-│   └── bpmarker.sty            # Marker/boxing package
 └── CompositeKEMs/              # Reference only — NOT part of the Python package
     ├── simple_extract.tex      # Original 562-line proof (reference/inspiration)
     └── macros.tex              # Crypto macros used by the example
@@ -370,7 +370,15 @@ System requirements (not pip-installable):
 
 ---
 
-## Example Proofs
+## Tutorials and Example Proofs
+
+### `tutorial/` and `tutorial-nicodemus/` — IND-CPA (cryptocode & nicodemus)
+
+Both tutorials implement the same small IND-CPA proof (4 entries: G0, G1, Red1, G2)
+for PRF-based symmetric encryption. `tutorial/` uses `package: cryptocode` (default);
+`tutorial-nicodemus/` uses `package: nicodemus`. Comparing the two shows the syntax
+differences between packages: `\procedure` vs `\begin{nicodemus}`, `\\` vs `\item`,
+`\pcreturn` vs plain `Return`, math-mode content vs text-mode content.
 
 ### `example/` — QSH IND-CCA (cryptocode)
 
@@ -378,17 +386,6 @@ System requirements (not pip-installable):
 from `CompositeKEMs/simple_extract.tex`, with 12 entries: G0–G9, Red2, Red5.
 Uses `package: cryptocode` (default). The source file uses `\begin{pcvstack}[boxed]`
 with two `\procedure` environments (main body + oracle).
-
-### `example-ntor/` — Signed-DH ntor IND (nicodemus)
-
-`example-ntor/proof.yaml` + `example-ntor/games_source.tex` implements the signed-DH
-(ntor) IND proof with 6 entries: G0–G3, RedSig, RedCDH. Uses `package: nicodemus`.
-The source file uses `\begin{tabular}` with `\nicodemusboxNew` and `\begin{nicodemus}`
-enumerate environments. Two-column layout with oracles split across left and right.
-
-Note on tag ranges: Because reductions (RedSig, RedCDH) sit between games in the
-ordering (G0, G1, G2, RedSig, G3, RedCDH), ranges like `G0-G3` include RedSig.
-Use `G0-G2,G3` to exclude it. See the source file for examples.
 
 ---
 
