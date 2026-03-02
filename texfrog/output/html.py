@@ -129,6 +129,7 @@ def _pdfcrop(pdf_path: Path) -> Path:
         ["pdfcrop", str(pdf_path), str(cropped)],
         capture_output=True,
         text=True,
+        timeout=120,
     )
     if result.returncode == 0 and cropped.exists():
         return cropped
@@ -152,7 +153,7 @@ def _pdf_to_svg(pdf_path: Path, svg_path: Path, converter: str) -> None:
         # pdftocairo -svg writes to the exact output path specified (no suffix added).
         cmd = ["pdftocairo", "-svg", str(pdf_path), str(svg_path)]
 
-    result = subprocess.run(cmd, capture_output=True, text=True)
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
     if result.returncode != 0:
         raise RuntimeError(
             f"{converter} failed for {pdf_path}:\n{result.stderr}"
@@ -257,10 +258,12 @@ def _compile_game_to_svg(
         wrapper_tex.write_text(wrapper_src, encoding="utf-8")
 
         result = subprocess.run(
-            ["pdflatex", "-interaction=nonstopmode", "wrapper.tex"],
+            ["pdflatex", "-interaction=nonstopmode", "-no-shell-escape",
+             "wrapper.tex"],
             cwd=tmp_path,
             capture_output=True,
             text=True,
+            timeout=120,
         )
         pdf_path = tmp_path / "wrapper.pdf"
         if not pdf_path.exists():
@@ -310,7 +313,7 @@ def _extract_mathjax_macros(macro_paths: list[str], proof_dir: Path) -> str:
 
 _jinja_env = Environment(
     loader=PackageLoader("texfrog.output", "templates"),
-    autoescape=False,
+    autoescape=True,
 )
 
 
@@ -581,13 +584,11 @@ def serve_html(html_dir: Path, port: int = 8080, open_browser: bool = True) -> N
         port: TCP port to listen on.
         open_browser: Whether to launch the default browser.
     """
-    import os
+    import functools
 
-    os.chdir(html_dir)
-
-    class _Handler(http.server.SimpleHTTPRequestHandler):
-        def log_message(self, fmt, *args):
-            pass  # silence per-request logging
+    _Handler = functools.partial(
+        http.server.SimpleHTTPRequestHandler, directory=str(html_dir),
+    )
 
     for attempt_port in range(port, port + 100):
         try:

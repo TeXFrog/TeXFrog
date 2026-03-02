@@ -268,3 +268,136 @@ def test_parse_proof_nicodemus_source_lines():
     # Should have a line tagged for Red1
     red1_lines = [sl for sl in proof.source_lines if sl.tags and "Red1" in sl.tags]
     assert len(red1_lines) > 0
+
+
+# ---------------------------------------------------------------------------
+# Security: label validation
+# ---------------------------------------------------------------------------
+
+def test_game_label_with_path_traversal_raises(tmp_path):
+    """Game labels containing path traversal characters must be rejected."""
+    import yaml
+    data = {
+        "macros": [],
+        "source": "source.tex",
+        "games": [
+            {"label": "../../evil", "latex_name": "E", "description": "test"},
+        ],
+    }
+    yaml_path = tmp_path / "proof.yaml"
+    yaml_path.write_text(yaml.dump(data))
+    (tmp_path / "source.tex").write_text("")
+    with pytest.raises(ValueError, match="unsafe characters"):
+        parse_proof(yaml_path)
+
+
+def test_game_label_with_slash_raises(tmp_path):
+    """Game labels containing slashes must be rejected."""
+    import yaml
+    data = {
+        "macros": [],
+        "source": "source.tex",
+        "games": [
+            {"label": "G0/bad", "latex_name": "G_0", "description": "test"},
+        ],
+    }
+    yaml_path = tmp_path / "proof.yaml"
+    yaml_path.write_text(yaml.dump(data))
+    (tmp_path / "source.tex").write_text("")
+    with pytest.raises(ValueError, match="unsafe characters"):
+        parse_proof(yaml_path)
+
+
+def test_figure_label_with_path_traversal_raises(tmp_path):
+    """Figure labels containing path traversal characters must be rejected."""
+    import yaml
+    data = {
+        "macros": [],
+        "source": "source.tex",
+        "games": [
+            {"label": "G0", "latex_name": "G_0", "description": "test"},
+        ],
+        "figures": [
+            {"label": "../../evil", "games": "G0"},
+        ],
+    }
+    yaml_path = tmp_path / "proof.yaml"
+    yaml_path.write_text(yaml.dump(data))
+    (tmp_path / "source.tex").write_text("")
+    with pytest.raises(ValueError, match="unsafe characters"):
+        parse_proof(yaml_path)
+
+
+def test_valid_labels_accepted(tmp_path):
+    """Labels with alphanumeric, underscore, and hyphen characters should work."""
+    import yaml
+    data = {
+        "macros": [],
+        "source": "source.tex",
+        "games": [
+            {"label": "G0", "latex_name": "G_0", "description": "test"},
+            {"label": "Red-1", "latex_name": "R_1", "description": "test",
+             "reduction": True},
+            {"label": "Game_2", "latex_name": "G_2", "description": "test"},
+        ],
+    }
+    yaml_path = tmp_path / "proof.yaml"
+    yaml_path.write_text(yaml.dump(data))
+    (tmp_path / "source.tex").write_text("")
+    proof = parse_proof(yaml_path)
+    assert len(proof.games) == 3
+
+
+# ---------------------------------------------------------------------------
+# Security: path traversal checks
+# ---------------------------------------------------------------------------
+
+def test_macro_path_traversal_raises(tmp_path):
+    """Macro paths that escape the proof directory must be rejected."""
+    import yaml
+    data = {
+        "macros": ["../../etc/passwd"],
+        "source": "source.tex",
+        "games": [
+            {"label": "G0", "latex_name": "G_0", "description": "test"},
+        ],
+    }
+    yaml_path = tmp_path / "proof.yaml"
+    yaml_path.write_text(yaml.dump(data))
+    (tmp_path / "source.tex").write_text("")
+    with pytest.raises(ValueError, match="outside the proof directory"):
+        parse_proof(yaml_path)
+
+
+def test_preamble_path_traversal_raises(tmp_path):
+    """Preamble paths that escape the proof directory must be rejected."""
+    import yaml
+    data = {
+        "macros": [],
+        "preamble": "../../etc/passwd",
+        "source": "source.tex",
+        "games": [
+            {"label": "G0", "latex_name": "G_0", "description": "test"},
+        ],
+    }
+    yaml_path = tmp_path / "proof.yaml"
+    yaml_path.write_text(yaml.dump(data))
+    (tmp_path / "source.tex").write_text("")
+    with pytest.raises(ValueError, match="outside the proof directory"):
+        parse_proof(yaml_path)
+
+
+def test_source_path_traversal_raises(tmp_path):
+    """Source paths that escape the proof directory must be rejected."""
+    import yaml
+    data = {
+        "macros": [],
+        "source": "../../etc/passwd",
+        "games": [
+            {"label": "G0", "latex_name": "G_0", "description": "test"},
+        ],
+    }
+    yaml_path = tmp_path / "proof.yaml"
+    yaml_path.write_text(yaml.dump(data))
+    with pytest.raises(ValueError, match="outside the proof directory"):
+        parse_proof(yaml_path)

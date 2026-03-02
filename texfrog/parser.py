@@ -15,6 +15,10 @@ from .packages import get_profile
 # Captures the tag string, e.g. "G1,G3-G5".
 _TAG_RE = re.compile(r"\s*%:tags:\s*(.+?)\s*$")
 
+# Labels must contain only alphanumeric characters, underscores, and hyphens.
+# This prevents path traversal when labels are used as filenames.
+_SAFE_LABEL = re.compile(r"^[A-Za-z0-9_-]+$")
+
 
 def resolve_tag_ranges(tag_string: str, ordered_labels: list[str]) -> frozenset[str]:
     """Convert a tag string like "G0,G3-G5" to a frozenset of labels.
@@ -152,11 +156,21 @@ def parse_proof(yaml_path: Path) -> Proof:
     preamble_rel: str | None = data.get("preamble")
     if preamble_rel:
         preamble_path = (base_dir / preamble_rel).resolve()
+        if not preamble_path.is_relative_to(base_dir):
+            raise ValueError(
+                f"Preamble path '{preamble_rel}' resolves outside the proof directory."
+            )
         if not preamble_path.exists():
             raise FileNotFoundError(f"Preamble file not found: {preamble_path}")
 
     # --- macros ---
     macros: list[str] = data.get("macros", [])
+    for macro_rel in macros:
+        macro_path = (base_dir / macro_rel).resolve()
+        if not macro_path.is_relative_to(base_dir):
+            raise ValueError(
+                f"Macro path '{macro_rel}' resolves outside the proof directory."
+            )
 
     # --- games ---
     raw_games = data.get("games", [])
@@ -164,9 +178,15 @@ def parse_proof(yaml_path: Path) -> Proof:
         raise ValueError("'games' list is required and must not be empty.")
     games: list[Game] = []
     for entry in raw_games:
+        label = entry["label"]
+        if not _SAFE_LABEL.match(label):
+            raise ValueError(
+                f"Game label '{label}' contains unsafe characters. "
+                f"Labels must match [A-Za-z0-9_-]."
+            )
         games.append(
             Game(
-                label=entry["label"],
+                label=label,
                 latex_name=entry["latex_name"],
                 description=entry["description"],
                 reduction=bool(entry.get("reduction", False)),
@@ -200,6 +220,10 @@ def parse_proof(yaml_path: Path) -> Proof:
     if not source_rel:
         raise ValueError("'source' field (path to combined .tex file) is required.")
     source_path = (base_dir / source_rel).resolve()
+    if not source_path.is_relative_to(base_dir):
+        raise ValueError(
+            f"Source path '{source_rel}' resolves outside the proof directory."
+        )
     if not source_path.exists():
         raise FileNotFoundError(f"Source file not found: {source_path}")
     source_lines = parse_source_file(source_path, ordered_labels)
@@ -212,6 +236,11 @@ def parse_proof(yaml_path: Path) -> Proof:
     figures: list[Figure] = []
     for entry in raw_figures:
         label = entry["label"]
+        if not _SAFE_LABEL.match(label):
+            raise ValueError(
+                f"Figure label '{label}' contains unsafe characters. "
+                f"Labels must match [A-Za-z0-9_-]."
+            )
         games_str = entry["games"]
         resolved = list(resolve_tag_ranges(games_str, ordered_labels))
         # Preserve the order from ordered_labels for deterministic output

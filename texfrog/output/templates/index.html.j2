@@ -13,7 +13,7 @@
 <body>
   <!-- Hidden block so MathJax learns user-defined macros before rendering -->
   <div id="mathjax-macros" style="display:none">\[
-{{ mathjax_macros }}
+{{ mathjax_macros|safe }}
   \]</div>
   <div id="nav">
     <h2>Games</h2>
@@ -43,7 +43,7 @@
   </div>
   <script src="app.js"></script>
   <script>
-    const GAMES = {{ games_json }};
+    const GAMES = {{ games_json|safe }};
     init(GAMES);
   </script>
 </body>

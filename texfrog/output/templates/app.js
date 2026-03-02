@@ -24,8 +24,14 @@ function init(gamesData) {
   const list = document.getElementById('game-list');
   games.forEach((g, i) => {
     const li = document.createElement('li');
-    li.innerHTML = `<div class="game-label">$${g.latex_name}$</div>
-                    <div class="game-desc">${g.description}</div>`;
+    const labelDiv = document.createElement('div');
+    labelDiv.className = 'game-label';
+    labelDiv.textContent = `$${g.latex_name}$`;
+    const descDiv = document.createElement('div');
+    descDiv.className = 'game-desc';
+    descDiv.textContent = g.description;
+    li.appendChild(labelDiv);
+    li.appendChild(descDiv);
     li.onclick = () => showGame(i);
     list.appendChild(li);
   });
@@ -40,7 +46,7 @@ function makePanel(label, latexName, svgSrc) {
   panel.className = 'game-panel';
   const header = document.createElement('div');
   header.className = 'game-panel-header';
-  header.innerHTML = `$${latexName}$`;
+  header.textContent = `$${latexName}$`;
   panel.appendChild(header);
   const img = new Image();
   img.alt = label;
@@ -63,8 +69,8 @@ function showGame(idx) {
   });
 
   // Update title and subtitle
-  document.getElementById('game-title').innerHTML = `$${g.latex_name}$`;
-  document.getElementById('game-subtitle').innerHTML = g.description || '';
+  document.getElementById('game-title').textContent = `$${g.latex_name}$`;
+  document.getElementById('game-subtitle').textContent = g.description || '';
 
   // Build side-by-side display
   const container = document.getElementById('game-svg-container');
