@@ -1,8 +1,10 @@
 # TeXFrog
 
-> **Note:** TeXFrog is an early-stage tool under active development. The input format, command-line interface, and output may change as the design evolves. Feedback, suggestions, and contributions are very welcome — see [Contributing](#contributing) below.
+> [!NOTE]
+> TeXFrog is an early-stage tool under active development. The input format, command-line interface, and output may change as the design evolves. Feedback, suggestions, and contributions are very welcome — see [Contributing](#contributing) below.
 
-> **Disclaimer:** Much of this codebase was vibe-coded with the assistance of large language models. While it has a test suite and works on the examples we have tried, there may be rough edges. Please report any issues you encounter.
+> [!WARNING]
+> Much of this codebase was vibe-coded with the assistance of large language models. While it has a test suite and works on the examples we have tried, there may be rough edges. Please report any issues you encounter.
 
 TeXFrog helps cryptographers manage game-hopping proofs in LaTeX. If you have ever maintained a dozen nearly-identical game files by hand, copying lines between them and trying to keep highlights consistent, TeXFrog is meant to solve that problem.
 
