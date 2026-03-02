@@ -17,8 +17,15 @@
   \]</div>
   <div id="nav">
     <h2>Games</h2>
-    <ul id="game-list">
-    </ul>
+    <div id="game-list-wrapper">
+      <ul id="game-list">
+      </ul>
+    </div>
+    <div id="zoom-controls">
+      <button onclick="adjustZoom(-0.1)" title="Zoom out">&minus;</button>
+      <span id="zoom-level">100%</span>
+      <button onclick="adjustZoom(+0.1)" title="Zoom in">+</button>
+    </div>
   </div>
   <div id="main">
     <div id="controls">

@@ -1,6 +1,24 @@
 let currentIndex = 0;
 let games = [];
 
+const BASE_GAME_ZOOM = 1.25;
+const BASE_COMMENTARY_ZOOM = 1.33;
+let zoomScale = 1.0;
+
+function adjustZoom(delta) {
+  zoomScale = Math.round((zoomScale + delta) * 10) / 10;
+  zoomScale = Math.max(0.5, Math.min(2.0, zoomScale));
+  applyZoom();
+}
+
+function applyZoom() {
+  const root = document.documentElement;
+  root.style.setProperty('--game-zoom', BASE_GAME_ZOOM * zoomScale);
+  root.style.setProperty('--commentary-zoom', BASE_COMMENTARY_ZOOM * zoomScale);
+  document.getElementById('zoom-level').textContent =
+    Math.round(zoomScale * 100) + '%';
+}
+
 function init(gamesData) {
   games = gamesData;
   const list = document.getElementById('game-list');
