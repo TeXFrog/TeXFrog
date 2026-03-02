@@ -1,7 +1,7 @@
 # TeXFrog Design Document
 
-This document is written for Claude instances working on this codebase. It captures the
-architecture, key algorithms, design decisions, and important implementation gotchas.
+This document captures the architecture, key algorithms, design decisions, and important
+implementation gotchas for contributors and maintainers.
 
 ---
 

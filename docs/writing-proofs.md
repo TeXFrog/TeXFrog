@@ -1,10 +1,10 @@
-# Writing a Proof for TeXFrog
+# Writing a Proof
 
-TeXFrog reads two input files: a YAML configuration file (`proof.yaml`) and a combined LaTeX source file (`games_source.tex`). This guide explains both.
+This is the reference guide for TeXFrog's two input files: a YAML configuration (`proof.yaml`) and a combined LaTeX source (`games_source.tex`). For a hands-on introduction, start with the [cryptocode tutorial](../tutorial-cryptocode/) or the [nicodemus tutorial](../tutorial-nicodemus/) instead.
 
 ## Overview
 
-A game-hopping proof consists of a sequence of games (and reductions). Adjacent games usually differ by only a few lines of pseudocode. TeXFrog exploits this by letting you write all games in a single source file, tagging each line with the games it belongs to. Lines without a tag appear in every game.
+A game-hopping proof consists of a sequence of games (and reductions) where adjacent games usually differ by only a few lines of pseudocode. TeXFrog lets you write all games in a single source file, tagging each line with the games it belongs to. Lines without a tag appear in every game.
 
 ## The YAML Configuration File
 
@@ -221,29 +221,9 @@ When generating the LaTeX output, TeXFrog wraps changed lines in `\tfchanged{}` 
 - Consolidated figures do NOT insert `\\` between lines
 - `\tfgamelabel` outputs the content without a comment macro
 
-## Complete Examples
+## Examples
 
-The repository includes tutorials and a larger example:
+The repository includes worked examples you can study and run:
 
-### Tutorials (cryptocode and nicodemus)
-
-The `tutorial-cryptocode/` and `tutorial-nicodemus/` directories implement the same small IND-CPA proof (4 games/reductions) using `cryptocode` and `nicodemus` respectively. Comparing the two shows the syntax differences between packages.
-
-- [tutorial-cryptocode/proof.yaml](../tutorial-cryptocode/proof.yaml) — cryptocode version
-- [tutorial-nicodemus/proof.yaml](../tutorial-nicodemus/proof.yaml) — nicodemus version with `package: nicodemus`
-
-### Larger example (cryptocode)
-
-The `example/` directory contains a QSH IND-CCA proof with 12 entries (G0–G9, Red2, Red5), using the `cryptocode` package (default).
-
-- [example/proof.yaml](../example/proof.yaml) — the YAML config
-- [example/games_source.tex](../example/games_source.tex) — the combined source
-
-To try these:
-
-```bash
-texfrog latex tutorial-cryptocode/proof.yaml -o /tmp/tf_tutorial
-texfrog latex tutorial-nicodemus/proof.yaml -o /tmp/tf_tutorial_nic
-texfrog latex example/proof.yaml -o /tmp/tf_latex
-texfrog html serve tutorial-cryptocode/proof.yaml
-```
+- [tutorial-cryptocode/](../tutorial-cryptocode/) — small IND-CPA proof (4 games/reductions) with a detailed walkthrough
+- [tutorial-nicodemus/](../tutorial-nicodemus/) — same proof using `nicodemus`, showing the syntax differences

@@ -1,17 +1,16 @@
-# TeXFrog Tutorial
+# TeXFrog Tutorial (cryptocode)
 
-> **Note:** This tutorial uses the `cryptocode` package (the default). For the same proof using `nicodemus`, see [tutorial-nicodemus/](../tutorial-nicodemus/).
+> **Package:** This tutorial uses [`cryptocode`](https://ctan.org/pkg/cryptocode) (the default). For the same proof using `nicodemus`, see [tutorial-nicodemus/](../tutorial-nicodemus/).
 
-This tutorial walks through a small, complete proof to introduce every TeXFrog concept.
-The proof is short enough to read in full, but exercises every feature of the tool.
+This tutorial walks through a small, complete game-hopping proof to introduce every TeXFrog concept. The proof is short enough to read in full, but exercises every feature of the tool.
 
 ## The Proof Scenario
 
-**Scheme.** Define a symmetric encryption scheme as:
+**Scheme.** A symmetric encryption scheme:
 
 ```
-Enc(k, m)  =  (r, PRF(k, r) ⊕ m)    where r ←$ {0,1}^λ is fresh per call
-Dec(k, (r, c))  =  PRF(k, r) ⊕ c
+Enc(k, m)  =  (r, PRF(k, r) XOR m)    where r is fresh per call
+Dec(k, (r, c))  =  PRF(k, r) XOR c
 ```
 
 **Theorem.** `Enc` is IND-CPA secure if `PRF` is a secure pseudorandom function.
@@ -19,32 +18,29 @@ Dec(k, (r, c))  =  PRF(k, r) ⊕ c
 **Proof.** Via a two-hop game sequence:
 
 ```
-G0 (Real)  ≈_PRF  G1  ≡  G2 (Ideal)
+G0 (Real)  ~_PRF  G1  =  G2 (Ideal)
 ```
 
-| Game | What changes in the LR oracle |
-|------|-------------------------------|
-| G0 — `IND-CPA.Real()` | Oracle computes `y ← PRF(k, r)`, returns `(r, y ⊕ m_b)` |
-| G1 — Game 1 | Oracle samples `y ←$ {0,1}^λ` (random function), returns `(r, y ⊕ m_b)` |
-| G2 — `IND-CPA.Ideal()` | Oracle samples `c ←$ {0,1}^λ` directly (message not used) |
-| Red1 — Reduction `B` | Replaces `y` computation by querying an external PRF challenger |
+| Game | What changes |
+|------|-------------|
+| G0 | Oracle computes `y <- PRF(k, r)`, returns `(r, y XOR m_b)` |
+| G1 | Oracle samples `y` at random, returns `(r, y XOR m_b)` |
+| G2 | Oracle samples `c` directly (message not used) |
+| Red1 | Reduction: replaces PRF call by querying an external challenger |
 
-G0 → G1 is by PRF security (via `Red1`). G1 → G2 is a perfect equivalence: `y ⊕ m_b` with
-uniform `y` is uniform regardless of `m_b`, so we can sample `c` directly.
+G0 to G1 is by PRF security (via Red1). G1 to G2 is a perfect equivalence.
 
 ## Files in This Directory
 
 | File | Purpose |
 |------|---------|
 | `proof.yaml` | Declares the games, commentary, and figure specs |
-| `games_source.tex` | The single combined LaTeX source with `%:tags:` annotations |
-| `macros.tex` | Five short macros (no external dependencies) |
+| `games_source.tex` | Combined LaTeX source with `%:tags:` annotations |
+| `macros.tex` | Short macro definitions (no external dependencies) |
 
 ---
 
 ## Step 1 — The YAML Configuration (`proof.yaml`)
-
-The YAML file has four active sections: `macros`, `source`, `games`, and `commentary`.
 
 ### `macros` and `source`
 
@@ -55,8 +51,7 @@ macros:
 source: games_source.tex
 ```
 
-`macros` lists LaTeX files that define your proof-specific commands; `source` points to the
-combined pseudocode file. Both paths are relative to the YAML file.
+`macros` lists LaTeX files that define your proof-specific commands; `source` points to the combined pseudocode file. Both paths are relative to the YAML file.
 
 ### `games`
 
@@ -80,18 +75,12 @@ games:
     reduction: true
 ```
 
-The optional `reduction: true` flag marks an entry as a reduction. In the HTML viewer,
-reductions are displayed alone rather than side-by-side with the previous game.
+Each game has a `label` (used in `%:tags:` and as the output filename), a `latex_name` (math-mode content without `$` delimiters), and a `description`. The optional `reduction: true` flag marks an entry as a reduction, which affects how it is displayed in the HTML viewer.
 
-The `latex_name` is math-mode content without `$` delimiters. TeXFrog wraps it in `\ensuremath` (LaTeX) or `$...$` (HTML/MathJax) automatically. You can reference any game's name in commentary or your paper with `\tfgamename{G1}`.
+The order of the game list matters:
 
-The order here matters in two ways:
-
-1. **Adjacent-game diffing.** TeXFrog highlights lines that differ between each game and
-   the one before it. G1 is diffed against G0, G2 against G1, Red1 against G2.
-
-2. **Range resolution.** Tags like `G0-G2` mean "from G0 to G2 by position in this list"
-   — so `G0-G2` covers G0, G1, G2 and excludes Red1 (which is at position 3).
+1. **Diffing.** TeXFrog highlights lines that differ between each game and the one before it. G1 is diffed against G0, G2 against G1, Red1 against G2.
+2. **Range resolution.** Tags like `G0-G2` mean "from G0 to G2 by position in this list" — so `G0-G2` covers G0, G1, G2 and excludes Red1 (which is at position 3).
 
 ### `commentary`
 
@@ -104,12 +93,7 @@ commentary:
     ...
 ```
 
-Each entry is raw LaTeX written to `{label}_commentary.tex` and `\input`-ed by the harness
-immediately after the game pseudocode. Use YAML's `|` (literal block) to preserve newlines.
-
-In the HTML viewer, commentary is compiled through the same LaTeX → PDF → SVG pipeline as
-game pseudocode, so any custom environments (e.g., `\newtheorem{claim}{Claim}`) must be
-defined in your macros file.
+Each entry is raw LaTeX, written to `{label}_commentary.tex` and included by the harness after the game pseudocode. Use YAML's `|` (literal block) to preserve newlines.
 
 ### `figures`
 
@@ -120,12 +104,7 @@ figures:
     procedure_name: "Games $\\tfgamename{G0}$--$\\tfgamename{G2}$, Reduction $\\tfgamename{Red1}$"
 ```
 
-This produces `fig_all_games.tex`: a single consolidated block showing all four games
-side by side, with game-specific lines annotated by `\tfgamelabel`.
-
-The optional `procedure_name` field controls the title of the first procedure header in the
-consolidated figure. Without it, the first game's header would be used (e.g., "Game $G_0 = \ldots$").
-Here we override it to show a collective name for the figure.
+This produces `fig_all_games.tex`: a consolidated block showing all four games, with game-specific lines annotated by `\tfgamelabel`. The optional `procedure_name` overrides the title of the first procedure header.
 
 ---
 
@@ -141,9 +120,7 @@ b' \gets \Adversary^{\mathsf{LR}}() \\
 \pcreturn (b' = b)
 ```
 
-These three lines — sampling the challenge bit, running the adversary, and returning
-the result — are identical across G0, G1, G2, and Red1. Writing them once with no
-tag is all that is needed.
+These lines are identical across G0, G1, G2, and Red1.
 
 ### Lines with a tag appear only in named games
 
@@ -151,16 +128,13 @@ tag is all that is needed.
 k \getsr \{0,1\}^\lambda \\ %:tags: G0-G2
 ```
 
-The range `G0-G2` resolves to positions 0–2 in the games list: G0, G1, G2.
-Red1 (position 3) does not receive this line — it has no PRF key because it queries
-an external challenger instead.
+The range `G0-G2` resolves to positions 0--2 in the games list: G0, G1, G2. Red1 (position 3) does not get this line.
 
 ### Consecutive variant lines encode "slots"
 
-The most important structural rule: **variant lines for the same logical slot must be
-consecutive in the source file.** TeXFrog filters but never reorders lines.
+**This is the most important structural rule:** variant lines for the same logical slot must be consecutive in the source file. TeXFrog filters but never reorders lines.
 
-Here the `y` computation is a three-way slot:
+The `y` computation is a three-way slot:
 
 ```latex
 y \gets \mathrm{PRF}(k, r) \\ %:tags: G0
@@ -168,20 +142,11 @@ y \getsr \{0,1\}^\lambda \\   %:tags: G1
 y \gets \OPRF(r) \\           %:tags: Red1
 ```
 
-For each game, exactly one of these three lines survives filtering. They are consecutive
-in the source, so the chosen line always appears at the right position in the output.
-In G2, none of them survive — the `c` slot that follows handles G2 directly:
-
-```latex
-c \gets y \oplus m_b \\ %:tags: G0,G1,Red1
-c \getsr \{0,1\}^\lambda \\ %:tags: G2
-```
+For each game, exactly one of these lines survives filtering. They are consecutive, so the chosen line always appears at the right position.
 
 ### Procedure headers
 
-Lines ending with `{` are treated as procedure headers. They are never wrapped in
-`\tfchanged` (wrapping would break LaTeX brace matching) and they collapse to a single
-header in consolidated figures.
+Lines ending with `{` are procedure headers. They are never wrapped in `\tfchanged` (wrapping would break LaTeX brace matching).
 
 ```latex
 \procedure[linenumbering]{\tfgamename{G0}}{ %:tags: G0
@@ -189,8 +154,6 @@ header in consolidated figures.
 \procedure[linenumbering]{\tfgamename{G2}}{ %:tags: G2
 \procedure[linenumbering]{\tfgamename{Red1}}{ %:tags: Red1
 ```
-
-Each game sees exactly one of these four headers.
 
 ---
 
@@ -205,8 +168,8 @@ texfrog latex tutorial-cryptocode/proof.yaml -o /tmp/tf_tutorial
 # Build an interactive HTML viewer
 texfrog html build tutorial-cryptocode/proof.yaml -o /tmp/tf_tutorial_html
 
-# Or build and open immediately in your browser
-texfrog html serve tutorial-cryptocode/proof.yaml
+# Or build and open in your browser with live reload
+texfrog html serve tutorial-cryptocode/proof.yaml --live-reload
 ```
 
 ---
@@ -216,50 +179,17 @@ texfrog html serve tutorial-cryptocode/proof.yaml
 After running `texfrog latex`, the output directory contains:
 
 ```
-G0.tex              — pseudocode for G0 (no highlighting; it is the first game)
+G0.tex              — pseudocode for G0 (no highlighting; first game)
 G1.tex              — pseudocode for G1; changed lines wrapped in \tfchanged{}
 G2.tex              — pseudocode for G2; changed lines wrapped in \tfchanged{}
 Red1.tex            — pseudocode for Red1; changed lines wrapped in \tfchanged{}
-G0_commentary.tex   — LaTeX commentary text for G0
+G0_commentary.tex   — LaTeX commentary for G0
 ...
-proof_harness.tex   — \inputs macros, then each game file + commentary in order
+proof_harness.tex   — \inputs macros, then each game + commentary in order
 fig_all_games.tex   — consolidated figure with all four games annotated
 ```
 
-### What changed in each game?
-
-| Output file | Highlighted lines |
-|-------------|------------------|
-| `G1.tex` | `y ←$ {0,1}^λ` (replaced PRF call) |
-| `G2.tex` | `c ←$ {0,1}^λ` (replaced `y ⊕ m_b`) |
-| `Red1.tex` | `y ← OPRF(r)` and `c ← y ⊕ m_b` (both absent from G2, so both are "new") |
-
-### The consolidated figure
-
-`fig_all_games.tex` shows all four games in one pseudocode block. Lines that appear in
-all four games are printed verbatim; lines that appear in only some are annotated:
-
-```latex
-\tfgamelabel{\tfgamename{G0},\tfgamename{G1},\tfgamename{G2}}{        k \getsr \{0,1\}^\lambda} \\
-\tfgamelabel{\tfgamename{G0}}{        y \gets \mathrm{PRF}(k, r)} \\
-\tfgamelabel{\tfgamename{G1}}{        y \getsr \{0,1\}^\lambda} \\
-\tfgamelabel{\tfgamename{Red1}}{        y \gets \OPRF(r)} \\
-\tfgamelabel{\tfgamename{G0},\tfgamename{G1},\tfgamename{Red1}}{        c \gets y \oplus m_b} \\
-\tfgamelabel{\tfgamename{G2}}{        c \getsr \{0,1\}^\lambda} \\
-```
-
-The first argument of `\tfgamelabel` uses `\tfgamename` to display the rendered game names (e.g., `$G_0$` instead of the raw label `G0`). The default `\tfgamelabel` definition appends these names as a pseudocode comment. Override it in your paper to match your house style.
-
-### Using the output in your paper
-
-`\input` the harness into your paper's LaTeX source:
-
-```latex
-\input{/path/to/output/proof_harness.tex}
-```
-
-Or `\input` individual game files and figures as needed. See
-[docs/latex-integration.md](../docs/latex-integration.md) for full details.
+Include the harness in your paper with `\input{output/proof_harness.tex}`, or include individual game files and figures as needed. See [LaTeX integration](../docs/latex-integration.md) for details.
 
 ---
 
@@ -267,24 +197,19 @@ Or `\input` individual game files and figures as needed. See
 
 | Concept | Where demonstrated |
 |---------|-------------------|
-| Untagged lines appear in every game | `b ←$ {0,1}`, `\pcreturn (b' = b)`, `r ←$ {0,1}^λ` |
+| Untagged lines appear in every game | `b`, `b'`, `\pcreturn` lines |
 | Single-game tag | `%:tags: G0`, `%:tags: G2` |
-| Explicit list tag | `%:tags: G0,G1,Red1` |
-| Range tag | `%:tags: G0-G2` (positions 0–2, excludes Red1) |
-| Consecutive variant slot | The three `y` computation lines; the two `c` computation lines |
-| Reduction sharing structure | Red1 main body is identical to G0/G1/G2 except `k` is absent |
-| Changed-line highlighting | `y ←$ {0,1}^λ` highlighted in G1; `c ←$ {0,1}^λ` highlighted in G2 |
-| Consolidated figure | `fig_all_games.tex` annotates every game-specific line |
-| `\tfgamename` | Commentary uses `\tfgamename{G0}` to reference game names portably |
+| Comma-separated tag list | `%:tags: G0,G1,Red1` |
+| Range tag | `%:tags: G0-G2` (positions 0--2, excludes Red1) |
+| Consecutive variant slot | The three `y` lines; the two `c` lines |
+| Changed-line highlighting | `y` highlighted in G1; `c` highlighted in G2 |
+| Consolidated figure | `fig_all_games.tex` annotates game-specific lines |
+| `\tfgamename` | Commentary uses `\tfgamename{G0}` to reference game names |
 
 ---
 
 ## Next Steps
 
-- Read [docs/writing-proofs.md](../docs/writing-proofs.md) for the complete reference on
-  `proof.yaml` syntax and source-file constraints.
-- See [tutorial-nicodemus/](../tutorial-nicodemus/) for the same proof using the `nicodemus` package.
-- See [example/](../example/) for a larger proof: a QSH IND-CCA argument with 12 games
-  and reductions (also using `cryptocode`).
-- See [docs/latex-integration.md](../docs/latex-integration.md) for how to customise
-  `\tfchanged` and `\tfgamelabel` in your paper.
+- [Writing a proof](../docs/writing-proofs.md) — full reference for `proof.yaml` and source file syntax
+- [tutorial-nicodemus/](../tutorial-nicodemus/) — the same proof using the `nicodemus` package
+- [LaTeX integration](../docs/latex-integration.md) — customizing `\tfchanged` and `\tfgamelabel`

@@ -1,6 +1,6 @@
 # Using TeXFrog Output in Your LaTeX Paper
 
-After running `texfrog latex`, you have a directory of generated files to incorporate into your paper. This guide explains what each file does and how to wire them in.
+After running `texfrog latex`, you have a directory of generated files ready to include in your paper. This guide explains what each file does and how to use it.
 
 ## Generated Files
 
