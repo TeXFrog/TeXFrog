@@ -21,6 +21,7 @@ def _write_game_file(
     changed_indices: set[int],
     out_path: Path,
     macro: str = _CHANGED_MACRO,
+    procedure_header_cmd: str | None = None,
 ) -> None:
     """Write per-game LaTeX file with changed lines highlighted.
 
@@ -30,6 +31,8 @@ def _write_game_file(
         changed_indices: 0-based indices of lines to wrap with a highlighting macro.
         out_path: Destination file path.
         macro: LaTeX macro name to use for wrapping (default ``\\tfchanged``).
+        procedure_header_cmd: Package-specific command name (without backslash)
+            for procedure headers that should never be wrapped.
     """
     parts: list[str] = [f"% TeXFrog output for game: {game_label}\n"]
     for i, line in enumerate(current_lines):
@@ -39,7 +42,9 @@ def _write_game_file(
         if not line.strip():
             continue
         if i in changed_indices:
-            parts.append(wrap_changed_line(line, macro) + "\n")
+            parts.append(
+                wrap_changed_line(line, macro, procedure_header_cmd) + "\n"
+            )
         else:
             parts.append(line + "\n")
     out_path.write_text("".join(parts), encoding="utf-8")
@@ -79,6 +84,14 @@ def _write_harness_file(proof: Proof, output_dir: Path, out_path: Path) -> None:
         profile.harness_tfchanged() + "\n",
         "% Default game label macro for consolidated figures:\n",
         profile.harness_tfgamelabel() + "\n",
+    ]
+    proc_hdr_def = profile.procedure_header_def()
+    if proc_hdr_def:
+        lines += [
+            "% Procedure header command:\n",
+            proc_hdr_def + "\n",
+        ]
+    lines += [
         "%\n",
         "% Game name lookup macro (use \\tfgamename{label} in your paper):\n",
         r"\makeatletter" + "\n",
@@ -140,6 +153,8 @@ def _write_consolidated_figure(
         game_labels: Ordered list of game labels to include in this figure.
         out_path: Destination file path.
     """
+    profile = get_profile(proof.package)
+    proc_hdr_cmd = profile.procedure_header_cmd
     n = len(game_labels)
 
     # For the consolidated view, iterate over the UNION of all included lines
@@ -148,7 +163,8 @@ def _write_consolidated_figure(
         f"% TeXFrog consolidated figure: {figure_label} ({', '.join(game_labels)})\n"
     ]
 
-    # Procedure headers (lines ending with "{") require special handling: a
+    # Procedure headers (lines ending with "{", or starting with the
+    # package-specific header command) require special handling: a
     # \procedure environment can only be opened once, so consecutive game-specific
     # header variants must collapse to a single line.  We track whether the
     # previous emitted-or-skipped line was a procedure header; when it was, any
@@ -170,7 +186,10 @@ def _write_consolidated_figure(
         if not sl.content.strip():
             continue
 
+        trimmed_content = sl.content.strip()
         is_proc_header = sl.content.rstrip().endswith("{")
+        if proc_hdr_cmd and trimmed_content.startswith(f"\\{proc_hdr_cmd}{{"):
+            is_proc_header = True
 
         if is_proc_header and last_was_proc_header:
             # Subsequent variant in a procedure-header slot — skip it so that
@@ -191,14 +210,15 @@ def _write_consolidated_figure(
                 rf"\tfgamename{{{lbl}}}" for lbl in present_in
             )
             partial_macro = f"{_GAMELABEL_MACRO}{{{label_str}}}"
-            output_parts.append(wrap_changed_line(sl.content, partial_macro) + "\n")
+            output_parts.append(
+                wrap_changed_line(sl.content, partial_macro, proc_hdr_cmd) + "\n"
+            )
 
     # Post-processing: insert \\ between consecutive procedure-body lines that
     # lack one.  This can happen when multiple game-variant "last lines" (which
     # have no \\ in the source, since they end their respective game's body)
     # all appear together in the consolidated output.
     # Only applies to packages that use \\ as a line separator (e.g. cryptocode).
-    profile = get_profile(proof.package)
     if profile.has_line_separators:
         final_parts: list[str] = []
         for i, raw in enumerate(output_parts):
@@ -247,6 +267,9 @@ def generate_latex(proof: Proof, output_dir: Path) -> None:
     """
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    profile = get_profile(proof.package)
+    proc_hdr_cmd = profile.procedure_header_cmd
+
     # Build filtered lines per game, then compute diffs.
     game_lines: dict[str, list[str]] = {}
     for game in proof.games:
@@ -266,7 +289,10 @@ def generate_latex(proof: Proof, output_dir: Path) -> None:
             changed = compute_changed_lines(game_lines[prev_label], current)
 
         # Write per-game file.
-        _write_game_file(label, current, changed, output_dir / f"{label}.tex")
+        _write_game_file(
+            label, current, changed, output_dir / f"{label}.tex",
+            procedure_header_cmd=proc_hdr_cmd,
+        )
 
         # Write commentary file if commentary exists.
         commentary = proof.commentary.get(label, "")

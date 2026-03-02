@@ -261,9 +261,9 @@ def test_wrap_item_custom_macro():
 
 def test_wrap_no_item_prefix_unchanged():
     r"""Non-\item lines are unaffected by \item handling."""
-    line = r"		\textbf{Oracle} $\Oinit(\pk)$"
+    line = r"		$c \gets \mathrm{Enc}(k, m)$"
     result = wrap_changed_line(line)
-    assert result == r"\tfchanged{		\textbf{Oracle} $\Oinit(\pk)$}"
+    assert result == r"\tfchanged{		$c \gets \mathrm{Enc}(k, m)$}"
 
 
 def test_wrap_item_with_trailing_backslash():
@@ -281,14 +281,14 @@ def test_wrap_item_with_trailing_backslash():
 
 def test_wrap_trailing_percent_moved_outside():
     r"""Trailing % must be placed outside \tfchanged{} to avoid commenting out }."""
-    line = r"		\textbf{Oracle} $\Oexp(i)$%"
+    line = r"		$c \gets \mathrm{Enc}(k, m)$%"
     result = wrap_changed_line(line)
-    assert result == r"\tfchanged{		\textbf{Oracle} $\Oexp(i)$}%"
+    assert result == r"\tfchanged{		$c \gets \mathrm{Enc}(k, m)$}%"
 
 
 def test_wrap_trailing_percent_with_whitespace():
     r"""Trailing % with surrounding whitespace."""
-    line = r"		\textbf{Oracle} $\Oexp(i)$%  "
+    line = r"		$c \gets \mathrm{Enc}(k, m)$%  "
     result = wrap_changed_line(line)
     assert result.endswith("%")
     assert r"\tfchanged{" in result
@@ -351,3 +351,36 @@ def test_wrap_skip_end_environment():
     r"""\end{...} lines are environment boundaries."""
     line = r"		\end{nicodemus}%"
     assert wrap_changed_line(line) == line
+
+
+# ---------------------------------------------------------------------------
+# wrap_changed_line — procedure_header_cmd (nicodemus-style headers)
+# ---------------------------------------------------------------------------
+
+def test_wrap_skip_nicodemusheader():
+    r"""\nicodemusheader{...} lines are skipped when procedure_header_cmd is set."""
+    line = r"		\nicodemusheader{Oracle $\Oinit(\pk)$}"
+    result = wrap_changed_line(line, procedure_header_cmd="nicodemusheader")
+    assert result == line
+
+
+def test_wrap_skip_nicodemusheader_with_tag():
+    r"""\nicodemusheader with trailing content after } is still matched."""
+    line = r"		\nicodemusheader{Games $\game^b_0$-$\game^b_3$}"
+    result = wrap_changed_line(line, procedure_header_cmd="nicodemusheader")
+    assert result == line
+
+
+def test_wrap_nicodemusheader_without_cmd_still_wraps():
+    r"""Without procedure_header_cmd, \nicodemusheader lines are wrapped normally."""
+    line = r"		\nicodemusheader{Oracle $\Oinit(\pk)$}"
+    result = wrap_changed_line(line)
+    assert result == r"\tfchanged{		\nicodemusheader{Oracle $\Oinit(\pk)$}}"
+
+
+def test_wrap_item_not_affected_by_header_cmd():
+    r"""\item lines still wrap normally even when procedure_header_cmd is set."""
+    line = r"			\item $x\getsr\Zp$"
+    result = wrap_changed_line(line, procedure_header_cmd="nicodemusheader")
+    assert result.startswith("\t\t\t\\item ")
+    assert r"\tfchanged{$x\getsr\Zp$}" in result

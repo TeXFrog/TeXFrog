@@ -84,6 +84,9 @@ def _build_wrapper_template(
             profile.html_tfremoved().replace("{", "{{").replace("}", "}}"),
             profile.html_tfgamelabel().replace("{", "{{").replace("}", "}}"),
         ]
+        proc_hdr_def = profile.procedure_header_def()
+        if proc_hdr_def:
+            parts.append(proc_hdr_def.replace("{", "{{").replace("}", "}}"))
     parts += [
         "{macro_inputs}",
         "{gamename_defs}",
@@ -295,7 +298,13 @@ def _extract_mathjax_macros(macro_paths: list[str], proof_dir: Path) -> str:
         for line in text.splitlines():
             stripped = line.strip()
             if any(stripped.startswith(p) for p in MACRO_PREFIXES):
-                collected.append(stripped)
+                # Only collect complete single-line definitions (balanced
+                # braces).  Multi-line definitions typically contain
+                # LaTeX-only commands that MathJax cannot handle, and
+                # collecting just the opening line would produce invalid
+                # TeX that breaks the entire MathJax macro block.
+                if stripped.count("{") == stripped.count("}"):
+                    collected.append(stripped)
     return "\n".join(collected)
 
 
@@ -406,6 +415,8 @@ def generate_html(
         )
 
     # Build wrapper templates from the proof's package profile.
+    profile = get_profile(proof.package)
+    proc_hdr_cmd = profile.procedure_header_cmd
     user_preamble = ""
     if proof.preamble:
         preamble_path = (proof_dir / proof.preamble).resolve()
@@ -442,6 +453,7 @@ def generate_html(
                 game.label, prev_lines, removed_indices,
                 latex_dir / f"{game.label}-removed.tex",
                 macro=r"\tfremoved",
+                procedure_header_cmd=proc_hdr_cmd,
             )
 
         # Generate clean (no-highlight) .tex files for related_games references.
@@ -454,6 +466,7 @@ def generate_html(
             _write_game_file(
                 label, clean_lines, set(),
                 latex_dir / f"{label}-clean.tex",
+                procedure_header_cmd=proc_hdr_cmd,
             )
 
         # Step 2: compile all games to SVG in parallel.

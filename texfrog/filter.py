@@ -124,7 +124,11 @@ def compute_changed_lines(prev_lines: list[str], curr_lines: list[str]) -> set[i
     return changed
 
 
-def wrap_changed_line(line: str, macro: str = r"\tfchanged") -> str:
+def wrap_changed_line(
+    line: str,
+    macro: str = r"\tfchanged",
+    procedure_header_cmd: str | None = None,
+) -> str:
     r"""Wrap a changed pseudocode line with a highlighting macro.
 
     Several kinds of lines are returned **verbatim** (never wrapped):
@@ -178,6 +182,10 @@ def wrap_changed_line(line: str, macro: str = r"\tfchanged") -> str:
     # \procedure{Name}{ or \nicodemusbox{...}{%) — wrapping them would break
     # LaTeX brace-matching.  Such structural lines are returned verbatim.
     if core.endswith("{"):
+        return line
+    # Don't wrap procedure header lines identified by a package-specific
+    # command (e.g. \nicodemusheader{...}).
+    if procedure_header_cmd and trimmed.startswith(f"\\{procedure_header_cmd}{{"):
         return line
     # Don't wrap layout-only commands that control column/box dimensions.
     # These vary between games but are not proof content.

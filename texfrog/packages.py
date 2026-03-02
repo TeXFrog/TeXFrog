@@ -40,6 +40,14 @@ class PackageProfile:
     has no built-in comment macro.
     """
 
+    procedure_header_cmd: str | None = None
+    """LaTeX command name (without backslash) for procedure headers.
+
+    Lines starting with this command are treated as structural headers
+    and are never wrapped with ``\\tfchanged``.  ``None`` if the package
+    uses structural braces (``endswith("{")``) to mark headers instead.
+    """
+
     # -- Derived macro definitions ------------------------------------------
 
     def html_tfchanged(self) -> str:
@@ -80,6 +88,18 @@ class PackageProfile:
             )
         return r"\providecommand{\tfgamelabel}[2]{#2}"
 
+    def procedure_header_def(self) -> str | None:
+        r"""``\providecommand`` definition for the procedure header command.
+
+        Returns ``None`` if the profile has no procedure header command.
+        """
+        if self.procedure_header_cmd is None:
+            return None
+        return (
+            rf"\providecommand{{\{self.procedure_header_cmd}}}"
+            r"[1]{\textbf{#1}}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Built-in profiles
@@ -105,6 +125,7 @@ BUILTIN_PROFILES: dict[str, PackageProfile] = {
         has_line_separators=False,
         math_mode_content=False,
         gamelabel_comment_cmd=None,
+        procedure_header_cmd="nicodemusheader",
     ),
 }
 
