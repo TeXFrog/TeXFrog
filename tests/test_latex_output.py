@@ -528,6 +528,63 @@ def test_nicodemus_consolidated_no_backslash_insertion(tmp_path):
         assert not l.rstrip().endswith("\\\\"), f"Unexpected \\\\ in: {l}"
 
 
+# ---------------------------------------------------------------------------
+# Changed-line diffing skips reductions
+# ---------------------------------------------------------------------------
+
+
+def test_game_after_reduction_diffs_against_previous_game(tmp_path):
+    """A non-reduction game should diff against the previous non-reduction game,
+    not against an intervening reduction."""
+    games = [
+        Game(label="G0", latex_name="G_0", description=""),
+        Game(label="Red", latex_name="Red", description="", reduction=True),
+        Game(label="G1", latex_name="G_1", description=""),
+    ]
+    source_lines = [
+        SourceLine(r"    common \\", None, ""),
+        # same_line appears identically in G0 and G1 but NOT in Red
+        SourceLine(r"    same_line \\", frozenset({"G0", "G1"}), ""),
+        SourceLine(r"    red_line \\", frozenset({"Red"}), ""),
+    ]
+    proof = Proof(
+        macros=[], games=games, source_lines=source_lines,
+        commentary={}, figures=[],
+    )
+    generate_latex(proof, tmp_path)
+    g1_text = (tmp_path / "G1.tex").read_text()
+    # same_line is identical in G0 and G1, so it should NOT be highlighted
+    same_lines = [l for l in g1_text.splitlines() if "same_line" in l]
+    assert same_lines
+    for l in same_lines:
+        assert r"\tfchanged" not in l, (
+            "same_line should not be marked changed when diffing G1 against G0"
+        )
+
+
+def test_reduction_diffs_against_immediately_preceding(tmp_path):
+    """A reduction should diff against the immediately preceding entry."""
+    games = [
+        Game(label="G0", latex_name="G_0", description=""),
+        Game(label="Red", latex_name="Red", description="", reduction=True),
+    ]
+    source_lines = [
+        SourceLine(r"    common \\", None, ""),
+        SourceLine(r"    g0_only \\", frozenset({"G0"}), ""),
+        SourceLine(r"    red_only \\", frozenset({"Red"}), ""),
+    ]
+    proof = Proof(
+        macros=[], games=games, source_lines=source_lines,
+        commentary={}, figures=[],
+    )
+    generate_latex(proof, tmp_path)
+    red_text = (tmp_path / "Red.tex").read_text()
+    # red_only replaces g0_only — should be highlighted
+    red_lines = [l for l in red_text.splitlines() if "red_only" in l]
+    assert red_lines
+    assert any(r"\tfchanged" in l for l in red_lines)
+
+
 def test_nicodemus_harness_skips_sty_files(tmp_path):
     r""".sty files in macros should NOT get \input{} in the harness."""
     games = [Game(label="G0", latex_name="G_0", description="")]

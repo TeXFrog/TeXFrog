@@ -282,11 +282,26 @@ def generate_latex(proof: Proof, output_dir: Path) -> None:
         current = game_lines[label]
 
         # Compute changed lines relative to previous game.
+        # Non-reduction games diff against the previous non-reduction game
+        # (skipping intervening reductions); reductions diff against the
+        # immediately preceding entry.
         if i == 0:
             changed: set[int] = set()
         else:
-            prev_label = ordered_labels[i - 1]
-            changed = compute_changed_lines(game_lines[prev_label], current)
+            if game.reduction:
+                prev_label = ordered_labels[i - 1]
+            else:
+                prev_label = None
+                for j in range(i - 1, -1, -1):
+                    if not proof.games[j].reduction:
+                        prev_label = ordered_labels[j]
+                        break
+            if prev_label is None:
+                changed = set()
+            else:
+                changed = compute_changed_lines(
+                    game_lines[prev_label], current
+                )
 
         # Write per-game file.
         _write_game_file(
