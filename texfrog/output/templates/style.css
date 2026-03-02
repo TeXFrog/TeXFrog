@@ -49,3 +49,37 @@ body { display: flex; height: 100vh; font-family: sans-serif; }
                   padding: 1rem; text-align: center; display: inline-block; }
 #commentary-box:empty { display: none; }
 #commentary-box img { height: auto; display: inline-block; zoom: var(--commentary-zoom); }
+
+/* Help button & overlay */
+#help-btn { position: fixed; bottom: 20px; right: 20px; width: 2.2rem; height: 2.2rem;
+            border-radius: 50%; border: 1px solid #aaa; background: #fff; color: #555;
+            font-size: 1.2rem; font-weight: bold; cursor: pointer; z-index: 9000;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15); display: flex;
+            align-items: center; justify-content: center; }
+#help-btn:hover { background: #e8e8e8; color: #333; }
+#help-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+                z-index: 9500; align-items: center; justify-content: center; }
+#help-overlay.visible { display: flex; }
+#help-content { background: #fff; border-radius: 8px; padding: 1.5rem 2rem; max-width: 380px;
+                box-shadow: 0 4px 20px rgba(0,0,0,0.25); font-size: 0.9rem; }
+#help-content h3 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em;
+                   color: #555; margin: 0 0 0.5rem; }
+#help-content h3:nth-of-type(2) { margin-top: 1rem; }
+#help-content table { width: 100%; border-collapse: collapse; }
+#help-content td { padding: 0.25rem 0; }
+#help-content td:first-child { width: 6rem; white-space: nowrap; }
+#help-content kbd { display: inline-block; padding: 0.15rem 0.45rem; background: #f4f4f4;
+                    border: 1px solid #ccc; border-radius: 3px; font-family: inherit;
+                    font-size: 0.85rem; line-height: 1.3; }
+#help-content ul { list-style: disc; padding-left: 1.2rem; }
+#help-content li { margin-bottom: 0.3rem; }
+#help-content code { background: #f4f4f4; padding: 0.1rem 0.35rem; border-radius: 3px;
+                     font-size: 0.85rem; }
+#help-branding { margin: 0 0 1rem; padding-bottom: 0.75rem; border-bottom: 1px solid #e0e0e0;
+                 font-size: 1rem; color: #333; text-align: center; font-weight: bold; }
+#help-branding a { color: #4a90d9; text-decoration: none; }
+#help-branding a:hover { text-decoration: underline; }
+#help-content > button { margin-top: 1rem; padding: 0.35rem 1.2rem; border: 1px solid #aaa;
+                         border-radius: 4px; background: #fff; cursor: pointer;
+                         font-size: 0.85rem; display: block; margin-left: auto; }
+#help-content > button:hover { background: #e8e8e8; }

@@ -41,6 +41,27 @@
       <div id="commentary-box"></div>
     </div>
   </div>
+  <button id="help-btn" onclick="toggleHelp()" title="Keyboard shortcuts (?)"
+          aria-label="Show keyboard shortcuts">?</button>
+  <div id="help-overlay" onclick="toggleHelp()">
+    <div id="help-content" onclick="event.stopPropagation()">
+      <p id="help-branding">Generated with <a href="https://texfrog.github.io/" target="_blank" rel="noopener">TeXFrog</a></p>
+      <h3>Keyboard shortcuts</h3>
+      <table>
+        <tr><td><kbd>&larr;</kbd> <kbd>&uarr;</kbd></td><td>Previous game</td></tr>
+        <tr><td><kbd>&rarr;</kbd> <kbd>&darr;</kbd></td><td>Next game</td></tr>
+        <tr><td><kbd>+</kbd></td><td>Zoom in</td></tr>
+        <tr><td><kbd>&minus;</kbd></td><td>Zoom out</td></tr>
+        <tr><td><kbd>?</kbd></td><td>Toggle this help</td></tr>
+      </table>
+      <h3>Tips</h3>
+      <ul>
+        <li>URL hash links directly to a game (e.g. <code>#G3</code>)</li>
+        <li>Live reload auto-refreshes when using <code>--live-reload</code></li>
+      </ul>
+      <button onclick="toggleHelp()">Close</button>
+    </div>
+  </div>
   <script src="app.js"></script>
   <script>
     const GAMES = {{ games_json|safe }};

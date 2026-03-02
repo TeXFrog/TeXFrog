@@ -162,7 +162,16 @@ function navigate(delta) {
   showGame(currentIndex + delta);
 }
 
+function toggleHelp() {
+  document.getElementById('help-overlay').classList.toggle('visible');
+}
+
 document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    document.getElementById('help-overlay').classList.remove('visible');
+    return;
+  }
+  if (e.key === '?') { toggleHelp(); return; }
   if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') navigate(-1);
   if (e.key === 'ArrowRight' || e.key === 'ArrowDown') navigate(+1);
   if (e.key === '+' || e.key === '=') adjustZoom(+0.1);
