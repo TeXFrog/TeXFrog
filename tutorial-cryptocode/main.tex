@@ -44,10 +44,54 @@ left-or-right oracle,
 \end{theorem}
 
 \noindent\textit{Proof.}\quad
-We proceed via a sequence of games.
+We proceed via a sequence of games. Figure~\ref{fig:all-games} shows all the games, and the games are also shown individually in subsequent figures.
 
-% The proof harness (\input's each game's pseudocode and commentary).
-\input{proof_harness.tex}
+\begin{figure}[ht]
+\centering
+\input{fig_all_games.tex}
+\caption{Consolidated figure showing games $\tfgamename{G0}$--$\tfgamename{G2}$.}
+\label{fig:all-games}
+\end{figure}
+
+\paragraph{Game~$\tfgamename{G0}$.}
+\input{G0_commentary.tex}
+
+\begin{figure}[ht]
+\centering
+\input{G0.tex}
+\caption{Game~$\tfgamename{G0}$: $\INDCPA_\Enc^\Adversary.\mathsf{Real}()$: the real IND-CPA game. The LR oracle encrypts using the actual PRF.}
+\label{fig:G0}
+\end{figure}
+
+\paragraph{Game~$\tfgamename{G1}$.}
+\input{G1_commentary.tex}
+
+\begin{figure}[ht]
+\centering
+\input{G1.tex}
+\caption{Game~$\tfgamename{G1}$: Replace $\mathrm{PRF}(k, r)$ with a truly random value.}
+\label{fig:G1}
+\end{figure}
+
+\paragraph{Reduction~$\tfgamename{Red1}$.}
+\input{Red1_commentary.tex}
+
+\begin{figure}[ht]
+\centering
+\input{Red1.tex}
+\caption{Reduction~$\tfgamename{Red1}$: Reduction against PRF security, simulating Games~\tfgamename{G0} and~\tfgamename{G1} via an external PRF challenger.}
+\label{fig:Red1}
+\end{figure}
+
+\paragraph{Game~$\tfgamename{G2}$.}
+\input{G2_commentary.tex}
+
+\begin{figure}[ht]
+\centering
+\input{G2.tex}
+\caption{Game~$\tfgamename{G2}$: $\INDCPA_\Enc^\Adversary.\mathsf{Ideal}()$: the ideal IND-CPA game. Ciphertext is uniformly random, independent of~$m_b$.}
+\label{fig:G2}
+\end{figure}
 
 \noindent
 Combining the bounds from each game hop, we obtain
@@ -60,9 +104,5 @@ Combining the bounds from each game hop, we obtain
   \;+\; 0 \,,
 \]
 which completes the proof.\hfill$\square$
-
-\subsection*{A consolidated figure}
-
-\input{fig_all_games.tex}
 
 \end{document}
