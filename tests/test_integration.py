@@ -30,7 +30,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 TEXFROG = str(Path(sys.executable).parent / "texfrog")
 
 # Tutorial directories to test.  Add new entries here as tutorials are created.
-_TUTORIAL_NAMES = ["tutorial", "tutorial-nicodemus"]
+_TUTORIAL_NAMES = ["tutorial-cryptocode", "tutorial-nicodemus"]
 
 # ---------------------------------------------------------------------------
 # Skip markers
