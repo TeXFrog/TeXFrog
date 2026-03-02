@@ -2,6 +2,8 @@
 
 This is the reference guide for TeXFrog's two input files: a YAML configuration (`proof.yaml`) and a combined LaTeX source (`games_source.tex`). For a hands-on introduction, start with the [cryptocode tutorial](../tutorial-cryptocode/) or the [nicodemus tutorial](../tutorial-nicodemus/) instead.
 
+> **Tip:** Run `texfrog init` to scaffold a starter proof with commented templates, then modify the generated files. Use `texfrog init --package nicodemus` for nicodemus-flavored templates.
+
 ## Overview
 
 A game-hopping proof consists of a sequence of games (and reductions) where adjacent games usually differ by only a few lines of pseudocode. TeXFrog lets you write all games in a single source file, tagging each line with the games it belongs to. Lines without a tag appear in every game.

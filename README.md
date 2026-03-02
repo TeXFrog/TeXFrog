@@ -51,7 +51,23 @@ pip install -e .
 
 ## Quick Start
 
-TeXFrog ships with tutorials you can try right away:
+The fastest way to start a new proof is with `texfrog init`:
+
+```bash
+# Scaffold a new proof in the current directory (cryptocode, the default)
+texfrog init
+
+# Or in a new directory, using the nicodemus package
+texfrog init myproof --package nicodemus
+```
+
+This creates a minimal, runnable proof (`proof.yaml`, `games_source.tex`, and `macros.tex`) with comments explaining each field. Build it immediately:
+
+```bash
+texfrog latex proof.yaml -o /tmp/tf_output
+```
+
+TeXFrog also ships with tutorials you can study:
 
 ```bash
 # Tutorial: IND-CPA proof (4 games/reductions)
@@ -65,6 +81,14 @@ texfrog html serve tutorial-cryptocode/proof.yaml --live-reload
 ```
 
 ## Usage
+
+### Scaffold a new proof
+
+```bash
+texfrog init [DIRECTORY] [--package cryptocode|nicodemus]
+```
+
+Creates starter files in DIRECTORY (default: current directory). The `--package` option selects the pseudocode package (default: `cryptocode`). Existing files are never overwritten.
 
 ### Generate LaTeX output
 

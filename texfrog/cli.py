@@ -9,6 +9,7 @@ import click
 
 from .parser import parse_proof
 from .output.latex import generate_latex
+from .templates import get_templates
 
 
 def _resolve_yaml_path(input_path: str) -> Path:
@@ -31,6 +32,54 @@ def _resolve_yaml_path(input_path: str) -> Path:
 @click.group()
 def main() -> None:
     """TeXFrog: organise and render cryptographic game-hopping proofs in LaTeX."""
+
+
+# ---------------------------------------------------------------------------
+# texfrog init
+# ---------------------------------------------------------------------------
+
+@main.command("init")
+@click.argument("directory", default=".", type=click.Path())
+@click.option(
+    "--package",
+    type=click.Choice(["cryptocode", "nicodemus"], case_sensitive=False),
+    default="cryptocode",
+    show_default=True,
+    help="Package profile for the generated templates.",
+)
+def init_cmd(directory: str, package: str) -> None:
+    """Scaffold a new proof with starter files.
+
+    Creates proof.yaml, a combined source file, and a macros file in DIRECTORY
+    (default: current directory).  The generated proof is immediately buildable
+    with ``texfrog latex``.
+    """
+    target = Path(directory).resolve()
+    target.mkdir(parents=True, exist_ok=True)
+
+    templates = get_templates(package)
+    written: list[str] = []
+    for filename, (content, description) in templates.items():
+        dest = target / filename
+        if dest.exists():
+            click.echo(f"Skipping {filename} (already exists).", err=True)
+            continue
+        dest.write_text(content, encoding="utf-8")
+        written.append(filename)
+
+    if not written:
+        click.echo("No files written (all already exist).")
+    else:
+        click.echo(
+            f"Created {len(written)} file(s) in {target}/:\n  "
+            + "\n  ".join(written)
+        )
+        click.echo(
+            f"\nNext steps:\n"
+            f"  1. Edit proof.yaml and games_source.tex to describe your proof.\n"
+            f"  2. Run: texfrog latex {directory}/proof.yaml\n"
+            f"  3. Run: texfrog html serve {directory}/proof.yaml"
+        )
 
 
 # ---------------------------------------------------------------------------

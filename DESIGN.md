@@ -34,7 +34,8 @@ TeXFrog/
 │   ├── parser.py               # YAML + tagged .tex parsing, range resolution
 │   ├── filter.py               # Line filtering, diff, \tfchanged wrapping
 │   ├── packages.py             # PackageProfile dataclass + built-in profiles
-│   ├── cli.py                  # Click CLI: texfrog latex / html build / html serve
+│   ├── cli.py                  # Click CLI: texfrog init / latex / html build / html serve
+│   ├── templates.py            # Inline template strings for texfrog init
 │   ├── watcher.py              # File watching + safe rebuild for live-reload
 │   └── output/
 │       ├── __init__.py
@@ -380,10 +381,20 @@ rebuilds + reloads the browser on changes.
 Built with Click. Entry point: `texfrog` → `texfrog.cli:main`.
 
 ```
+texfrog init [DIRECTORY] [--package cryptocode|nicodemus]
 texfrog latex INPUT.yaml [-o DIR]
 texfrog html build INPUT.yaml [-o DIR]
 texfrog html serve INPUT.yaml [-o DIR] [--port 8080] [--no-browser] [--live-reload]
 ```
+
+### `texfrog init`
+
+Scaffolds a new proof directory with starter files (`proof.yaml`, `games_source.tex`,
+`macros.tex`). The `--package` option selects the template flavour (default: `cryptocode`).
+Existing files are never overwritten — skipped with a warning instead.
+
+Templates are stored as inline strings in `texfrog/templates.py`. Each template set
+produces a minimal 3-game proof that is immediately buildable with `texfrog latex`.
 
 Default output dirs: `texfrog_latex/` (latex) and `texfrog_html/` (html), both
 created next to the input YAML file.
