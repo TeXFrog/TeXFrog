@@ -78,7 +78,13 @@ def html_group() -> None:
     default=None,
     help="Output directory (default: texfrog_html/ next to INPUT.yaml).",
 )
-def html_build_cmd(input_yaml: str, output_dir: str | None) -> None:
+@click.option(
+    "--keep-tmp",
+    is_flag=True,
+    default=False,
+    help="Keep intermediate LaTeX/PDF files in a temp directory.",
+)
+def html_build_cmd(input_yaml: str, output_dir: str | None, keep_tmp: bool) -> None:
     """Build the interactive HTML proof viewer.
 
     Requires pdflatex and pdf2svg (or pdftocairo) to be installed.
@@ -100,7 +106,7 @@ def html_build_cmd(input_yaml: str, output_dir: str | None) -> None:
 
     click.echo(f"Building HTML site in {out} …")
     try:
-        generate_html(proof, yaml_path.parent, out)
+        generate_html(proof, yaml_path.parent, out, keep_tmp=keep_tmp)
     except Exception as exc:
         click.echo(f"Error building HTML: {exc}", err=True)
         sys.exit(1)
@@ -118,11 +124,18 @@ def html_build_cmd(input_yaml: str, output_dir: str | None) -> None:
 )
 @click.option("--port", default=8080, show_default=True, help="Port to listen on.")
 @click.option("--no-browser", is_flag=True, default=False, help="Don't open a browser.")
+@click.option(
+    "--keep-tmp",
+    is_flag=True,
+    default=False,
+    help="Keep intermediate LaTeX/PDF files in a temp directory.",
+)
 def html_serve_cmd(
     input_yaml: str,
     output_dir: str | None,
     port: int,
     no_browser: bool,
+    keep_tmp: bool,
 ) -> None:
     """Build and serve the interactive HTML proof viewer on localhost."""
     from .output.html import generate_html, serve_html
@@ -142,7 +155,7 @@ def html_serve_cmd(
 
     click.echo(f"Building HTML site in {out} …")
     try:
-        generate_html(proof, yaml_path.parent, out)
+        generate_html(proof, yaml_path.parent, out, keep_tmp=keep_tmp)
     except Exception as exc:
         click.echo(f"Error building HTML: {exc}", err=True)
         sys.exit(1)

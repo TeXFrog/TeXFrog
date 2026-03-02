@@ -13,6 +13,7 @@ System requirements (not installed via pip):
 from __future__ import annotations
 
 import concurrent.futures
+import contextlib
 import http.server
 import importlib.resources
 import json
@@ -166,6 +167,7 @@ def _compile_game_to_svg(
     game_names: dict[str, str] | None = None,
     wrapper_template: str = "",
     converter: str | None = None,
+    tmp_parent: Path | None = None,
 ) -> None:
     """Compile one game's LaTeX file to an SVG image.
 
@@ -182,6 +184,9 @@ def _compile_game_to_svg(
             ``_build_wrapper_template()``.
         converter: SVG converter tool name ('pdf2svg' or 'pdftocairo').
             If ``None``, auto-detected via ``_find_svg_converter()``.
+        tmp_parent: If provided, create a named subdirectory here for
+            compilation files and keep it after compilation.  When
+            ``None``, a system temp directory is used and cleaned up.
 
     Raises:
         RuntimeError: If pdflatex or SVG conversion fails.
@@ -200,8 +205,12 @@ def _compile_game_to_svg(
             "Install a TeX distribution (e.g. TeX Live or MacTeX)."
         )
 
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp_path = Path(tmp)
+    with contextlib.ExitStack() as stack:
+        if tmp_parent is not None:
+            tmp_path = tmp_parent / game_label
+            tmp_path.mkdir(parents=True, exist_ok=True)
+        else:
+            tmp_path = Path(stack.enter_context(tempfile.TemporaryDirectory()))
 
         # Copy the game .tex file into the temp dir so pdflatex runs from a
         # path that contains no spaces (LaTeX's \input{} can't handle spaces).
@@ -361,7 +370,12 @@ def _expand_tfgamename(text: str, game_names: dict[str, str]) -> str:
     return "".join(parts)
 
 
-def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
+def generate_html(
+    proof: Proof,
+    proof_dir: Path,
+    output_dir: Path,
+    keep_tmp: bool = False,
+) -> None:
     """Build the interactive HTML proof viewer.
 
     Steps:
@@ -373,6 +387,8 @@ def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
         proof: The parsed proof.
         proof_dir: Directory containing the proof's macro files.
         output_dir: Destination directory for the HTML site.
+        keep_tmp: If True, preserve the intermediate LaTeX/PDF files
+            instead of cleaning them up.
     """
     output_dir.mkdir(parents=True, exist_ok=True)
     games_dir = output_dir / "games"
@@ -405,8 +421,12 @@ def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
     )
 
     # Step 1: generate LaTeX files in a temp directory.
-    with tempfile.TemporaryDirectory() as tmp:
-        latex_dir = Path(tmp)
+    with contextlib.ExitStack() as stack:
+        if keep_tmp:
+            latex_dir = Path(tempfile.mkdtemp(prefix="texfrog_"))
+            print(f"  Keeping intermediate files in {latex_dir}", file=sys.stderr)
+        else:
+            latex_dir = Path(stack.enter_context(tempfile.TemporaryDirectory()))
         generate_latex(proof, latex_dir)
 
         # Generate removed-highlight .tex files for the side-by-side view.
@@ -499,6 +519,7 @@ def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
                     task_label, tex_path, proof.macros, proof_dir,
                     svg_path, game_names=gn, wrapper_template=tmpl,
                     converter=converter,
+                    tmp_parent=latex_dir if keep_tmp else None,
                 )
             except (RuntimeError, EnvironmentError) as exc:
                 print(
