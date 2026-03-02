@@ -1,6 +1,6 @@
 # TeXFrog — Claude Instructions
 
-See `DESIGN.md` for full architecture, algorithms, and implementation notes.
+See `docs/system-design.md` for full architecture, algorithms, and implementation notes.
 
 ## Quick Reference
 

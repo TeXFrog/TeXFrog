@@ -2,6 +2,8 @@
 
 > **Note:** TeXFrog is an early-stage tool under active development. The input format, command-line interface, and output may change as the design evolves. Feedback, suggestions, and contributions are very welcome — see [Contributing](#contributing) below.
 
+> **Disclaimer:** Much of this codebase was vibe-coded with the assistance of large language models. While it has a test suite and works on the examples we have tried, there may be rough edges. Please report any issues you encounter.
+
 TeXFrog helps cryptographers manage game-hopping proofs in LaTeX. If you have ever maintained a dozen nearly-identical game files by hand, copying lines between them and trying to keep highlights consistent, TeXFrog is meant to solve that problem.
 
 **Key idea:** Write your pseudocode once in a single source file. Tag each line with the games it belongs to using `%:tags:` comments. TeXFrog produces:
@@ -143,8 +145,8 @@ Comparing the two tutorials side by side shows the syntax differences between ps
 ## Documentation
 
 - [Writing a proof](docs/writing-proofs.md) — `proof.yaml` and `games_source.tex` reference
-- [LaTeX integration](docs/latex-integration.md) — incorporating output into your paper, customizing highlight macros
-- [DESIGN.md](DESIGN.md) — architecture and implementation notes (for contributors)
+- [Using TeXFrog Output in Your LaTeX Paper](docs/latex-integration.md) — incorporating output into your paper, customizing highlight macros
+- [Troubleshooting & FAQ](docs/troubleshooting.md) — common problems proof authors encounter
 
 ## Contributing
 
