@@ -16,7 +16,11 @@ All from that one source file.
 
 TeXFrog currently supports the [`cryptocode`](https://ctan.org/pkg/cryptocode) and [`nicodemus`](https://github.com/awslabs/nicodemus) pseudocode packages.
 
-## What It Looks Like
+## Screenshot of web viewer
+
+![TeXFrog HTML proof viewer](docs/images/screenshot-web.png)
+
+## What The Source Code Looks Like
 
 A snippet of the combined source file (`games_source.tex`):
 
@@ -37,19 +41,30 @@ Lines with no `%:tags:` comment appear in every game. Lines with tags appear onl
 
 - **Python** >= 3.10
 - **LaTeX** — [TeX Live](https://tug.org/texlive/) or [MacTeX](https://tug.org/mactex/) (for `pdflatex` and `pdfcrop`)
-- **Poppler** — for `pdftocairo` (`brew install poppler` on macOS), or `pdf2svg` as an alternative
+- **Poppler** or **pdf2svg** — for `pdftocairo` (`brew install poppler` on macOS), or `pdf2svg` as an alternative
 
 LaTeX and Poppler are only needed for the HTML viewer (`texfrog html`). The LaTeX output mode (`texfrog latex`) works with Python alone.
 
-## Installation
+## Installation and Running
+
+Because TeXFrog is still in preview mode, it is not yet available to install via `pip`. You will need to install it by cloning it from GitHub:
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/TeXFrog/TeXFrog
 cd TeXFrog
 python3 -m venv .venv
 source .venv/bin/activate    # on macOS/Linux; use .venv\Scripts\activate on Windows
 pip install -e .
 ```
+
+When you open a new terminal session and want to run TeXFrog, you will need to reactivate the Python virtual environment:
+
+```bash
+cd TeXFrog
+source .venv/bin/activate    # on macOS/Linux; use .venv\Scripts\activate on Windows
+```
+
+After activating the virtual environment, you can `cd` to any directory on your computer and run the `texfrog` command.
 
 ## Quick Start
 
@@ -158,6 +173,10 @@ To set up a development environment:
 pip install -e ".[dev]"
 pytest tests/ -q
 ```
+
+## Acknowledgements
+
+TeXFrog was originally created by Douglas Stebila, based on discussions with many people over the years about the desire for a tool for managing LaTeX source code of pen-and-paper proofs. Much of this codebase was vibe-coded with the assistance of large language models, especially Anthropic Claude.
 
 ## License
 
