@@ -35,6 +35,7 @@ TeXFrog/
 │   ├── filter.py               # Line filtering, diff, \tfchanged wrapping
 │   ├── packages.py             # PackageProfile dataclass + built-in profiles
 │   ├── cli.py                  # Click CLI: texfrog latex / html build / html serve
+│   ├── watcher.py              # File watching + safe rebuild for live-reload
 │   └── output/
 │       ├── __init__.py
 │       ├── latex.py            # generate_latex(): per-game .tex, commentary, harness, figures
@@ -342,6 +343,36 @@ Reductions support a `related_games` field listing zero, one, or two game labels
 - **2 related games**: the first clean game on the left, the highlighted reduction in
   the middle, the second clean game on the right.
 
+### Live Reload (`watcher.py` + `output/html.py`)
+
+When `--live-reload` is passed to `html serve`, the tool watches the proof's source
+files (YAML config, `.tex` source, macros, preamble) using `watchdog` and automatically
+rebuilds + reloads the browser on changes.
+
+**File watching** (`watcher.py`):
+- `collect_watched_files(yaml_path)` reads the YAML with `yaml.safe_load` (lightweight,
+  does not run full `parse_proof` validation) and returns the set of absolute paths.
+- `_DebouncedHandler` ignores events for files not in the watched set and debounces
+  rapid changes (0.5 s quiet period) before triggering a rebuild.
+- `safe_rebuild()` builds into a staging temp dir (created in `output_dir.parent` to
+  guarantee same-filesystem). On success, the old output dir is atomically swapped via
+  rename. On failure, the existing site is left untouched and the error is logged.
+- After each successful rebuild, the watched file set is refreshed from the YAML in case
+  it changed (e.g. a new macro file was added).
+
+**Browser reload** (`output/html.py`):
+- `serve_html_live()` uses a custom `LiveReloadHandler` subclass that adds a
+  `/_texfrog/version` JSON endpoint returning `{"version": N}`.
+- A small inline `<script>` is injected into `index.html` at serve time (not at build
+  time — `generate_html` output is unaffected). The script polls the version endpoint
+  every 1 second and calls `location.reload()` when the version changes.
+- On reload, a toast notification appears in the bottom-right corner showing the
+  timestamp (e.g. "Reloaded at 14:32:05"), with a close button and 10-second auto-dismiss.
+  The toast uses `sessionStorage` to pass the "just reloaded" flag across the page reload.
+- All responses include `Cache-Control: no-store` so the browser always fetches fresh
+  SVGs after a rebuild. Version endpoint polls are suppressed from the server's terminal
+  log output.
+
 ---
 
 ## CLI (`cli.py`)
@@ -351,7 +382,7 @@ Built with Click. Entry point: `texfrog` → `texfrog.cli:main`.
 ```
 texfrog latex INPUT.yaml [-o DIR]
 texfrog html build INPUT.yaml [-o DIR]
-texfrog html serve INPUT.yaml [-o DIR] [--port 8080] [--no-browser]
+texfrog html serve INPUT.yaml [-o DIR] [--port 8080] [--no-browser] [--live-reload]
 ```
 
 Default output dirs: `texfrog_latex/` (latex) and `texfrog_html/` (html), both

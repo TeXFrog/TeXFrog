@@ -8,7 +8,7 @@ TeXFrog is a tool for cryptographers who write game-hopping proofs in LaTeX. Ins
 
 **Python packages** (installed via pip):
 - Python ≥ 3.10
-- `pyyaml`, `click`, `jinja2` (installed automatically)
+- `pyyaml`, `click`, `jinja2`, `watchdog` (installed automatically)
 
 **System tools** (installed separately):
 - `pdflatex` — from [TeX Live](https://tug.org/texlive/) or [MacTeX](https://tug.org/mactex/)
@@ -54,6 +54,7 @@ texfrog latex tutorial-nicodemus/proof.yaml -o /tmp/tf_tutorial_nic
 texfrog latex example/proof.yaml -o /tmp/tf_latex
 texfrog html build example/proof.yaml -o /tmp/tf_html
 texfrog html serve example/proof.yaml --port 8080
+texfrog html serve example/proof.yaml --live-reload
 ```
 
 ## Usage
@@ -79,10 +80,12 @@ Compiles each game to SVG via pdflatex and produces a static HTML site in `texfr
 ### Serve the HTML viewer
 
 ```bash
-texfrog html serve INPUT.yaml [-o OUTPUT_DIR] [--port 8080] [--no-browser]
+texfrog html serve INPUT.yaml [-o OUTPUT_DIR] [--port 8080] [--no-browser] [--live-reload]
 ```
 
 Builds the HTML site and starts a local web server. Opens your browser automatically unless `--no-browser` is given.
+
+With `--live-reload`, TeXFrog watches the proof's source files (YAML config, `.tex` source, macros, and preamble) for changes and automatically rebuilds the site and reloads the browser page. If a rebuild fails (e.g. due to a LaTeX error), the existing site is kept and the error is logged to the terminal.
 
 ## Writing a Proof
 

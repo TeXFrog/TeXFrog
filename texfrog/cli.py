@@ -148,12 +148,19 @@ def html_build_cmd(input_yaml: str, output_dir: str | None, keep_tmp: bool) -> N
     default=False,
     help="Keep intermediate LaTeX/PDF files in a temp directory.",
 )
+@click.option(
+    "--live-reload",
+    is_flag=True,
+    default=False,
+    help="Watch source files and rebuild/reload automatically on changes.",
+)
 def html_serve_cmd(
     input_yaml: str,
     output_dir: str | None,
     port: int,
     no_browser: bool,
     keep_tmp: bool,
+    live_reload: bool,
 ) -> None:
     """Build and serve the interactive HTML proof viewer on localhost.
 
@@ -181,4 +188,27 @@ def html_serve_cmd(
         click.echo(f"Error building HTML: {exc}", err=True)
         sys.exit(1)
 
-    serve_html(out, port=port, open_browser=not no_browser)
+    if live_reload:
+        import logging
+
+        from .output.html import serve_html_live
+        from .watcher import start_watcher
+
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s [%(levelname)s] %(message)s",
+            datefmt="%H:%M:%S",
+        )
+
+        version = [1]
+        observer = start_watcher(
+            yaml_path, out, keep_tmp=keep_tmp,
+            version=version, debounce_seconds=0.5,
+        )
+        try:
+            serve_html_live(out, version, port=port, open_browser=not no_browser)
+        finally:
+            observer.stop()
+            observer.join()
+    else:
+        serve_html(out, port=port, open_browser=not no_browser)

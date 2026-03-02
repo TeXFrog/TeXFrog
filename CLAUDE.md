@@ -21,6 +21,7 @@ pip install -e ".[dev]"          # if reinstall needed
 .venv/bin/texfrog html build example/proof.yaml -o /tmp/tfhtml
 .venv/bin/texfrog latex tutorial-cryptocode/proof.yaml -o /tmp/tflatex-tutorial
 .venv/bin/texfrog latex tutorial-nicodemus/proof.yaml -o /tmp/tflatex-tutorial-nic
+.venv/bin/texfrog html serve --live-reload tutorial-cryptocode/proof.yaml -o /tmp/tfhtml
 ```
 
 System requirements (not pip): `pdflatex`, `pdftocairo` (or `pdf2svg`), `pdfcrop`.

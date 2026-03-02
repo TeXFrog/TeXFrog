@@ -609,3 +609,180 @@ def serve_html(html_dir: Path, port: int = 8080, open_browser: bool = True) -> N
         server.serve_forever()
     except KeyboardInterrupt:
         print("\nServer stopped.")
+
+
+# ---------------------------------------------------------------------------
+# Live-reload server
+# ---------------------------------------------------------------------------
+
+_LIVE_RELOAD_JS = """\
+<style>
+#texfrog-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: rgba(30, 30, 30, 0.9);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font: 13px/1.4 system-ui, sans-serif;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  opacity: 1;
+  transition: opacity 0.4s ease;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+#texfrog-toast.fade-out { opacity: 0; }
+#texfrog-toast button {
+  background: none;
+  border: none;
+  color: #aaa;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+#texfrog-toast button:hover { color: #fff; }
+</style>
+<script>
+(function() {
+  // Show toast if we just reloaded via live-reload.
+  var reloadedAt = sessionStorage.getItem('texfrog_reloaded_at');
+  if (reloadedAt) {
+    sessionStorage.removeItem('texfrog_reloaded_at');
+    var toast = document.createElement('div');
+    toast.id = 'texfrog-toast';
+    toast.innerHTML = 'Reloaded at ' + reloadedAt +
+      ' <button onclick="this.parentNode.remove()" title="Dismiss">&times;</button>';
+    document.body.appendChild(toast);
+    setTimeout(function() {
+      toast.classList.add('fade-out');
+      setTimeout(function() { toast.remove(); }, 500);
+    }, 10000);
+  }
+
+  // Poll for version changes.
+  var currentVersion = null;
+  function checkVersion() {
+    fetch('/_texfrog/version')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (currentVersion === null) {
+          currentVersion = data.version;
+        } else if (data.version !== currentVersion) {
+          currentVersion = data.version;
+          var now = new Date();
+          var ts = now.getHours().toString().padStart(2,'0') + ':' +
+                   now.getMinutes().toString().padStart(2,'0') + ':' +
+                   now.getSeconds().toString().padStart(2,'0');
+          sessionStorage.setItem('texfrog_reloaded_at', ts);
+          window.location.reload();
+        }
+      })
+      .catch(function() {})
+      .finally(function() { setTimeout(checkVersion, 1000); });
+  }
+  checkVersion();
+})();
+</script>
+"""
+
+
+def serve_html_live(
+    html_dir: Path,
+    version: list[int],
+    port: int = 8080,
+    open_browser: bool = True,
+) -> None:
+    """Serve the HTML site with live-reload support.
+
+    Adds a ``/_texfrog/version`` JSON endpoint and injects a polling
+    script into ``index.html`` that reloads the page when the version
+    changes.
+
+    Args:
+        html_dir: Directory containing the built HTML site.
+        version: Mutable ``[int]`` list; ``version[0]`` is returned by
+            the version endpoint and incremented by the watcher on
+            successful rebuild.
+        port: TCP port to listen on.
+        open_browser: Whether to launch the default browser.
+    """
+
+    class LiveReloadHandler(http.server.SimpleHTTPRequestHandler):
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=str(html_dir), **kwargs)
+
+        def do_GET(self):
+            if self.path == "/_texfrog/version":
+                body = json.dumps({"version": version[0]}).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            super().do_GET()
+
+        def end_headers(self):
+            self.send_header("Cache-Control", "no-store")
+            super().end_headers()
+
+        def do_HEAD(self):
+            # Override so send_head isn't called twice for index.html.
+            if self.path in ("/", "/index.html"):
+                # For HEAD requests on index, delegate to parent directly.
+                super().do_HEAD()
+                return
+            super().do_HEAD()
+
+        def send_head(self):
+            # Inject the live-reload script into index.html.
+            if self.path in ("/", "/index.html"):
+                index_path = Path(self.directory) / "index.html"
+                try:
+                    content = index_path.read_text(encoding="utf-8")
+                except OSError:
+                    return super().send_head()
+                content = content.replace("</body>", _LIVE_RELOAD_JS + "</body>")
+                encoded = content.encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(encoded)))
+                self.end_headers()
+                self.wfile.write(encoded)
+                return None
+            return super().send_head()
+
+        def log_message(self, format, *args):
+            if args and "/_texfrog/version" in str(args[0]):
+                return
+            super().log_message(format, *args)
+
+    for attempt_port in range(port, port + 100):
+        try:
+            server = http.server.HTTPServer(
+                ("127.0.0.1", attempt_port), LiveReloadHandler,
+            )
+            break
+        except OSError:
+            continue
+    else:
+        raise RuntimeError(
+            f"Could not find an available port in range {port}\u2013{port + 99}"
+        )
+
+    url = f"http://127.0.0.1:{attempt_port}/"
+    print(f"Serving proof viewer at {url}  (live-reload enabled, Ctrl-C to stop)")
+
+    if open_browser:
+        threading.Timer(0.5, lambda: webbrowser.open(url)).start()
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nServer stopped.")
