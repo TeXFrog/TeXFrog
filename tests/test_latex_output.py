@@ -433,3 +433,104 @@ def test_consolidated_last_line_variants_separator_added(tmp_path):
     assert g0_line.rstrip().endswith("\\\\")
     # G1's return is the last before } → no \\
     assert not g1_line.rstrip().endswith("\\\\")
+
+
+# ---------------------------------------------------------------------------
+# Nicodemus package support
+# ---------------------------------------------------------------------------
+
+
+def _make_nicodemus_proof(source_lines=None, game_labels=None, figures=None):
+    """Build a minimal nicodemus-package Proof."""
+    if game_labels is None:
+        game_labels = ["G0", "G1"]
+    if source_lines is None:
+        source_lines = [
+            SourceLine(r"		\begin{nicodemus}", None, ""),
+            SourceLine(r"			\item common line", None, ""),
+            SourceLine(r"			\item $x\getsr\Zp$", frozenset({"G0"}), ""),
+            SourceLine(r"			\item $x\gets\Ogen$", frozenset({"G1"}), ""),
+            SourceLine(r"			\item Return $x$", None, ""),
+            SourceLine(r"		\end{nicodemus}%", None, ""),
+        ]
+    games = [Game(label=lbl, latex_name=lbl, description="") for lbl in game_labels]
+    return Proof(
+        macros=[],
+        games=games,
+        source_lines=source_lines,
+        commentary={},
+        figures=figures or [],
+        package="nicodemus",
+    )
+
+
+def test_nicodemus_harness_no_ensuremath(tmp_path):
+    r"""Nicodemus harness \tfchanged should NOT use $..$ wrapping."""
+    proof = _make_nicodemus_proof()
+    generate_latex(proof, tmp_path)
+    text = (tmp_path / "proof_harness.tex").read_text()
+    assert r"\providecommand{\tfchanged}[1]{\colorbox{blue!15}{#1}}" in text
+    assert "$#1$" not in text
+
+
+def test_nicodemus_harness_no_pccomment(tmp_path):
+    r"""Nicodemus harness \tfgamelabel should NOT use \pccomment."""
+    proof = _make_nicodemus_proof()
+    generate_latex(proof, tmp_path)
+    text = (tmp_path / "proof_harness.tex").read_text()
+    assert r"\pccomment" not in text
+
+
+def test_nicodemus_game_item_prefix_outside_tfchanged(tmp_path):
+    r"""\item prefix must stay outside \tfchanged in per-game output."""
+    proof = _make_nicodemus_proof()
+    generate_latex(proof, tmp_path)
+    text = (tmp_path / "G1.tex").read_text()
+    # G1 should have \tfchanged for the G1-only line
+    assert r"\tfchanged" in text
+    # \item should NOT be inside \tfchanged
+    changed_lines = [l for l in text.splitlines() if r"\tfchanged" in l]
+    for l in changed_lines:
+        assert r"\tfchanged{\item" not in l.replace(" ", "").replace("\t", "")
+
+
+def test_nicodemus_consolidated_no_backslash_insertion(tmp_path):
+    r"""Nicodemus consolidated figures must NOT insert \\ between lines."""
+    source_lines = [
+        SourceLine(r"		\begin{nicodemus}", None, ""),
+        SourceLine(r"			\item common line", None, ""),
+        SourceLine(r"			\item $x\getsr\Zp$", frozenset({"G0"}), ""),
+        SourceLine(r"			\item $x\gets\Ogen$", frozenset({"G1"}), ""),
+        SourceLine(r"			\item Return $x$", None, ""),
+        SourceLine(r"		\end{nicodemus}%", None, ""),
+    ]
+    proof = _make_nicodemus_proof(
+        source_lines=source_lines,
+        figures=[Figure(label="main", games=["G0", "G1"])],
+    )
+    generate_latex(proof, tmp_path)
+    text = (tmp_path / "fig_main.tex").read_text()
+    # No \\ should have been inserted — nicodemus uses \item, not \\
+    content_lines = [l for l in text.splitlines()
+                     if l.strip() and not l.strip().startswith("%")]
+    for l in content_lines:
+        # Lines should NOT end with \\ (nicodemus doesn't use line separators)
+        assert not l.rstrip().endswith("\\\\"), f"Unexpected \\\\ in: {l}"
+
+
+def test_nicodemus_harness_skips_sty_files(tmp_path):
+    r""".sty files in macros should NOT get \input{} in the harness."""
+    games = [Game(label="G0", latex_name="G_0", description="")]
+    proof = Proof(
+        macros=["commands.tex", "nicodemus.sty", "bpmarker.sty"],
+        games=games,
+        source_lines=[SourceLine(r"\item test", None, "")],
+        commentary={},
+        figures=[],
+        package="nicodemus",
+    )
+    generate_latex(proof, tmp_path)
+    text = (tmp_path / "proof_harness.tex").read_text()
+    assert r"\input{commands.tex}" in text
+    assert r"\input{nicodemus.sty}" not in text
+    assert r"\input{bpmarker.sty}" not in text

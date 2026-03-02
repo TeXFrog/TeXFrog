@@ -8,7 +8,17 @@ A game-hopping proof consists of a sequence of games (and reductions). Adjacent 
 
 ## The YAML Configuration File
 
-The YAML file has five sections: `macros`, `source`, `games`, `commentary`, and `figures`.
+The YAML file has up to seven sections: `package`, `macros`, `preamble`, `source`, `games`, `commentary`, and `figures`.
+
+### `package` (optional)
+
+Selects the pseudocode LaTeX package. Available options: `cryptocode` (default), `nicodemus`.
+
+```yaml
+package: nicodemus
+```
+
+This controls how TeXFrog generates macro definitions (e.g., whether `\tfchanged` wraps content in math mode), how it handles line separators in consolidated figures, and which packages are loaded in the HTML build wrapper. If omitted, defaults to `cryptocode`.
 
 ### `macros`
 
@@ -18,9 +28,20 @@ A list of LaTeX files containing macro definitions, relative to the YAML file's 
 macros:
   - macros.tex
   - ../shared/crypto-macros.tex
+  - nicodemus.sty         # .sty files are copied but not \input'd
 ```
 
-These files are `\input`-ed into the HTML compilation and into the generated harness. You can list as many as you need.
+`.tex` files are `\input`-ed into the HTML compilation and the generated harness. `.sty` and `.cls` files are copied to the build directory (so `\usepackage` can find them) but are NOT `\input`-ed. You can list as many files as you need.
+
+### `preamble` (optional)
+
+A path to a `.tex` file containing extra `\usepackage` lines needed for the HTML build, relative to the YAML file.
+
+```yaml
+preamble: preamble.tex
+```
+
+Use this for packages that your proof needs beyond what the package profile provides. For example, if your macros use `\usepackage{stmaryrd}` or `\usepackage{lmodern}`, list them in the preamble file.
 
 ### `source`
 
@@ -85,7 +106,7 @@ commentary:
 
 Use YAML's literal block scalar (`|`) to preserve newlines. LaTeX environments, math, and display equations all work here. You can use `\tfgamename{G1}` to reference a game's `latex_name` — see [latex-integration.md](latex-integration.md).
 
-**HTML viewer:** Commentary is compiled through the same LaTeX → PDF → SVG pipeline as game pseudocode, so any LaTeX commands or environments used in commentary (e.g., `\newtheorem{claim}{Claim}`) must be defined in your macros file. The packages available in the HTML compilation wrapper are: `cryptocode`, `amsfonts`, `amsmath`, `amsthm`, `adjustbox`, and `xcolor`.
+**HTML viewer:** Commentary is compiled through the same LaTeX → PDF → SVG pipeline as game pseudocode, so any LaTeX commands or environments used in commentary (e.g., `\newtheorem{claim}{Claim}`) must be defined in your macros file. The packages available in the HTML compilation wrapper include your selected pseudocode package (e.g., `cryptocode` or `nicodemus`), plus `amsfonts`, `amsmath`, `amsthm`, `adjustbox`, and `xcolor`. Additional packages can be added via the `preamble` field.
 
 ### `figures` (optional)
 
@@ -179,16 +200,47 @@ When generating the LaTeX output, TeXFrog wraps changed lines in `\tfchanged{}` 
 
 **Avoid blank lines between tagged variants.** Only untagged blank lines appear in the output; tagged blank lines are excluded with their game. Blank lines in output are stripped regardless to prevent `varwidth` dimension errors in pseudocode environments like `pcvstack`.
 
+## Package-Specific Notes
+
+### cryptocode (default)
+
+- Lines end with `\\` as a separator (except the last line of each procedure body)
+- Content is in math mode (inside `\procedure` environments)
+- `\tfchanged` wraps content in `$...$` for text-mode containers
+- Consolidated figures insert `\\` between adjacent game-specific lines
+- `\tfgamelabel` uses `\pccomment` for inline game labels
+
+### nicodemus
+
+- Lines start with `\item` (enumerate-based pseudocode)
+- Content is in text mode (inside `\begin{nicodemus}` environments)
+- `\tfchanged` wraps content directly (no math-mode wrapping)
+- `\item` prefix is kept outside `\tfchanged{}` to preserve list structure
+- Consolidated figures do NOT insert `\\` between lines
+- `\tfgamelabel` outputs the content without a comment macro
+
 ## Complete Example
 
-The `example/` directory contains a full worked example: a QSH IND-CCA proof with 12 entries (G0–G9, Red2, Red5).
+The repository includes two worked examples:
+
+### cryptocode example
+
+The `example/` directory contains a QSH IND-CCA proof with 12 entries (G0–G9, Red2, Red5), using the `cryptocode` package (default).
 
 - [example/proof.yaml](../example/proof.yaml) — the YAML config
 - [example/games_source.tex](../example/games_source.tex) — the combined source
 
-To try it:
+### nicodemus example
+
+The `example-ntor/` directory contains a signed-DH (ntor) IND proof with 6 entries (G0–G3, RedSig, RedCDH), using the `nicodemus` package.
+
+- [example-ntor/proof.yaml](../example-ntor/proof.yaml) — the YAML config with `package: nicodemus`
+- [example-ntor/games_source.tex](../example-ntor/games_source.tex) — the combined source with `\item`-based lines
+
+To try either:
 
 ```bash
 texfrog latex example/proof.yaml -o /tmp/tf_latex
+texfrog latex example-ntor/proof.yaml -o /tmp/tf_ntor
 texfrog html serve example/proof.yaml
 ```

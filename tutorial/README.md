@@ -1,5 +1,7 @@
 # TeXFrog Tutorial
 
+> **Note:** This tutorial uses the `cryptocode` package (the default). For a `nicodemus` example, see [example-ntor/](../example-ntor/).
+
 This tutorial walks through a small, complete proof to introduce every TeXFrog concept.
 The proof is short enough to read in full, but exercises every feature of the tool.
 
@@ -277,6 +279,8 @@ Or `\input` individual game files and figures as needed. See
 - Read [docs/writing-proofs.md](../docs/writing-proofs.md) for the complete reference on
   `proof.yaml` syntax and source-file constraints.
 - See [example/](../example/) for a larger proof: a QSH IND-CCA argument with 12 games
-  and reductions.
+  and reductions (also using `cryptocode`).
+- See [example-ntor/](../example-ntor/) for a proof using the `nicodemus` package: a signed-DH
+  (ntor) IND proof with 6 games and reductions.
 - See [docs/latex-integration.md](../docs/latex-integration.md) for how to customise
   `\tfchanged` and `\tfgamelabel` in your paper.

@@ -6,6 +6,7 @@ from pathlib import Path
 
 from ..filter import compute_changed_lines, filter_for_game, wrap_changed_line
 from ..model import Proof
+from ..packages import get_profile
 
 # Macro used to highlight changed lines.
 _CHANGED_MACRO = r"\tfchanged"
@@ -70,13 +71,14 @@ def _write_harness_file(proof: Proof, output_dir: Path, out_path: Path) -> None:
             to produce relative paths for ``\input``).
         out_path: Destination file path for the harness.
     """
+    profile = get_profile(proof.package)
     lines: list[str] = [
         "% TeXFrog proof harness — \\input this file in your main paper\n",
         "%\n",
         "% Default highlight macro for changed lines:\n",
-        r"\providecommand{\tfchanged}[1]{\colorbox{blue!15}{$#1$}}" + "\n",
+        profile.harness_tfchanged() + "\n",
         "% Default game label macro for consolidated figures:\n",
-        r"\providecommand{\tfgamelabel}[2]{#2 \pccomment{#1}}" + "\n",
+        profile.harness_tfgamelabel() + "\n",
         "%\n",
         "% Game name lookup macro (use \\tfgamename{label} in your paper):\n",
         r"\makeatletter" + "\n",
@@ -89,8 +91,13 @@ def _write_harness_file(proof: Proof, output_dir: Path, out_path: Path) -> None:
         "%\n",
     ]
 
-    # Macro files (paths relative to harness location)
+    # Macro files (paths relative to harness location).
+    # .sty/.cls files are loaded via \usepackage in the paper preamble,
+    # not via \input in the harness.
     for macro_file in proof.macros:
+        suffix = Path(macro_file).suffix.lower()
+        if suffix in (".sty", ".cls"):
+            continue
         lines.append(f"\\input{{{macro_file}}}\n")
 
     lines.append("%\n")
@@ -190,32 +197,37 @@ def _write_consolidated_figure(
     # lack one.  This can happen when multiple game-variant "last lines" (which
     # have no \\ in the source, since they end their respective game's body)
     # all appear together in the consolidated output.
-    final_parts: list[str] = []
-    for i, raw in enumerate(output_parts):
-        line = raw.rstrip("\n")
-        stripped = line.strip()
+    # Only applies to packages that use \\ as a line separator (e.g. cryptocode).
+    profile = get_profile(proof.package)
+    if profile.has_line_separators:
+        final_parts: list[str] = []
+        for i, raw in enumerate(output_parts):
+            line = raw.rstrip("\n")
+            stripped = line.strip()
 
-        # Only consider adding \\ to lines that are pseudocode content:
-        # not empty, not a comment, not a structural brace/environment line,
-        # and not already ending with \\.
-        if (
-            stripped
-            and not stripped.startswith("%")
-            and stripped != "}"
-            and not stripped.startswith("\\begin{")
-            and not stripped.startswith("\\end{")
-            and not line.rstrip().endswith("{")
-            and not line.rstrip().endswith("\\\\")
-        ):
-            # Look ahead to the next non-comment content line.
-            for j in range(i + 1, len(output_parts)):
-                nc = output_parts[j].strip()
-                if nc and not nc.startswith("%"):
-                    if nc != "}" and not nc.startswith("\\end{"):
-                        line = line.rstrip() + " \\\\"
-                    break
+            # Only consider adding \\ to lines that are pseudocode content:
+            # not empty, not a comment, not a structural brace/environment line,
+            # and not already ending with \\.
+            if (
+                stripped
+                and not stripped.startswith("%")
+                and stripped != "}"
+                and not stripped.startswith("\\begin{")
+                and not stripped.startswith("\\end{")
+                and not line.rstrip().endswith("{")
+                and not line.rstrip().endswith("\\\\")
+            ):
+                # Look ahead to the next non-comment content line.
+                for j in range(i + 1, len(output_parts)):
+                    nc = output_parts[j].strip()
+                    if nc and not nc.startswith("%"):
+                        if nc != "}" and not nc.startswith("\\end{"):
+                            line = line.rstrip() + " \\\\"
+                        break
 
-        final_parts.append(line + "\n")
+            final_parts.append(line + "\n")
+    else:
+        final_parts = output_parts
 
     out_path.write_text("".join(final_parts), encoding="utf-8")
 

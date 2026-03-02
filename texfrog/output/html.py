@@ -31,51 +31,73 @@ from jinja2 import Environment, PackageLoader
 
 from ..filter import compute_removed_lines, filter_for_game
 from ..model import Proof
+from ..packages import get_profile
 from .latex import _write_game_file, generate_latex
 
 # ---------------------------------------------------------------------------
 # LaTeX wrapper template used to compile individual game files to PDF
 # ---------------------------------------------------------------------------
 
-_WRAPPER_TEMPLATE = r"""\documentclass{{article}}
-% Standard letter paper; pdfcrop removes whitespace after compilation.
-% Pseudocode box environments (pcvstack etc.) use their natural width anyway.
-\usepackage[letterpaper,margin=1in]{{geometry}}
-\usepackage[n,advantage,operators,sets,adversary,landau,probability,notions,logic,ff,mm,primitives,events,complexity,oracles,asymptotics,keys]{{cryptocode}}
-\usepackage{{amsfonts,amsmath,amsthm}}
-\usepackage{{adjustbox}}
-\usepackage[dvipsnames,table]{{xcolor}}
-\newcommand{{\solidbox}}[1]{{\adjustbox{{fbox}}{{\strut #1}}}}
-\newcommand{{\graybox}}[1]{{\adjustbox{{cframe=black!15, bgcolor=black!15}}{{\strut #1}}}}
-\newcommand{{\highlightbox}}[2][RoyalBlue!20]{{\adjustbox{{cframe=#1, bgcolor=#1}}{{\strut #2}}}}
-\newcommand{{\tfchanged}}[1]{{\highlightbox{{\ensuremath{{#1}}}}}}
-\newcommand{{\tfremoved}}[1]{{\textcolor{{red}}{{\ensuremath{{#1}}}}}}
-\newcommand{{\tfgamelabel}}[2]{{#2 \pccomment{{#1}}}}
-{macro_inputs}
-{gamename_defs}
-\pagestyle{{empty}}
-\begin{{document}}
-\input{{{game_file}}}
-\end{{document}}
-"""
+def _build_wrapper_template(
+    package_name: str,
+    user_preamble_content: str = "",
+    commentary: bool = False,
+) -> str:
+    r"""Build a LaTeX wrapper template string for HTML compilation.
 
-# Commentary wrapper: uses article class (same as game wrapper) with pdfcrop
-# to trim whitespace.  \raggedright avoids justified text filling to a fixed
-# \textwidth so the cropped result is tight around the prose.
-_COMMENTARY_WRAPPER_TEMPLATE = r"""\documentclass{{article}}
-\usepackage[letterpaper,margin=1in]{{geometry}}
-\usepackage[n,advantage,operators,sets,adversary,landau,probability,notions,logic,ff,mm,primitives,events,complexity,oracles,asymptotics,keys]{{cryptocode}}
-\usepackage{{amsfonts,amsmath,amsthm}}
-\usepackage{{adjustbox}}
-\usepackage[dvipsnames,table]{{xcolor}}
-{macro_inputs}
-{gamename_defs}
-\pagestyle{{empty}}
-\begin{{document}}
-\raggedright
-\input{{{game_file}}}
-\end{{document}}
-"""
+    The wrapper is tailored to the pseudocode package in use.  For game
+    wrappers (``commentary=False``) it includes highlighting macros
+    (``\tfchanged``, ``\tfremoved``, ``\tfgamelabel``).  For commentary
+    wrappers it omits them (commentary text uses none of those macros).
+
+    Args:
+        package_name: Package profile name (e.g. ``"cryptocode"``).
+        user_preamble_content: Extra LaTeX lines from the user's preamble
+            ``.tex`` file (inserted after common packages).
+        commentary: If ``True``, build the commentary wrapper variant.
+
+    Returns:
+        A wrapper template string with ``{macro_inputs}``,
+        ``{gamename_defs}``, and ``{game_file}`` placeholders.
+    """
+    profile = get_profile(package_name)
+    parts: list[str] = [
+        r"\documentclass{{article}}",
+        r"\usepackage[letterpaper,margin=1in]{{geometry}}",
+    ]
+    for pkg_line in profile.preamble_lines:
+        # Double braces for .format() escaping
+        parts.append(pkg_line.replace("{", "{{").replace("}", "}}"))
+    parts += [
+        r"\usepackage{{amsfonts,amsmath,amsthm}}",
+        r"\usepackage{{adjustbox}}",
+        r"\usepackage[dvipsnames,table]{{xcolor}}",
+    ]
+    if user_preamble_content:
+        # Insert user preamble lines (already escaped for .format())
+        parts.append(user_preamble_content.replace("{", "{{").replace("}", "}}"))
+    if not commentary:
+        parts += [
+            r"\newcommand{{\solidbox}}[1]{{\adjustbox{{fbox}}{{\strut #1}}}}",
+            r"\newcommand{{\graybox}}[1]{{\adjustbox{{cframe=black!15, bgcolor=black!15}}{{\strut #1}}}}",
+            r"\newcommand{{\highlightbox}}[2][RoyalBlue!20]{{\adjustbox{{cframe=#1, bgcolor=#1}}{{\strut #2}}}}",
+            profile.html_tfchanged().replace("{", "{{").replace("}", "}}"),
+            profile.html_tfremoved().replace("{", "{{").replace("}", "}}"),
+            profile.html_tfgamelabel().replace("{", "{{").replace("}", "}}"),
+        ]
+    parts += [
+        "{macro_inputs}",
+        "{gamename_defs}",
+        r"\pagestyle{{empty}}",
+        r"\begin{{document}}",
+    ]
+    if commentary:
+        parts.append(r"\raggedright")
+    parts += [
+        r"\input{{{game_file}}}",
+        r"\end{{document}}",
+    ]
+    return "\n".join(parts) + "\n"
 
 
 def _find_svg_converter() -> Optional[str]:
@@ -142,7 +164,7 @@ def _compile_game_to_svg(
     proof_dir: Path,
     svg_out_path: Path,
     game_names: dict[str, str] | None = None,
-    wrapper_template: str = _WRAPPER_TEMPLATE,
+    wrapper_template: str = "",
     converter: str | None = None,
 ) -> None:
     """Compile one game's LaTeX file to an SVG image.
@@ -156,9 +178,8 @@ def _compile_game_to_svg(
         game_names: Optional mapping from game label to ``latex_name``.
             When provided, ``\\tfgamename`` definitions are added to the
             wrapper preamble so that commentary can reference game names.
-        wrapper_template: LaTeX wrapper template string. Defaults to
-            ``_WRAPPER_TEMPLATE``; use ``_COMMENTARY_WRAPPER_TEMPLATE``
-            for prose commentary (uses ``varwidth`` for tight cropping).
+        wrapper_template: LaTeX wrapper template string built by
+            ``_build_wrapper_template()``.
         converter: SVG converter tool name ('pdf2svg' or 'pdftocairo').
             If ``None``, auto-detected via ``_find_svg_converter()``.
 
@@ -187,14 +208,20 @@ def _compile_game_to_svg(
         game_local = tmp_path / "game.tex"
         shutil.copy2(game_tex_path, game_local)
 
-        # Copy each macro file into the temp dir under a flat name.
-        # Build the corresponding \input{} lines using those local names.
+        # Copy each macro file into the temp dir.
+        # .sty/.cls files are copied with their original name (so \usepackage
+        # can find them) and do NOT get \input{} lines.
+        # .tex files are copied under a flat prefixed name and \input{}'d.
         macro_input_lines: list[str] = []
         for i, rel_path in enumerate(macro_paths):
             src = (proof_dir / rel_path).resolve()
-            local_name = f"macros_{i:02d}_{src.name}"
-            shutil.copy2(src, tmp_path / local_name)
-            macro_input_lines.append(f"\\input{{{local_name}}}")
+            suffix = src.suffix.lower()
+            if suffix in (".sty", ".cls"):
+                shutil.copy2(src, tmp_path / src.name)
+            else:
+                local_name = f"macros_{i:02d}_{src.name}"
+                shutil.copy2(src, tmp_path / local_name)
+                macro_input_lines.append(f"\\input{{{local_name}}}")
         macro_inputs = "\n".join(macro_input_lines)
 
         # Build \tfgamename definitions if game_names were provided.
@@ -226,7 +253,7 @@ def _compile_game_to_svg(
             text=True,
         )
         pdf_path = tmp_path / "wrapper.pdf"
-        if result.returncode != 0 or not pdf_path.exists():
+        if not pdf_path.exists():
             raise RuntimeError(
                 f"pdflatex failed for game {game_label}:\n{result.stdout[-3000:]}"
             )
@@ -364,6 +391,19 @@ def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
             "Install a TeX distribution (e.g. TeX Live or MacTeX)."
         )
 
+    # Build wrapper templates from the proof's package profile.
+    user_preamble = ""
+    if proof.preamble:
+        preamble_path = (proof_dir / proof.preamble).resolve()
+        if preamble_path.exists():
+            user_preamble = preamble_path.read_text(encoding="utf-8")
+    wrapper_template = _build_wrapper_template(
+        proof.package, user_preamble, commentary=False,
+    )
+    commentary_wrapper_template = _build_wrapper_template(
+        proof.package, user_preamble, commentary=True,
+    )
+
     # Step 1: generate LaTeX files in a temp directory.
     with tempfile.TemporaryDirectory() as tmp:
         latex_dir = Path(tmp)
@@ -417,7 +457,7 @@ def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
                 (latex_dir / f"{label}.tex").resolve(),
                 games_dir / f"{label}.svg",
                 None,
-                _WRAPPER_TEMPLATE,
+                wrapper_template,
             ))
             # Removed (red strikethrough) version — needed for non-reduction
             # games that have a successor non-reduction game.
@@ -427,7 +467,7 @@ def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
                     (latex_dir / f"{label}-removed.tex").resolve(),
                     games_dir / f"{label}-removed.svg",
                     None,
-                    _WRAPPER_TEMPLATE,
+                    wrapper_template,
                 ))
             # Clean (no-highlight) version — needed for related_games display.
             if label in clean_labels:
@@ -436,7 +476,7 @@ def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
                     (latex_dir / f"{label}-clean.tex").resolve(),
                     games_dir / f"{label}-clean.svg",
                     None,
-                    _WRAPPER_TEMPLATE,
+                    wrapper_template,
                 ))
             # Commentary
             commentary = proof.commentary.get(label, "")
@@ -446,7 +486,7 @@ def generate_html(proof: Proof, proof_dir: Path, output_dir: Path) -> None:
                     (latex_dir / f"{label}_commentary.tex").resolve(),
                     games_dir / f"{label}_commentary.svg",
                     game_names,
-                    _COMMENTARY_WRAPPER_TEMPLATE,
+                    commentary_wrapper_template,
                 ))
 
         def _compile_task(

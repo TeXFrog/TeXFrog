@@ -1,0 +1,27 @@
+package: nicodemus
+
+macros:
+  - macros.tex
+
+source: source.tex
+
+games:
+  - label: G0
+    latex_name: '\game^b_0'
+    description: 'The starting game.'
+  - label: G1
+    latex_name: '\game^b_1'
+    description: 'Modified game.'
+  - label: Red1
+    latex_name: '\advB_1'
+    description: 'Reduction.'
+    reduction: true
+    related_games: [G0, G1]
+
+commentary:
+  G0: |
+    This is the starting game.
+
+figures:
+  - label: all_games
+    games: "G0,G1"

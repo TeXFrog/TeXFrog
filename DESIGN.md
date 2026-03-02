@@ -17,8 +17,9 @@ to. The tool then:
 3. Produces consolidated figures showing multiple games annotated side-by-side
 4. Builds an interactive HTML site (via pdflatex → pdftocairo → SVG)
 
-The tool is pseudocode-package-agnostic: it works with `cryptocode`, `algorithmic`,
-`algpseudocode`, etc., since it operates at the level of physical lines.
+The tool supports multiple LaTeX pseudocode packages via a **package profile** system.
+Currently supported: `cryptocode` (default) and `nicodemus`. Each profile captures
+differences in line separators, content mode, and macro definitions.
 
 ---
 
@@ -32,19 +33,28 @@ TeXFrog/
 │   ├── model.py                # Dataclasses: Proof, Game, SourceLine, Figure
 │   ├── parser.py               # YAML + tagged .tex parsing, range resolution
 │   ├── filter.py               # Line filtering, diff, \tfchanged wrapping
+│   ├── packages.py             # PackageProfile dataclass + built-in profiles
 │   ├── cli.py                  # Click CLI: texfrog latex / html build / html serve
 │   └── output/
 │       ├── __init__.py
 │       ├── latex.py            # generate_latex(): per-game .tex, commentary, harness, figures
 │       └── html.py             # generate_html() + serve_html(): pdflatex → SVG → HTML site
 ├── tests/
-│   ├── fixtures/simple/        # Minimal YAML + source.tex for fast unit tests
-│   ├── test_parser.py          # 20 tests: tag parsing, range resolution, full parse_proof
-│   ├── test_filter.py          # 16 tests: filter_for_game, compute_changed_lines, wrap_changed_line
-│   └── test_latex_output.py    # 20 tests: per-game files, harness, consolidated figures
+│   ├── fixtures/simple/        # Minimal cryptocode YAML + source.tex for fast unit tests
+│   ├── fixtures/nicodemus/     # Minimal nicodemus YAML + source.tex for package tests
+│   ├── test_parser.py
+│   ├── test_filter.py
+│   └── test_latex_output.py
 ├── example/
-│   ├── proof.yaml              # QSH IND-CCA proof config (12 games/reductions)
+│   ├── proof.yaml              # QSH IND-CCA proof config (12 games/reductions, cryptocode)
 │   └── games_source.tex        # Combined tagged source for the example
+├── example-ntor/
+│   ├── proof.yaml              # Signed-DH (ntor) IND proof config (6 games/reductions, nicodemus)
+│   ├── games_source.tex        # Combined tagged source
+│   ├── preamble.tex            # Extra \usepackage lines for HTML build
+│   ├── commands.tex            # Proof-specific macros
+│   ├── nicodemus.sty           # The nicodemus package
+│   └── bpmarker.sty            # Marker/boxing package
 └── CompositeKEMs/              # Reference only — NOT part of the Python package
     ├── simple_extract.tex      # Original 562-line proof (reference/inspiration)
     └── macros.tex              # Crypto macros used by the example
@@ -84,6 +94,8 @@ class Proof:
     source_lines: list[SourceLine] # All lines from combined source
     commentary: dict[str, str]     # label → raw LaTeX text
     figures: list[Figure]          # Consolidated figure specs
+    package: str = "cryptocode"    # Package profile name (see packages.py)
+    preamble: Optional[str] = None # Path to extra preamble .tex (relative to YAML dir)
 ```
 
 ---
@@ -93,8 +105,13 @@ class Proof:
 ### `proof.yaml`
 
 ```yaml
+package: cryptocode            # or "nicodemus" (default: "cryptocode")
+
 macros:
   - macros.tex                 # relative to this yaml file
+  - nicodemus.sty              # .sty files are copied but not \input'd
+
+preamble: preamble.tex         # optional: extra \usepackage lines for HTML build
 
 source: games_source.tex       # relative to this yaml file
 
@@ -196,6 +213,8 @@ Wraps a changed line in `\tfchanged{content}`, with special handling:
   in PDF, wrapping produces spurious output.
 - **Lines with trailing `\\`** (cryptocode separator): `\\` is placed OUTSIDE the macro:
   `\tfchanged{content} \\` so the separator stays at the token level.
+- **Lines with `\item` prefix** (nicodemus-style): `\item` is placed OUTSIDE the macro:
+  `\item \tfchanged{content}` to preserve list structure.
 - **Other lines**: `\tfchanged{line}` directly.
 
 ---
@@ -217,11 +236,12 @@ Generated only if commentary text is non-empty. Contains verbatim YAML commentar
 
 - Defines `\tfchanged` (via `\providecommand`), `\tfgamelabel`, and `\tfgamename`
 - `\tfgamename{label}` expands to `\ensuremath{latex_name}` via `\@namedef`/`\@nameuse`
-- `\input`s each macro file
+- `\input`s each macro file (`.sty`/`.cls` files are skipped — they are loaded via `\usepackage`)
 - `\input`s each game file, then its commentary file, in order
 
 The `\providecommand` means authors can override macros in their paper preamble.
-Default `\tfchanged`: `\colorbox{blue!15}{$#1$}` (works in math mode).
+Default `\tfchanged` varies by package: `\colorbox{blue!15}{$#1$}` for cryptocode (math mode),
+`\colorbox{blue!15}{#1}` for nicodemus (text mode).
 
 ### Consolidated figures: `fig_{label}.tex`
 
@@ -254,13 +274,13 @@ Uses `\documentclass{article}` with `[letterpaper,margin=1in]{geometry}`.
 **DO NOT use** `\usepackage[active,tightpage]{preview}` — conflicts with `varwidth`
 (used internally by cryptocode's `pcvstack`), causing "Dimension too large" errors.
 
-The `\tfchanged` macro in the HTML wrapper MUST use `\ensuremath`:
-```latex
-\newcommand{\tfchanged}[1]{\highlightbox{\ensuremath{#1}}}
-```
-Because `\adjustbox` (used by `\highlightbox`) processes content in text mode, but
-pseudocode content contains math-mode macros like `\mathsf`, `\mathcal`, etc.
-Without `\ensuremath`, you get "! LaTeX Error: \mathsf allowed only in math mode."
+The `\tfchanged` macro in the HTML wrapper varies by package profile:
+- **cryptocode** (math-mode content): `\newcommand{\tfchanged}[1]{\highlightbox{\ensuremath{#1}}}`
+- **nicodemus** (text-mode content): `\newcommand{\tfchanged}[1]{\highlightbox{#1}}`
+
+For cryptocode, `\ensuremath` is required because `\adjustbox` (used by `\highlightbox`)
+processes content in text mode, but pseudocode content contains math-mode macros.
+For nicodemus, content is already in text mode, so no `\ensuremath` is needed.
 
 ### pdftocairo Behavior
 
@@ -340,7 +360,7 @@ python3 -m venv .venv
 source .venv/bin/activate   # or: .venv/bin/activate.fish for fish shell
 pip install -e ".[dev]"     # installs texfrog + pytest
 texfrog --help
-pytest tests/ -q            # 56 tests
+pytest tests/ -q            # 100 tests
 ```
 
 System requirements (not pip-installable):
@@ -350,22 +370,48 @@ System requirements (not pip-installable):
 
 ---
 
-## Example Proof
+## Example Proofs
+
+### `example/` — QSH IND-CCA (cryptocode)
 
 `example/proof.yaml` + `example/games_source.tex` implements the QSH IND-CCA proof
 from `CompositeKEMs/simple_extract.tex`, with 12 entries: G0–G9, Red2, Red5.
-Each game and reduction is separate (no side-by-side layout in a single file).
+Uses `package: cryptocode` (default). The source file uses `\begin{pcvstack}[boxed]`
+with two `\procedure` environments (main body + oracle).
 
-The source file uses `\begin{pcvstack}[boxed]` with two `\procedure` environments
-(main body + oracle). The oracle uses both compact (G0–G2, G8–G9) and expanded
-case-decomposition (G3–G7) forms, interleaved with proper ordering.
+### `example-ntor/` — Signed-DH ntor IND (nicodemus)
+
+`example-ntor/proof.yaml` + `example-ntor/games_source.tex` implements the signed-DH
+(ntor) IND proof with 6 entries: G0–G3, RedSig, RedCDH. Uses `package: nicodemus`.
+The source file uses `\begin{tabular}` with `\nicodemusboxNew` and `\begin{nicodemus}`
+enumerate environments. Two-column layout with oracles split across left and right.
+
+Note on tag ranges: Because reductions (RedSig, RedCDH) sit between games in the
+ordering (G0, G1, G2, RedSig, G3, RedCDH), ranges like `G0-G3` include RedSig.
+Use `G0-G2,G3` to exclude it. See the source file for examples.
+
+---
+
+## Package Profiles (`packages.py`)
+
+Package-specific behavior is abstracted via `PackageProfile`:
+
+| Attribute | cryptocode | nicodemus |
+|-----------|-----------|-----------|
+| `has_line_separators` | `True` (`\\` between lines) | `False` (`\item` per line) |
+| `math_mode_content` | `True` (inside `\procedure`) | `False` (inside `\begin{nicodemus}`) |
+| `gamelabel_comment_cmd` | `\pccomment` | `None` |
+
+Derived methods generate `\tfchanged`, `\tfremoved`, and `\tfgamelabel` definitions
+appropriate for each package, used in both the LaTeX harness and HTML wrapper.
+
+`.sty`/`.cls` files in the `macros:` list are handled specially: they are copied to
+the build directory without renaming (so `\usepackage` can find them) and are NOT
+`\input`'d in the harness.
 
 ---
 
 ## Known Limitations / Future Work
 
-- The consolidated figure output (`fig_*.tex`) does not handle the `\\` separator
-  stripping correctly for the annotated lines — this may need attention if the
-  annotated lines end with `\\`
 - No validation that game labels in `%:tags:` comments actually exist in the YAML
   (unknown labels are silently ignored)

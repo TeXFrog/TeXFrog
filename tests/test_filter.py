@@ -229,3 +229,125 @@ def test_wrap_line_with_backslash_and_trailing_space():
     # The \\ should still be placed outside
     assert result.endswith("\\\\")
     assert r"\tfchanged{" in result
+
+
+# ---------------------------------------------------------------------------
+# wrap_changed_line — \item prefix (nicodemus-style)
+# ---------------------------------------------------------------------------
+
+def test_wrap_item_prefix_stays_outside():
+    r"""The \item prefix must be placed outside \tfchanged{}."""
+    line = r"			\item $x\getsr\Zp$"
+    result = wrap_changed_line(line)
+    assert result.startswith("\t\t\t\\item ")
+    assert r"\tfchanged{$x\getsr\Zp$}" in result
+
+
+def test_wrap_item_with_indentation():
+    r"""Indented \item (e.g. \quad) preserves structure."""
+    line = r"			\item \quad $P[n]\gets j$"
+    result = wrap_changed_line(line)
+    assert result.startswith("\t\t\t\\item ")
+    assert r"\tfchanged{\quad $P[n]\gets j$}" in result
+
+
+def test_wrap_item_custom_macro():
+    r"""Custom macro with \item prefix."""
+    line = r"			\item $k\getsr\ksp$"
+    result = wrap_changed_line(line, macro=r"\tfremoved")
+    assert r"\tfremoved{$k\getsr\ksp$}" in result
+    assert result.startswith("\t\t\t\\item ")
+
+
+def test_wrap_no_item_prefix_unchanged():
+    r"""Non-\item lines are unaffected by \item handling."""
+    line = r"		\textbf{Oracle} $\Oinit(\pk)$"
+    result = wrap_changed_line(line)
+    assert result == r"\tfchanged{		\textbf{Oracle} $\Oinit(\pk)$}"
+
+
+def test_wrap_item_with_trailing_backslash():
+    r"""\item with trailing \\ — both handled correctly."""
+    line = r"			\item $x\gets 1$ \\"
+    result = wrap_changed_line(line)
+    assert result.startswith("\t\t\t\\item ")
+    assert result.endswith("\\\\")
+    assert r"\tfchanged{$x\gets 1$}" in result
+
+
+# ---------------------------------------------------------------------------
+# wrap_changed_line — trailing % (LaTeX newline suppressor)
+# ---------------------------------------------------------------------------
+
+def test_wrap_trailing_percent_moved_outside():
+    r"""Trailing % must be placed outside \tfchanged{} to avoid commenting out }."""
+    line = r"		\textbf{Oracle} $\Oexp(i)$%"
+    result = wrap_changed_line(line)
+    assert result == r"\tfchanged{		\textbf{Oracle} $\Oexp(i)$}%"
+
+
+def test_wrap_trailing_percent_with_whitespace():
+    r"""Trailing % with surrounding whitespace."""
+    line = r"		\textbf{Oracle} $\Oexp(i)$%  "
+    result = wrap_changed_line(line)
+    assert result.endswith("%")
+    assert r"\tfchanged{" in result
+
+
+def test_wrap_trailing_percent_with_item():
+    r"""\item prefix + trailing % — both handled correctly."""
+    line = r"			\item $content$%"
+    result = wrap_changed_line(line)
+    assert result.startswith("\t\t\t\\item ")
+    assert result.endswith("%")
+    assert r"\tfchanged{$content$}" in result
+
+
+def test_wrap_escaped_percent_not_extracted():
+    r"""A \% (escaped percent) is content, not a newline suppressor."""
+    line = r"    $x = 10\%$"
+    result = wrap_changed_line(line)
+    # The \% is content — should stay inside the macro
+    assert result == r"\tfchanged{    $x = 10\%$}"
+
+
+def test_wrap_trailing_backslash_takes_priority_over_percent():
+    r"""If line has both \\ and %, the \\ wins (it appears last in cryptocode)."""
+    line = r"    content \\"
+    result = wrap_changed_line(line)
+    assert result.endswith("\\\\")
+    assert r"\tfchanged{    content}" in result
+
+
+# ---------------------------------------------------------------------------
+# wrap_changed_line — structural line guards
+# ---------------------------------------------------------------------------
+
+def test_wrap_skip_markersetlen():
+    r"""\markersetlen lines are layout-only and should not be wrapped."""
+    line = r"\markersetlen{ndR}{195pt}%"
+    assert wrap_changed_line(line) == line
+
+
+def test_wrap_skip_markersetlen_with_indent():
+    r"""Indented \markersetlen also skipped."""
+    line = r"	\markersetlen{ndL}{170pt}%"
+    assert wrap_changed_line(line) == line
+
+
+def test_wrap_skip_brace_percent():
+    r"""Lines ending with {%% are structural openers (e.g. \nicodemusbox{...}{%)."""
+    line = r"	\nicodemusbox{\markerlenndL}{%"
+    assert wrap_changed_line(line) == line
+
+
+def test_wrap_skip_begin_environment():
+    r"""\begin{...} lines are environment boundaries, not wrappable content."""
+    line = r"		\begin{nicodemus}"
+    assert wrap_changed_line(line) == line
+
+
+def test_wrap_skip_end_environment():
+    r"""\end{...} lines are environment boundaries."""
+    line = r"		\end{nicodemus}%"
+    assert wrap_changed_line(line) == line

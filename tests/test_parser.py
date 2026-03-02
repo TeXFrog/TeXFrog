@@ -216,3 +216,55 @@ def test_related_games_unknown_label_raises(tmp_path):
     (tmp_path / "source.tex").write_text("")
     with pytest.raises(ValueError, match="unknown related game"):
         parse_proof(yaml_path)
+
+
+# ---------------------------------------------------------------------------
+# Package and preamble fields
+# ---------------------------------------------------------------------------
+
+NICO_FIXTURE_DIR = Path(__file__).parent / "fixtures" / "nicodemus"
+
+
+def test_parse_proof_default_package():
+    """Default package should be 'cryptocode'."""
+    proof = parse_proof(FIXTURE_DIR / "proof.yaml")
+    assert proof.package == "cryptocode"
+
+
+def test_parse_proof_nicodemus_package():
+    """Nicodemus fixture should have package='nicodemus'."""
+    proof = parse_proof(NICO_FIXTURE_DIR / "proof.yaml")
+    assert proof.package == "nicodemus"
+
+
+def test_parse_proof_unknown_package_raises(tmp_path):
+    """Unknown package name should raise ValueError."""
+    import yaml
+    data = {
+        "package": "nonexistent",
+        "macros": [],
+        "source": "source.tex",
+        "games": [
+            {"label": "G0", "latex_name": "G_0", "description": "test"},
+        ],
+    }
+    yaml_path = tmp_path / "proof.yaml"
+    yaml_path.write_text(yaml.dump(data))
+    (tmp_path / "source.tex").write_text("")
+    with pytest.raises(ValueError, match="Unknown package"):
+        parse_proof(yaml_path)
+
+
+def test_parse_proof_preamble_default_none():
+    """No preamble field means proof.preamble is None."""
+    proof = parse_proof(FIXTURE_DIR / "proof.yaml")
+    assert proof.preamble is None
+
+
+def test_parse_proof_nicodemus_source_lines():
+    """Nicodemus fixture should parse source lines correctly."""
+    proof = parse_proof(NICO_FIXTURE_DIR / "proof.yaml")
+    assert len(proof.source_lines) > 0
+    # Should have a line tagged for Red1
+    red1_lines = [sl for sl in proof.source_lines if sl.tags and "Red1" in sl.tags]
+    assert len(red1_lines) > 0

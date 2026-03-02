@@ -40,11 +40,10 @@ The harness uses `\colorbox`, which requires the `xcolor` package. Add to your p
 
 ## Customizing the Highlight Macro
 
-Changed lines are wrapped in `\tfchanged{content}`. The harness defines a default:
+Changed lines are wrapped in `\tfchanged{content}`. The harness defines a default that depends on the package profile:
 
-```latex
-\providecommand{\tfchanged}[1]{\colorbox{blue!15}{$#1$}}
-```
+- **cryptocode**: `\providecommand{\tfchanged}[1]{\colorbox{blue!15}{$#1$}}`
+- **nicodemus**: `\providecommand{\tfchanged}[1]{\colorbox{blue!15}{#1}}`
 
 This renders changed lines with a light blue background. Because `\providecommand` is used, you can override it in your paper preamble simply by defining it yourself **before** `\input`-ing the harness:
 
@@ -62,17 +61,16 @@ Or suppress highlighting entirely (useful for the final paper version where you 
 \input{output/proof_harness.tex}
 ```
 
-**Note on math mode:** The default macro wraps content in `$...$` because the pseudocode content typically contains math-mode commands (`\mathsf`, `\mathcal`, etc.), and `\colorbox` operates in text mode. If you write a custom `\tfchanged`, ensure that the content is placed in math mode — for example, use `\ensuremath{#1}` rather than bare `{#1}`.
+**Note on math mode:** For `cryptocode`, the default macro wraps content in `$...$` because the pseudocode content is in math mode and `\colorbox` operates in text mode. For `nicodemus`, content is already in text mode, so no `$...$` wrapping is needed. If you write a custom `\tfchanged`, match the mode of your pseudocode package.
 
 ## Customizing the Game Label Macro
 
-In consolidated figures, lines that appear in only some of the selected games are annotated with `\tfgamelabel{labels}{content}`. The default:
+In consolidated figures, lines that appear in only some of the selected games are annotated with `\tfgamelabel{labels}{content}`. The default depends on the package profile:
 
-```latex
-\providecommand{\tfgamelabel}[2]{#2 \pccomment{#1}}
-```
+- **cryptocode**: `\providecommand{\tfgamelabel}[2]{#2 \pccomment{#1}}` — appends a `\pccomment` annotation
+- **nicodemus**: `\providecommand{\tfgamelabel}[2]{#2}` — no annotation (nicodemus has no built-in comment macro)
 
-This appends a `\pccomment` with the game labels after the line content. Override before the harness to change the appearance:
+Override before the harness to change the appearance:
 
 ```latex
 % Use a margin note instead:
@@ -164,7 +162,7 @@ Running `texfrog html build` or `texfrog html serve` produces a standalone HTML 
 
 The HTML output is self-contained in its directory and can be served from any static file host, or opened directly in a browser.
 
-**Commentary rendering:** Because commentary is compiled through LaTeX (not MathJax), any commands or environments used in commentary must be defined in your macros file. For example, if your commentary uses `\begin{claim}...\end{claim}`, your macros file must include `\newtheorem{claim}{Claim}`. The packages available in the HTML compilation wrapper are: `cryptocode`, `amsfonts`, `amsmath`, `amsthm`, `adjustbox`, and `xcolor`.
+**Commentary rendering:** Because commentary is compiled through LaTeX (not MathJax), any commands or environments used in commentary must be defined in your macros file. For example, if your commentary uses `\begin{claim}...\end{claim}`, your macros file must include `\newtheorem{claim}{Claim}`. The packages available in the HTML compilation wrapper include your selected pseudocode package plus `amsfonts`, `amsmath`, `amsthm`, `adjustbox`, and `xcolor`. Additional packages can be added via the `preamble` field in your YAML config.
 
 ### System Requirements for HTML
 
@@ -174,8 +172,8 @@ The HTML output is self-contained in its directory and can be served from any st
 
 ### Troubleshooting HTML Build
 
-**"Dimension too large" errors:** Do not use `\usepackage[active,tightpage]{preview}` in your macro files — it conflicts with `varwidth`, which is used internally by cryptocode's `pcvstack`. Similarly, do not use `\documentclass{standalone}`.
+**"Dimension too large" errors:** Do not use `\usepackage[active,tightpage]{preview}` in your macro files — it conflicts with `varwidth`, which is used internally by cryptocode's `pcvstack`. Similarly, do not use `\documentclass{standalone}`. (This is primarily a cryptocode issue.)
 
-**Math mode errors in changed lines:** The HTML wrapper defines `\tfchanged` using `\ensuremath{#1}` to handle math-mode content inside text-mode boxes. If you see errors like `\mathsf allowed only in math mode`, ensure your macro files do not redefine `\tfchanged` without `\ensuremath`.
+**Math mode errors in changed lines:** For `cryptocode`, the HTML wrapper defines `\tfchanged` using `\ensuremath{#1}` to handle math-mode content inside text-mode boxes. If you see errors like `\mathsf allowed only in math mode`, ensure your macro files do not redefine `\tfchanged` without `\ensuremath`. For `nicodemus`, content is text-mode so `\ensuremath` is not needed.
 
 **Path errors:** If your project directory has spaces in its path, TeXFrog automatically copies files to a temporary directory before running pdflatex (since LaTeX's `\input{}` does not handle spaces). This is handled transparently.

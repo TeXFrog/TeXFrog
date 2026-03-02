@@ -39,3 +39,5 @@ class Proof:
     source_lines: list[SourceLine]  # Combined source lines
     commentary: dict[str, str]      # game_label -> LaTeX commentary text
     figures: list[Figure]           # Consolidated figure specs
+    package: str = "cryptocode"     # Package profile name (see packages.py)
+    preamble: Optional[str] = None  # Path to extra preamble .tex file (relative to yaml dir)

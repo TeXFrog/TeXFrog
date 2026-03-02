@@ -9,6 +9,7 @@ from typing import Optional
 import yaml
 
 from .model import Figure, Game, Proof, SourceLine
+from .packages import get_profile
 
 # Matches a %:tags: comment at the end of a line.
 # Captures the tag string, e.g. "G1,G3-G5".
@@ -143,6 +144,17 @@ def parse_proof(yaml_path: Path) -> Proof:
     with yaml_path.open("r", encoding="utf-8") as fh:
         data = yaml.safe_load(fh)
 
+    # --- package ---
+    package_name: str = data.get("package", "cryptocode")
+    get_profile(package_name)  # validate early; raises ValueError if unknown
+
+    # --- preamble ---
+    preamble_rel: str | None = data.get("preamble")
+    if preamble_rel:
+        preamble_path = (base_dir / preamble_rel).resolve()
+        if not preamble_path.exists():
+            raise FileNotFoundError(f"Preamble file not found: {preamble_path}")
+
     # --- macros ---
     macros: list[str] = data.get("macros", [])
 
@@ -212,4 +224,6 @@ def parse_proof(yaml_path: Path) -> Proof:
         source_lines=source_lines,
         commentary=commentary,
         figures=figures,
+        package=package_name,
+        preamble=preamble_rel,
     )

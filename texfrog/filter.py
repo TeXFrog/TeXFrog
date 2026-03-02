@@ -10,6 +10,14 @@ from .model import SourceLine
 # Matches a trailing \\ possibly followed by whitespace at end of a line.
 _TRAILING_BACKSLASH_BS = re.compile(r"\\\\(\s*)$")
 
+# Matches a trailing % (LaTeX newline suppressor) at end of a line.
+# This must be placed outside wrapping macros to avoid commenting out the
+# closing brace: \tfchanged{content}% instead of \tfchanged{content%}.
+_TRAILING_PERCENT = re.compile(r"(?<!\\)%(\s*)$")
+
+# Matches a \item prefix (nicodemus-style) with optional leading whitespace.
+_ITEM_PREFIX = re.compile(r"^(\s*\\item\s*)")
+
 
 def _strip_trailing_newline_sep(lines: list[str]) -> list[str]:
     """Strip trailing \\ from the last non-empty line in a list.
@@ -119,11 +127,30 @@ def compute_changed_lines(prev_lines: list[str], curr_lines: list[str]) -> set[i
 def wrap_changed_line(line: str, macro: str = r"\tfchanged") -> str:
     r"""Wrap a changed pseudocode line with a highlighting macro.
 
+    Several kinds of lines are returned **verbatim** (never wrapped):
+
+    * Pure comment lines (starting with ``%``)
+    * Lines ending with ``{`` (or ``{%``) — structural brace openers
+      (procedure headers, ``\nicodemusbox{...}{%``)
+    * ``\markersetlen`` lines — layout-only dimension commands
+    * ``\begin{...}`` / ``\end{...}`` lines — environment boundaries
+
     For lines ending with ``\\`` (cryptocode-style line separator), the
     ``\\`` is placed *outside* the macro call so the macro only wraps the
     visual content:
 
         \tfchanged{\key_1 \gets ...} \\
+
+    For lines starting with ``\item`` (nicodemus-style), the ``\item``
+    prefix is placed *outside* the macro call:
+
+        \item \tfchanged{$content$}
+
+    For lines ending with ``%`` (LaTeX newline suppressor), the ``%`` is
+    placed *outside* the macro call so it does not comment out the closing
+    brace:
+
+        \tfchanged{content}%
 
     For lines without a trailing ``\\`` (last line of a procedure, or lines
     in algorithmicx-style packages):
@@ -142,15 +169,51 @@ def wrap_changed_line(line: str, macro: str = r"\tfchanged") -> str:
     # invisible in the compiled PDF and wrapping them produces spurious output.
     if stripped.lstrip().startswith("%"):
         return line
+    # Strip a trailing % (LaTeX newline suppressor) for the structural checks
+    # below, so that e.g. \nicodemusbox{...}{% is correctly recognised as
+    # ending with '{'.
+    core = stripped.rstrip("%").rstrip()
+    trimmed = stripped.lstrip()
     # Don't wrap lines that open a LaTeX group with an unmatched '{' (e.g.
-    # \procedure{Name}{ or \begin{environment}) — wrapping them would break
+    # \procedure{Name}{ or \nicodemusbox{...}{%) — wrapping them would break
     # LaTeX brace-matching.  Such structural lines are returned verbatim.
-    if stripped.endswith("{"):
+    if core.endswith("{"):
+        return line
+    # Don't wrap layout-only commands that control column/box dimensions.
+    # These vary between games but are not proof content.
+    if trimmed.startswith(r"\markersetlen"):
+        return line
+    # Don't wrap environment boundaries (\begin{...} / \end{...}) when they
+    # appear as standalone structural lines.  Wrapping \begin{nicodemus}
+    # in \tfchanged would start the environment inside an \adjustbox, then
+    # the closing } of \tfchanged would close the box while the environment
+    # remains open — breaking LaTeX grouping.
+    if trimmed.startswith(r"\begin{") or trimmed.startswith(r"\end{"):
         return line
 
-    m = _TRAILING_BACKSLASH_BS.search(stripped)
-    if m:
-        content = line[: m.start()].rstrip()
-        return f"{macro}{{{content}}} \\\\"
+    # Extract \item prefix if present (nicodemus-style enumerate lines).
+    # The \item must stay outside the wrapping macro so the list structure
+    # is preserved.
+    item_match = _ITEM_PREFIX.match(line)
+    if item_match:
+        prefix = item_match.group(0)
+        rest = line[item_match.end():]
     else:
-        return f"{macro}{{{line}}}"
+        prefix = ""
+        rest = line
+
+    stripped_rest = rest.rstrip()
+    m = _TRAILING_BACKSLASH_BS.search(stripped_rest)
+    if m:
+        content = rest[: m.start()].rstrip()
+        return f"{prefix}{macro}{{{content}}} \\\\"
+    else:
+        # Check for trailing % (LaTeX newline suppressor).  If left inside
+        # the macro, it comments out the closing brace:
+        #   \tfchanged{content%}  ← LaTeX never sees the }
+        # Move it outside: \tfchanged{content}%
+        pm = _TRAILING_PERCENT.search(stripped_rest)
+        if pm:
+            content = rest[:pm.start()].rstrip()
+            return f"{prefix}{macro}{{{content}}}%"
+        return f"{prefix}{macro}{{{rest}}}"
