@@ -1,8 +1,9 @@
 # TeXFrog Tutorial (cryptocode)
 
+> [!NOTE]
 > **Package:** This tutorial uses [`cryptocode`](https://ctan.org/pkg/cryptocode) (the default). For the same proof using `nicodemus`, see [tutorial-nicodemus/](../tutorial-nicodemus/).
 
-This tutorial walks through a small, complete game-hopping proof to introduce every TeXFrog concept. The proof is short enough to read in full, but exercises every feature of the tool.
+This tutorial walks through a small, complete game-hopping proof to introduce important TeXFrog concepts. The proof is short enough to read in full, but exercises several features of the tool.
 
 ## The Proof Scenario
 
@@ -101,7 +102,7 @@ Each entry is raw LaTeX, written to `{label}_commentary.tex` and included by the
 figures:
   - label: all_games
     games: "G0,G1,G2,Red1"
-    procedure_name: "Games $\\tfgamename{G0}$--$\\tfgamename{G2}$, Reduction $\\tfgamename{Red1}$"
+    procedure_name: "Games $\tfgamename{G0}$--$\tfgamename{G2}$, Reduction $\tfgamename{Red1}$"
 ```
 
 This produces `fig_all_games.tex`: a consolidated block showing all four games, with game-specific lines annotated by `\tfgamelabel`. The optional `procedure_name` overrides the title of the first procedure header.
@@ -142,11 +143,11 @@ y \getsr \{0,1\}^\lambda \\   %:tags: G1
 y \gets \OPRF(r) \\           %:tags: Red1
 ```
 
-For each game, exactly one of these lines survives filtering. They are consecutive, so the chosen line always appears at the right position.
+For each game, at most one of these lines survives filtering. They are consecutive, so the chosen line always appears at the right position.
 
 ### Procedure headers
 
-Lines ending with `{` are procedure headers. They are never wrapped in `\tfchanged` (wrapping would break LaTeX brace matching).
+Here is how TeXFrog expects procedure headers to be typeset when using cryptocode:
 
 ```latex
 \procedure[linenumbering]{\tfgamename{G0}}{ %:tags: G0
@@ -163,7 +164,7 @@ From the repo root:
 
 ```bash
 # Generate per-game LaTeX files
-texfrog latex examples/tutorial-cryptocode/proof.yaml -o /tmp/tf_tutorial
+texfrog latex examples/tutorial-cryptocode/proof.yaml -o /tmp/tf_tutorial_latex
 
 # Build an interactive HTML viewer
 texfrog html build examples/tutorial-cryptocode/proof.yaml -o /tmp/tf_tutorial_html
@@ -189,7 +190,7 @@ proof_harness.tex   — \inputs macros, then each game + commentary in order
 fig_all_games.tex   — consolidated figure with all four games annotated
 ```
 
-Include the harness in your paper with `\input{output/proof_harness.tex}`, or include individual game files and figures as needed. See [LaTeX integration](../../docs/latex-integration.md) for details.
+Include the harness in your paper with `\input{proof_harness.tex}`, or include individual game files and figures as needed. See [LaTeX integration](../../docs/latex-integration.md) for details.
 
 ---
 
