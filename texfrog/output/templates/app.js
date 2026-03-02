@@ -165,4 +165,6 @@ function navigate(delta) {
 document.addEventListener('keydown', e => {
   if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') navigate(-1);
   if (e.key === 'ArrowRight' || e.key === 'ArrowDown') navigate(+1);
+  if (e.key === '+' || e.key === '=') adjustZoom(+0.1);
+  if (e.key === '-') adjustZoom(-0.1);
 });
