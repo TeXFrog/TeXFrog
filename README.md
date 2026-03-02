@@ -16,20 +16,20 @@ TeXFrog helps cryptographers manage game-hopping proofs in LaTeX. If you have ev
 
 All from that one source file.
 
-TeXFrog currently supports the [`cryptocode`](https://ctan.org/pkg/cryptocode) and [`nicodemus`](https://github.com/awslabs/nicodemus) pseudocode packages.
+TeXFrog currently supports the [`cryptocode`](https://ctan.org/pkg/cryptocode) and [`nicodemus`](https://github.com/awslabs/nicodemus) pseudocode packages, and we are open to supporting others.
 
-## Screenshot of web viewer
+## Live Demos
 
-![TeXFrog HTML proof viewer](docs/images/screenshot-web.png)
+[![TeXFrog HTML proof viewer](docs/images/screenshot-web.png)](https://texfrog.github.io/examples/){:target="_blank"}
 
 ## What The Source Code Looks Like
 
 A snippet of the combined source file (`games_source.tex`):
 
 ```latex
-k \getsr \{0,1\}^\lambda \\                      %:tags: G0-G2
+k \getsr \{0,1\}^\lambda \\                       %:tags: G0-G2
 ...
-y \gets \mathrm{PRF}(k, r) \\                    %:tags: G0
+y \gets \mathrm{PRF}(k, r) \\                     %:tags: G0
 y \getsr \{0,1\}^\lambda \\                       %:tags: G1
 y \gets \OPRF(r) \\                               %:tags: Red1
 ...
@@ -70,17 +70,20 @@ After activating the virtual environment, you can `cd` to any directory on your 
 
 ## Quick Start
 
-The fastest way to start a new proof is with `texfrog init`:
+The fastest way to start a new proof is with `texfrog init`. This creates a minimal, runnable proof (`proof.yaml`, `games_source.tex`, and `macros.tex`) with comments explaining each field. 
 
 ```bash
-# Scaffold a new proof in the current directory (cryptocode, the default)
+# Scaffold a new proof in the current directory using cryptocode for pseudocode
 texfrog init
 
-# Or in a new directory, using the nicodemus package
+# ... or in a new directory
+texfrog init mydirectory
+
+# ... or using the nicodemus package for pseudocode
 texfrog init myproof --package nicodemus
 ```
 
-This creates a minimal, runnable proof (`proof.yaml`, `games_source.tex`, and `macros.tex`) with comments explaining each field. Build it immediately:
+Build it immediately:
 
 ```bash
 texfrog latex proof.yaml -o /tmp/tf_output
@@ -107,7 +110,7 @@ texfrog html serve examples/tutorial-cryptocode/proof.yaml --live-reload
 texfrog init [DIRECTORY] [--package cryptocode|nicodemus]
 ```
 
-Creates starter files in DIRECTORY (default: current directory). The `--package` option selects the pseudocode package (default: `cryptocode`). Existing files are never overwritten.
+Creates starter files in `DIRECTORY` (default: current directory). The `--package` option selects the pseudocode package (default: `cryptocode`). Existing files are never overwritten.
 
 ### Validate a proof
 
@@ -115,7 +118,7 @@ Creates starter files in DIRECTORY (default: current directory). The `--package`
 texfrog check proof.yaml [--strict]
 ```
 
-Parses the proof and runs all validation checks (YAML structure, file existence, tag consistency, empty games, commentary references) without generating any output. Prints a summary and exits with code 0 if valid. With `--strict`, exits with code 1 if there are any warnings.
+Parses the proof and runs validation checks (YAML structure, file existence, tag consistency, empty games, commentary references) without generating any output. Prints a summary and exits with code 0 if valid. With `--strict`, exits with code 1 if there are any warnings.
 
 ### Generate LaTeX output
 
@@ -125,7 +128,7 @@ texfrog latex proof.yaml [-o OUTPUT_DIR]
 
 Produces per-game `.tex` files, commentary files, a harness file, and consolidated figures. Output goes to `texfrog_latex/` next to the input file by default. See [LaTeX integration](docs/latex-integration.md) for how to incorporate the output into your paper.
 
-### Build the HTML viewer
+### Generate HTML output
 
 ```bash
 texfrog html build proof.yaml [-o OUTPUT_DIR]
@@ -133,13 +136,13 @@ texfrog html build proof.yaml [-o OUTPUT_DIR]
 
 Compiles each game to SVG via `pdflatex` and produces a self-contained HTML site. Open `index.html` in any browser. Games are shown side by side with changed lines highlighted, and you can navigate with arrow keys.
 
-### Serve with live reload
+### Open in a local web server
 
 ```bash
 texfrog html serve proof.yaml [--port 8080] [--live-reload]
 ```
 
-Builds the HTML site, starts a local server, and opens your browser. With `--live-reload`, TeXFrog watches your source files and automatically rebuilds when you save changes.
+Builds the HTML site, starts a local server, and opens your browser. With `--live-reload`, TeXFrog watches your source files and automatically rebuilds and refreshes the web browser when you save changes.
 
 ## Writing a Proof
 
@@ -152,18 +155,18 @@ See [Writing a proof](docs/writing-proofs.md) for a full guide, and the [tutoria
 
 ## Included Examples
 
-| Directory | Description | Package |
-|-----------|-------------|---------|
-| [`examples/tutorial-cryptocode/`](examples/tutorial-cryptocode/) | Small IND-CPA proof walkthrough (4 games/reductions) | `cryptocode` |
-| [`examples/tutorial-nicodemus/`](examples/tutorial-nicodemus/) | Same proof using `nicodemus` syntax | `nicodemus` |
+| Directory | Description | Package | Live Demo |
+|-----------|-------------|---------|-----------|
+| [`examples/tutorial-cryptocode/`](examples/tutorial-cryptocode/) | Small IND-CPA proof walkthrough (4 games/reductions) | `cryptocode` | [View demo](https://texfrog.github.io/demos/tutorial-cryptocode/) |
+| [`examples/tutorial-nicodemus/`](examples/tutorial-nicodemus/) | Same proof using `nicodemus` syntax | `nicodemus` | [View demo](https://texfrog.github.io/demos/tutorial-nicodemus/) |
 
 Comparing the two tutorials side by side shows the syntax differences between pseudocode packages.
 
 ## Documentation
 
-- [Writing a proof](docs/writing-proofs.md) — `proof.yaml` and `games_source.tex` reference
-- [Using TeXFrog Output in Your LaTeX Paper](docs/latex-integration.md) — incorporating output into your paper, customizing highlight macros
-- [Troubleshooting & FAQ](docs/troubleshooting.md) — common problems proof authors encounter
+- [Writing a proof](docs/writing-proofs.md) — reference for `proof.yaml` and `games_source.tex`
+- [Using TeXFrog Output in Your LaTeX Paper](docs/latex-integration.md) — how to incorporate LaTeX output into your paper, including customizing highlight macros
+- [Troubleshooting & FAQ](docs/troubleshooting.md) — common problems proof authors may encounter
 
 ## Contributing
 
@@ -182,4 +185,4 @@ TeXFrog was originally created by Douglas Stebila, based on discussions with man
 
 ## License
 
-Apache License 2.0. See [LICENSE.txt](LICENSE.txt) for details.
+TeXFrog is released under the Apache License 2.0. See [LICENSE.txt](LICENSE.txt) for details.
