@@ -584,11 +584,29 @@ def serve_html(html_dir: Path, port: int = 8080, open_browser: bool = True) -> N
         port: TCP port to listen on.
         open_browser: Whether to launch the default browser.
     """
-    import functools
 
-    _Handler = functools.partial(
-        http.server.SimpleHTTPRequestHandler, directory=str(html_dir),
-    )
+    class _Handler(http.server.SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=str(html_dir), **kwargs)
+
+        def do_GET(self):
+            # Return a static version so cached live-reload scripts
+            # get a valid response instead of 404.
+            if self.path == "/_texfrog/version":
+                body = b'{"version": 0}'
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            super().do_GET()
+
+        def log_message(self, format, *args):
+            if args and "/_texfrog/version" in str(args[0]):
+                return
+            super().log_message(format, *args)
 
     for attempt_port in range(port, port + 100):
         try:
