@@ -57,3 +57,12 @@ System requirements (not pip): `pdflatex`, `pdftocairo` (or `pdf2svg`), `pdfcrop
 - `pdftocairo -svg in.pdf out.svg` writes to the exact path given (no `.svg` appended).
 - Files are copied to a flat temp dir before pdflatex — paths with spaces (this project
   lives in "Formal methods/") break `\input{}`.
+
+## When Making Changes
+
+- **Update user documentation**: When adding or changing features, update the relevant
+  docs (e.g., `docs/*.md`, tutorial READMEs, example `proof.yaml` files)
+  to reflect the new behavior.
+- **Write unit tests**: For any new feature or bug fix, add both positive tests
+  (expected behavior works correctly) and negative tests (invalid input is rejected
+  with appropriate errors/warnings) in `tests/`.
