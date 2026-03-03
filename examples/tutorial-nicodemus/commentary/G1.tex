@@ -1,0 +1,9 @@
+\textbf{Claim.}
+  Games \tfgamename{G0} and \tfgamename{G1} are computationally indistinguishable assuming $\mathrm{PRF}$
+  is a secure pseudorandom function, with advantage gap at most
+  $\mathbf{Adv}^{\mathrm{PRF}}(\Bdversary_1)$.
+
+Reduction \tfgamename{Red1} (shown separately) interacts with an external PRF challenger
+and simulates the LR oracle by forwarding nonces $r$ to that challenger.
+When the external challenger uses the real PRF, \tfgamename{Red1} exactly simulates
+\tfgamename{G0}; when it uses a random function, \tfgamename{Red1} exactly simulates \tfgamename{G1}.

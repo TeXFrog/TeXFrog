@@ -60,9 +60,12 @@ class TestCheckCommand:
 
     def test_warnings_exit_0_by_default(self, tmp_path):
         """Proof with warnings should exit 0 without --strict."""
+        commentary_dir = tmp_path / "commentary"
+        commentary_dir.mkdir()
+        (commentary_dir / "G99.tex").write_text("orphan\n", encoding="utf-8")
         yaml_path = _write_minimal_proof(
             tmp_path,
-            extra_yaml="commentary:\n  G99: orphan\n",
+            extra_yaml="commentary:\n  G99: commentary/G99.tex\n",
         )
         runner = CliRunner()
         result = runner.invoke(main, ["check", str(yaml_path)])
@@ -71,9 +74,12 @@ class TestCheckCommand:
 
     def test_warnings_exit_1_with_strict(self, tmp_path):
         """Proof with warnings should exit 1 with --strict."""
+        commentary_dir = tmp_path / "commentary"
+        commentary_dir.mkdir()
+        (commentary_dir / "G99.tex").write_text("orphan\n", encoding="utf-8")
         yaml_path = _write_minimal_proof(
             tmp_path,
-            extra_yaml="commentary:\n  G99: orphan\n",
+            extra_yaml="commentary:\n  G99: commentary/G99.tex\n",
         )
         runner = CliRunner()
         result = runner.invoke(main, ["check", "--strict", str(yaml_path)])

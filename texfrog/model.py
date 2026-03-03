@@ -38,7 +38,8 @@ class Proof:
     macros: list[str]               # Paths to macro .tex files (relative to yaml dir)
     games: list[Game]               # All games/reductions in order
     source_lines: list[SourceLine]  # Combined source lines
-    commentary: dict[str, str]      # game_label -> LaTeX commentary text
+    commentary: dict[str, str]      # game_label -> LaTeX commentary text (loaded from files)
     figures: list[Figure]           # Consolidated figure specs
     package: str = "cryptocode"     # Package profile name (see packages.py)
     preamble: Optional[str] = None  # Path to extra preamble .tex file (relative to yaml dir)
+    commentary_files: dict[str, str] = field(default_factory=dict)  # game_label -> relative file path

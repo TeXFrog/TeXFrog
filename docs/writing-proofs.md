@@ -93,21 +93,24 @@ Labels can be anything: `G0`, `Red2`, `Hybrid3`, `BadEvent` — TeXFrog treats t
 
 ### `commentary` (optional)
 
-Free-form LaTeX text for each game, keyed by label. This text is written to `{label}_commentary.tex` and `\input`-ed into the harness after the game pseudocode.
+Per-game commentary, keyed by label. Each value is a path (relative to the YAML file) to a `.tex` file containing free-form LaTeX. The commentary text is written to `{label}_commentary.tex` in the output and `\input`-ed into the harness after the game pseudocode.
 
 ```yaml
 commentary:
-  G0: |
-    The starting game is $\indcca_\QSH^\adv.\REAL()$.
-
-  G1: |
-    \begin{claim}
-      Games~0 and~1 are indistinguishable assuming correctness of $\KEM_2$.
-    \end{claim}
-    This follows by inlining the decapsulation result.
+  G0: commentary/G0.tex
+  G1: commentary/G1.tex
 ```
 
-Use YAML's literal block scalar (`|`) to preserve newlines. LaTeX environments, math, and display equations all work here. You can use `\tfgamename{G1}` to reference a game's `latex_name` — see [latex-integration.md](latex-integration.md).
+Each `.tex` file contains raw LaTeX — environments, math, and display equations all work. For example, `commentary/G1.tex` might contain:
+
+```latex
+\begin{claim}
+  Games~0 and~1 are indistinguishable assuming correctness of $\KEM_2$.
+\end{claim}
+This follows by inlining the decapsulation result.
+```
+
+You can use `\tfgamename{G1}` to reference a game's `latex_name` — see [latex-integration.md](latex-integration.md).
 
 **HTML viewer:** Commentary is compiled through the same LaTeX → PDF → SVG pipeline as game pseudocode, so any LaTeX commands or environments used in commentary (e.g., `\newtheorem{claim}{Claim}`) must be defined in your macros file. The packages available in the HTML compilation wrapper include your selected pseudocode package (e.g., `cryptocode` or `nicodemus`), plus `amsfonts`, `amsmath`, `amsthm`, `adjustbox`, and `xcolor`. Additional packages can be added via the `preamble` field.
 

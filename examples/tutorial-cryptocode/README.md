@@ -39,6 +39,7 @@ G0 to G1 is by PRF security (via Red1). G1 to G2 is by a birthday bound on nonce
 | `proof.yaml` | Declares the games, commentary, and figure specs |
 | `games_source.tex` | Combined LaTeX source with `%:tags:` annotations |
 | `macros.tex` | Short macro definitions (no external dependencies) |
+| `commentary/*.tex` | Per-game commentary files (LaTeX) |
 
 ---
 
@@ -92,14 +93,14 @@ The order of the game list matters:
 
 ```yaml
 commentary:
-  G1: |
-    \begin{claim}
-      Games~0 and~1 are indistinguishable assuming $\mathrm{PRF}$ is secure.
-    \end{claim}
-    ...
+  G0: commentary/G0.tex
+  G1: commentary/G1.tex
+  Red1: commentary/Red1.tex
+  G2: commentary/G2.tex
+  G3: commentary/G3.tex
 ```
 
-Each entry is raw LaTeX, written to `{label}_commentary.tex` and included by the harness after the game pseudocode. Use YAML's `|` (literal block) to preserve newlines.
+Each entry maps a game label to a `.tex` file containing raw LaTeX commentary. These are written to `{label}_commentary.tex` in the output and included by the harness after the game pseudocode.
 
 ### `figures`
 

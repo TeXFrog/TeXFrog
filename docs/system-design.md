@@ -50,14 +50,17 @@ TeXFrog/
 ├── examples/
 │   ├── tutorial-cryptocode/
 │   │   ├── proof.yaml          # IND-CPA tutorial proof (4 games/reductions, cryptocode)
-│   │   └── games_source.tex    # Combined tagged source for the tutorial
+│   │   ├── games_source.tex    # Combined tagged source for the tutorial
+│   │   └── commentary/         # Per-game commentary .tex files (G0.tex, G1.tex, …)
 │   ├── tutorial-nicodemus/
 │   │   ├── proof.yaml          # Same IND-CPA tutorial proof using nicodemus
 │   │   ├── games_source.tex    # Combined tagged source (nicodemus syntax)
-│   │   └── nicodemus.sty       # The nicodemus package
+│   │   ├── nicodemus.sty       # The nicodemus package
+│   │   └── commentary/         # Per-game commentary .tex files
 │   └── example-compositekems/
 │       ├── proof.yaml          # QSH IND-CCA proof config (12 games/reductions, cryptocode)
-│       └── games_source.tex    # Combined tagged source for the example
+│       ├── games_source.tex    # Combined tagged source for the example
+│       └── commentary/         # Per-game commentary .tex files
 └── CompositeKEMs/              # Reference only — NOT part of the Python package
     ├── simple_extract.tex      # Original 562-line proof (reference/inspiration)
     └── macros.tex              # Crypto macros used by the example
@@ -96,10 +99,11 @@ class Proof:
     macros: list[str]              # Paths relative to the yaml file
     games: list[Game]              # All games/reductions in declared order
     source_lines: list[SourceLine] # All lines from combined source
-    commentary: dict[str, str]     # label → raw LaTeX text
+    commentary: dict[str, str]     # label → LaTeX text (loaded from files)
     figures: list[Figure]          # Consolidated figure specs
     package: str = "cryptocode"    # Package profile name (see packages.py)
     preamble: Optional[str] = None # Path to extra preamble .tex (relative to YAML dir)
+    commentary_files: dict[str, str] = field(default_factory=dict)  # label → relative file path
 ```
 
 ---
@@ -133,11 +137,9 @@ games:
     related_games: [G0, G1]      # show clean G0 and G1 alongside in HTML viewer
   # ... more games ...
 
-commentary:                    # optional
-  G0: |
-    The starting game is the real IND-CCA experiment.
-  G1: |
-    \begin{claim} Games 0 and 1 are indistinguishable ... \end{claim}
+commentary:                    # optional; values are file paths relative to this yaml file
+  G0: commentary/G0.tex
+  G1: commentary/G1.tex
 
 figures:                       # optional
   - label: start_end
@@ -235,7 +237,8 @@ environments like cryptocode's `pcvstack`.
 
 ### Commentary files: `{label}_commentary.tex`
 
-Generated only if commentary text is non-empty. Contains verbatim YAML commentary.
+Generated only if commentary text is non-empty. Contains the content loaded from the
+corresponding commentary file (e.g., `commentary/G0.tex` as specified in proof.yaml).
 
 ### Harness: `proof_harness.tex`
 
@@ -348,12 +351,13 @@ Reductions support a `related_games` field listing zero, one, or two game labels
 ### Live Reload (`watcher.py` + `output/html.py`)
 
 When `--live-reload` is passed to `html serve`, the tool watches the proof's source
-files (YAML config, `.tex` source, macros, preamble) using `watchdog` and automatically
-rebuilds + reloads the browser on changes.
+files (YAML config, `.tex` source, macros, preamble, commentary files) using `watchdog`
+and automatically rebuilds + reloads the browser on changes.
 
 **File watching** (`watcher.py`):
 - `collect_watched_files(yaml_path)` reads the YAML with `yaml.safe_load` (lightweight,
-  does not run full `parse_proof` validation) and returns the set of absolute paths.
+  does not run full `parse_proof` validation) and returns the set of absolute paths,
+  including any commentary files listed under `commentary:`.
 - `_DebouncedHandler` ignores events for files not in the watched set and debounces
   rapid changes (0.5 s quiet period) before triggering a rebuild.
 - `safe_rebuild()` builds into a staging temp dir (created in `output_dir.parent` to
@@ -391,7 +395,8 @@ texfrog html serve INPUT.yaml [-o DIR] [--port 8080] [--no-browser] [--live-relo
 ### `texfrog init`
 
 Scaffolds a new proof directory with starter files (`proof.yaml`, `games_source.tex`,
-`macros.tex`). The `--package` option selects the template flavour (default: `cryptocode`).
+`macros.tex`) and a `commentary/` subdirectory containing starter `.tex` files for each
+game. The `--package` option selects the template flavour (default: `cryptocode`).
 Existing files are never overwritten — skipped with a warning instead.
 
 Templates are stored as inline strings in `texfrog/templates.py`. Each template set

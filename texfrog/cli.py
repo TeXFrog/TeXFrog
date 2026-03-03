@@ -82,6 +82,7 @@ def init_cmd(directory: str, package: str) -> None:
         if dest.exists():
             click.echo(f"Skipping {filename} (already exists).", err=True)
             continue
+        dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(content, encoding="utf-8")
         written.append(filename)
 
@@ -94,7 +95,7 @@ def init_cmd(directory: str, package: str) -> None:
         )
         click.echo(
             f"\nNext steps:\n"
-            f"  1. Edit proof.yaml and games_source.tex to describe your proof.\n"
+            f"  1. Edit proof.yaml, games_source.tex, and commentary/*.tex to describe your proof.\n"
             f"  2. Run: texfrog latex {directory}/proof.yaml\n"
             f"  3. Run: texfrog html serve {directory}/proof.yaml"
         )

@@ -20,12 +20,8 @@ games:
     description: 'Use random key.'
 
 commentary:
-  G0: |
-    This is the starting game.
-  G1: |
-    \begin{claim}
-    G0 and G1 are indistinguishable.
-    \end{claim}
+  G0: commentary/G0.tex
+  G1: commentary/G1.tex
 
 figures:
   - label: start_end

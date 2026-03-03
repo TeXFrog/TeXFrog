@@ -72,6 +72,20 @@ class TestCollectWatchedFiles:
         assert m1.resolve() in watched
         assert m2.resolve() in watched
 
+    def test_includes_commentary_files(self, tmp_path: Path) -> None:
+        yaml_file = tmp_path / "proof.yaml"
+        commentary_dir = tmp_path / "commentary"
+        commentary_dir.mkdir()
+        comm_file = commentary_dir / "G0.tex"
+        comm_file.write_text("commentary text")
+        yaml_file.write_text(
+            "source: source.tex\nmacros: []\n"
+            "commentary:\n  G0: commentary/G0.tex\n"
+            "games:\n  - label: G0\n    latex_name: G_0\n    description: d\n"
+        )
+        watched = collect_watched_files(yaml_file)
+        assert comm_file.resolve() in watched
+
     def test_no_optional_fields(self, tmp_path: Path) -> None:
         """YAML with only source and games — no macros or preamble."""
         yaml_file = tmp_path / "proof.yaml"

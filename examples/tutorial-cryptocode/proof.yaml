@@ -37,50 +37,11 @@ games:
     description: 'Ciphertext is uniformly random, independent of $m_b$.'
 
 commentary:
-  G0: |
-    The starting game is $\tfgamename{G0} = \INDCPA_\Enc^\Adversary()$.
-    The challenger samples a uniform key $k$ and challenge bit $b$, then
-    answers each $\mathsf{LR}(m_0, m_1)$ query with a fresh encryption
-    $(r, \mathrm{PRF}(k,r) \oplus m_b)$.
-
-  G1: |
-    \textbf{Claim.}
-      Games \tfgamename{G0} and \tfgamename{G1} are computationally indistinguishable assuming $\mathrm{PRF}$
-      is a secure pseudorandom function, with advantage gap at most
-      $\mathbf{Adv}^{\mathrm{PRF}}(\Bdversary_1)$.
-
-    Reduction \tfgamename{Red1} (shown separately) interacts with an external PRF challenger
-    and simulates the LR oracle by forwarding nonces $r$ to that challenger.
-    When the external challenger uses the real PRF, \tfgamename{Red1} exactly simulates
-    \tfgamename{G0}; when it uses a random function, \tfgamename{Red1} exactly simulates \tfgamename{G1}.
-
-  G2: |
-    \textbf{Claim.}
-      Games \tfgamename{G1} and \tfgamename{G2} are statistically close:
-      $|\Pr[\tfgamename{G1} = 1] - \Pr[\tfgamename{G2} = 1]| \leq q^2 / 2^{\lambda+1}$.
-
-    In \tfgamename{G1}, each query samples a fresh nonce $r \getsr \{0,1\}^\lambda$
-    and evaluates the random function $\RF$ at $r$.  If all $q$ nonces are distinct---which
-    fails with probability at most $\binom{q}{2}/2^\lambda = q(q-1)/2^{\lambda+1}$
-    by the birthday bound---then the outputs $\RF(r_1), \ldots, \RF(r_q)$
-    are independent and uniformly distributed, exactly as in \tfgamename{G2}.
-
-  G3: |
-    \textbf{Claim.}
-      Games \tfgamename{G2} and \tfgamename{G3} are perfectly indistinguishable.
-
-    In \tfgamename{G2}, each query samples a uniform $y$ independently.
-    Since $c = y \oplus m_b$ with uniform $y$, the ciphertext $c$ is
-    uniformly distributed regardless of $m_b$.
-    Game \tfgamename{G3} makes this explicit by sampling $c$ directly.
-
-    In Game \tfgamename{G3} the adversary's view is identically distributed for $b = 0$ and $b = 1$,
-    so $\Pr[b' = b] = \tfrac{1}{2}$ and the IND-CPA advantage is~$0$.
-
-  Red1: |
-    The reduction \tfgamename{Red1} receives no PRF key; instead it routes each nonce $r$
-    to the external PRF oracle $\OPRF$.  All other bookkeeping (sampling $b$,
-    running $\Adversary$, checking the guess) is identical to Games \tfgamename{G0} and \tfgamename{G1}.
+  G0: commentary/G0.tex
+  G1: commentary/G1.tex
+  Red1: commentary/Red1.tex
+  G2: commentary/G2.tex
+  G3: commentary/G3.tex
 
 figures:
   - label: all_games

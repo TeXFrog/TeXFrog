@@ -120,6 +120,15 @@ def test_parse_proof_commentary():
     assert "G1" in proof.commentary
 
 
+def test_parse_proof_commentary_files_field():
+    """Commentary file paths should be stored in proof.commentary_files."""
+    proof = parse_proof(FIXTURE_DIR / "proof.yaml")
+    assert "G0" in proof.commentary_files
+    assert proof.commentary_files["G0"] == "commentary/G0.tex"
+    assert "G1" in proof.commentary_files
+    assert proof.commentary_files["G1"] == "commentary/G1.tex"
+
+
 def test_parse_proof_figures():
     proof = parse_proof(FIXTURE_DIR / "proof.yaml")
     assert len(proof.figures) == 2
@@ -399,6 +408,42 @@ def test_source_path_traversal_raises(tmp_path):
     }
     yaml_path = tmp_path / "proof.yaml"
     yaml_path.write_text(yaml.dump(data))
+    with pytest.raises(ValueError, match="outside the proof directory"):
+        parse_proof(yaml_path)
+
+
+def test_commentary_missing_file_raises(tmp_path):
+    """Missing commentary file should raise FileNotFoundError."""
+    import yaml
+    data = {
+        "macros": [],
+        "source": "source.tex",
+        "games": [
+            {"label": "G0", "latex_name": "G_0", "description": "test"},
+        ],
+        "commentary": {"G0": "commentary/G0.tex"},
+    }
+    yaml_path = tmp_path / "proof.yaml"
+    yaml_path.write_text(yaml.dump(data))
+    (tmp_path / "source.tex").write_text("")
+    with pytest.raises(FileNotFoundError, match="Commentary file"):
+        parse_proof(yaml_path)
+
+
+def test_commentary_path_traversal_raises(tmp_path):
+    """Commentary paths outside proof dir should raise ValueError."""
+    import yaml
+    data = {
+        "macros": [],
+        "source": "source.tex",
+        "games": [
+            {"label": "G0", "latex_name": "G_0", "description": "test"},
+        ],
+        "commentary": {"G0": "../../etc/passwd"},
+    }
+    yaml_path = tmp_path / "proof.yaml"
+    yaml_path.write_text(yaml.dump(data))
+    (tmp_path / "source.tex").write_text("")
     with pytest.raises(ValueError, match="outside the proof directory"):
         parse_proof(yaml_path)
 

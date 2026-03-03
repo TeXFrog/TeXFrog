@@ -1,0 +1,9 @@
+\textbf{Claim.}
+  Games \tfgamename{G1} and \tfgamename{G2} are statistically close:
+  $|\Pr[\tfgamename{G1} = 1] - \Pr[\tfgamename{G2} = 1]| \leq q^2 / 2^{\lambda+1}$.
+
+In \tfgamename{G1}, each query samples a fresh nonce $r \getsr \{0,1\}^\lambda$
+and evaluates the random function $\RF$ at $r$.  If all $q$ nonces are distinct---which
+fails with probability at most $\binom{q}{2}/2^\lambda = q(q-1)/2^{\lambda+1}$
+by the birthday bound---then the outputs $\RF(r_1), \ldots, \RF(r_q)$
+are independent and uniformly distributed, exactly as in \tfgamename{G2}.

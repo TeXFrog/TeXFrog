@@ -19,8 +19,7 @@ games:
     related_games: [G0, G1]
 
 commentary:
-  G0: |
-    This is the starting game.
+  G0: commentary/G0.tex
 
 figures:
   - label: all_games

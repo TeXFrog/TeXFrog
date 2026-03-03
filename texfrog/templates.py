@@ -49,16 +49,12 @@ games:
     description: 'The final game, where the adversary has no advantage.'
 
 # Per-game commentary shown in the HTML viewer and LaTeX harness.
+# Each value is a path to a .tex file (relative to this file).
 commentary:
-  G0: |
-    The starting game.
-  G1: |
-    Games \tfgamename{G0} and \tfgamename{G1} differ in how $y$ is computed.
-  Red1: |
-    Reduction \tfgamename{Red1} queries an external oracle instead of
-    computing $f(k)$ directly.
-  G2: |
-    The final game.
+  G0: commentary/G0.tex
+  G1: commentary/G1.tex
+  Red1: commentary/Red1.tex
+  G2: commentary/G2.tex
 
 # Consolidated figures showing multiple games side by side.
 figures:
@@ -159,16 +155,12 @@ games:
     description: 'The final game, where the adversary has no advantage.'
 
 # Per-game commentary shown in the HTML viewer and LaTeX harness.
+# Each value is a path to a .tex file (relative to this file).
 commentary:
-  G0: |
-    The starting game.
-  G1: |
-    Games \tfgamename{G0} and \tfgamename{G1} differ in how $y$ is computed.
-  Red1: |
-    Reduction \tfgamename{Red1} queries an external oracle instead of
-    computing $f(k)$ directly.
-  G2: |
-    The final game.
+  G0: commentary/G0.tex
+  G1: commentary/G1.tex
+  Red1: commentary/Red1.tex
+  G2: commentary/G2.tex
 
 # Consolidated figures showing multiple games side by side.
 figures:
@@ -225,6 +217,23 @@ NICODEMUS_MACROS = r"""% Custom macros for this proof.
 \newcommand{\sample}{\stackrel{{\scriptscriptstyle\$}}{\gets}}
 """
 
+# ---------------------------------------------------------------------------
+# Commentary file templates (shared by both packages)
+# ---------------------------------------------------------------------------
+
+COMMENTARY_G0 = r"""The starting game.
+"""
+
+COMMENTARY_G1 = r"""Games \tfgamename{G0} and \tfgamename{G1} differ in how $y$ is computed.
+"""
+
+COMMENTARY_RED1 = r"""Reduction \tfgamename{Red1} queries an external oracle instead of
+computing $f(k)$ directly.
+"""
+
+COMMENTARY_G2 = r"""The final game.
+"""
+
 
 def get_templates(package: str) -> dict[str, tuple[str, str]]:
     """Return template files for the given package profile.
@@ -238,17 +247,25 @@ def get_templates(package: str) -> dict[str, tuple[str, str]]:
     Raises:
         ValueError: If the package name is not recognised.
     """
+    commentary_files = {
+        "commentary/G0.tex": (COMMENTARY_G0.lstrip("\n"), "commentary for G0"),
+        "commentary/G1.tex": (COMMENTARY_G1.lstrip("\n"), "commentary for G1"),
+        "commentary/Red1.tex": (COMMENTARY_RED1.lstrip("\n"), "commentary for Red1"),
+        "commentary/G2.tex": (COMMENTARY_G2.lstrip("\n"), "commentary for G2"),
+    }
     if package == "cryptocode":
         return {
             "proof.yaml": (CRYPTOCODE_YAML.lstrip("\n"), "proof configuration"),
             "games_source.tex": (CRYPTOCODE_SOURCE.lstrip("\n"), "combined game source"),
             "macros.tex": (CRYPTOCODE_MACROS.lstrip("\n"), "custom macros"),
+            **commentary_files,
         }
     elif package == "nicodemus":
         return {
             "proof.yaml": (NICODEMUS_YAML.lstrip("\n"), "proof configuration"),
             "games_source.tex": (NICODEMUS_SOURCE.lstrip("\n"), "combined game source"),
             "macros.tex": (NICODEMUS_MACROS.lstrip("\n"), "custom macros"),
+            **commentary_files,
         }
     else:
         raise ValueError(f"Unknown package '{package}'. Use 'cryptocode' or 'nicodemus'.")

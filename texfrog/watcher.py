@@ -71,6 +71,12 @@ def collect_watched_files(yaml_path: Path) -> set[Path]:
     if preamble_rel:
         paths.add((base_dir / preamble_rel).resolve())
 
+    raw_commentary = data.get("commentary") or {}
+    if isinstance(raw_commentary, dict):
+        for file_rel in raw_commentary.values():
+            if isinstance(file_rel, str) and file_rel.strip():
+                paths.add((base_dir / file_rel).resolve())
+
     return paths
 
 

@@ -75,7 +75,7 @@ After activating the virtual environment, you can `cd` to any directory on your 
 
 ## Quick Start
 
-The fastest way to start a new proof is with `texfrog init`. This creates a minimal, runnable proof (`proof.yaml`, `games_source.tex`, and `macros.tex`) with comments explaining each field. 
+The fastest way to start a new proof is with `texfrog init`. This creates a minimal, runnable proof (`proof.yaml`, `games_source.tex`, `macros.tex`, and `commentary/*.tex`) with comments explaining each field.
 
 ```bash
 # Scaffold a new proof in the current directory using cryptocode for pseudocode

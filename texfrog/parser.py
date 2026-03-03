@@ -284,7 +284,29 @@ def parse_proof(yaml_path: Path) -> Proof:
     source_lines = parse_source_file(source_path, ordered_labels)
 
     # --- commentary ---
-    commentary: dict[str, str] = data.get("commentary") or {}
+    raw_commentary: dict[str, str] = data.get("commentary") or {}
+    commentary: dict[str, str] = {}
+    commentary_files: dict[str, str] = {}
+    for comm_label, file_rel in raw_commentary.items():
+        if not isinstance(file_rel, str) or not file_rel.strip():
+            raise ValueError(
+                f"Commentary entry for '{comm_label}' must be a non-empty "
+                f"file path string."
+            )
+        file_path = (base_dir / file_rel).resolve()
+        if not file_path.is_relative_to(base_dir):
+            raise ValueError(
+                f"Commentary path '{file_rel}' for '{comm_label}' resolves "
+                f"outside the proof directory."
+            )
+        if not file_path.exists():
+            raise FileNotFoundError(
+                f"Commentary file '{file_rel}' for '{comm_label}' not found "
+                f"(looked in {base_dir}/). Check the 'commentary' field in "
+                f"proof.yaml."
+            )
+        commentary[comm_label] = file_path.read_text(encoding="utf-8")
+        commentary_files[comm_label] = file_rel
 
     # --- figures ---
     raw_figures = data.get("figures") or []
@@ -325,4 +347,5 @@ def parse_proof(yaml_path: Path) -> Proof:
         figures=figures,
         package=package_name,
         preamble=preamble_rel,
+        commentary_files=commentary_files,
     )

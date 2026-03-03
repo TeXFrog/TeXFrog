@@ -263,4 +263,4 @@ Blank lines inside `varwidth` environments (used by cryptocode's `pcvstack`) can
 
 ### My live-reload isn't picking up changes to a new file
 
-The file watcher monitors paths listed in your `proof.yaml` (source, macros, preamble). After adding a new file to `macros:` in the YAML, save the YAML file — the watcher refreshes its file set after each rebuild.
+The file watcher monitors paths listed in your `proof.yaml` (source, macros, preamble, commentary files). After adding a new file to `macros:` or `commentary:` in the YAML, save the YAML file — the watcher refreshes its file set after each rebuild.

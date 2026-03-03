@@ -23,6 +23,10 @@ def test_get_templates_returns_expected_files(package: str):
     assert "proof.yaml" in templates
     assert "games_source.tex" in templates
     assert "macros.tex" in templates
+    assert "commentary/G0.tex" in templates
+    assert "commentary/G1.tex" in templates
+    assert "commentary/Red1.tex" in templates
+    assert "commentary/G2.tex" in templates
     for filename, (content, description) in templates.items():
         assert len(content) > 0
         assert len(description) > 0
@@ -46,7 +50,11 @@ def test_init_creates_files_in_new_directory(tmp_path: Path):
     assert (target / "proof.yaml").exists()
     assert (target / "games_source.tex").exists()
     assert (target / "macros.tex").exists()
-    assert "Created 3 file(s)" in result.output
+    assert (target / "commentary" / "G0.tex").exists()
+    assert (target / "commentary" / "G1.tex").exists()
+    assert (target / "commentary" / "Red1.tex").exists()
+    assert (target / "commentary" / "G2.tex").exists()
+    assert "Created 7 file(s)" in result.output
 
 
 def test_init_creates_files_in_existing_directory(tmp_path: Path):
@@ -94,6 +102,10 @@ def test_init_skips_existing_files(tmp_path: Path):
 def test_init_all_existing_writes_nothing(tmp_path: Path):
     for name in ("proof.yaml", "games_source.tex", "macros.tex"):
         (tmp_path / name).write_text("existing")
+    commentary_dir = tmp_path / "commentary"
+    commentary_dir.mkdir()
+    for name in ("G0.tex", "G1.tex", "Red1.tex", "G2.tex"):
+        (commentary_dir / name).write_text("existing")
     runner = CliRunner()
     result = runner.invoke(main, ["init", str(tmp_path)])
     assert result.exit_code == 0
