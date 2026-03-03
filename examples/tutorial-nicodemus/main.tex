@@ -40,7 +40,8 @@ left-or-right oracle,
 \[
   \mathbf{Adv}^{\mathrm{IND\text{-}CPA}}_\Pi(\mathcal{A})
   \;\leq\;
-  \mathbf{Adv}^{\mathrm{PRF}}_{\mathrm{PRF}}(\mathcal{B}_1) \,.
+  \mathbf{Adv}^{\mathrm{PRF}}_{\mathrm{PRF}}(\mathcal{B}_1)
+  \;+\; \frac{q^2}{2^{\lambda+1}} \,.
 \]
 \end{theorem}
 
@@ -50,7 +51,7 @@ We proceed via a sequence of games. Figure~\ref{fig:all-games} shows all the gam
 \begin{figure}[ht]
 \centering
 \input{fig_all_games.tex}
-\caption{Consolidated figure showing games $\tfgamename{G0}$--$\tfgamename{G2}$ and Reduction $\tfgamename{Red1}$.}
+\caption{Consolidated figure showing games $\tfgamename{G0}$--$\tfgamename{G3}$ and Reduction $\tfgamename{Red1}$.}
 \label{fig:all-games}
 \end{figure}
 
@@ -60,7 +61,7 @@ We proceed via a sequence of games. Figure~\ref{fig:all-games} shows all the gam
 \begin{figure}[ht]
 \centering
 \input{G0.tex}
-\caption{Game~$\tfgamename{G0}$: $\INDCPA_\Enc^\Adversary.\mathsf{Real}()$: the real IND-CPA game. The LR oracle encrypts using the actual PRF.}
+\caption{Game~$\tfgamename{G0}$: $\INDCPA_\Enc^\Adversary()$: The IND-CPA game. The LR oracle encrypts using the actual PRF.}
 \label{fig:G0}
 \end{figure}
 
@@ -70,7 +71,7 @@ We proceed via a sequence of games. Figure~\ref{fig:all-games} shows all the gam
 \begin{figure}[ht]
 \centering
 \input{G1.tex}
-\caption{Game~$\tfgamename{G1}$: Replace $\mathrm{PRF}(k, r)$ with a truly random value.}
+\caption{Game~$\tfgamename{G1}$: Replace $\mathrm{PRF}(k, r)$ with a truly random function $\RF(r)$.}
 \label{fig:G1}
 \end{figure}
 
@@ -90,8 +91,18 @@ We proceed via a sequence of games. Figure~\ref{fig:all-games} shows all the gam
 \begin{figure}[ht]
 \centering
 \input{G2.tex}
-\caption{Game~$\tfgamename{G2}$: $\INDCPA_\Enc^\Adversary.\mathsf{Ideal}()$: the ideal IND-CPA game. Ciphertext is uniformly random, independent of~$m_b$.}
+\caption{Game~$\tfgamename{G2}$: Replace $\RF(r)$ with independently sampled randomness.}
 \label{fig:G2}
+\end{figure}
+
+\paragraph{Game~$\tfgamename{G3}$.}
+\input{G3_commentary.tex}
+
+\begin{figure}[ht]
+\centering
+\input{G3.tex}
+\caption{Game~$\tfgamename{G3}$: Ciphertext is uniformly random, independent of~$m_b$.}
+\label{fig:G3}
 \end{figure}
 
 \noindent
@@ -102,6 +113,7 @@ Combining the bounds from each game hop, we obtain
   \bigl|\Pr[\mathsf{G}_0 = 1] - \tfrac{1}{2}\bigr|
   \;\leq\;
   \mathbf{Adv}^{\mathrm{PRF}}_{\mathrm{PRF}}(\mathcal{B}_1)
+  \;+\; \frac{q^2}{2^{\lambda+1}}
   \;+\; 0 \,,
 \]
 which completes the proof.\hfill$\square$

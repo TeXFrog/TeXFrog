@@ -16,20 +16,21 @@ Dec(k, (r, c))  =  PRF(k, r) XOR c
 
 **Theorem.** `Enc` is IND-CPA secure if `PRF` is a secure pseudorandom function.
 
-**Proof.** Via a two-hop game sequence:
+**Proof.** Via a three-hop game sequence:
 
 ```
-G0 (Real)  ~_PRF  G1  =  G2 (Ideal)
+G0 (Real)  ~_PRF  G1  ~_birthday  G2  =  G3 (Ideal)
 ```
 
 | Game | What changes |
 |------|-------------|
 | G0 | Oracle computes `y <- PRF(k, r)`, returns `(r, y XOR m_b)` |
-| G1 | Oracle samples `y` at random, returns `(r, y XOR m_b)` |
-| G2 | Oracle samples `c` directly (message not used) |
+| G1 | Oracle computes `y <- RF(r)` (truly random function), returns `(r, y XOR m_b)` |
+| G2 | Oracle samples `y` at random, returns `(r, y XOR m_b)` |
+| G3 | Oracle samples `c` directly (message not used) |
 | Red1 | Reduction: replaces PRF call by querying an external challenger |
 
-G0 to G1 is by PRF security (via Red1). G1 to G2 is a perfect equivalence.
+G0 to G1 is by PRF security (via Red1). G1 to G2 is by a birthday bound on nonce collisions. G2 to G3 is a perfect equivalence.
 
 ## Files in This Directory
 
@@ -80,27 +81,31 @@ The source file syntax differs substantially:
 ### Lines with a tag appear only in named games
 
 ```latex
-\item $k \getsr \{0,1\}^\lambda$ %:tags: G0-G2
+\item $k \getsr \{0,1\}^\lambda$ %:tags: G0
 ```
 
 ### Consecutive variant lines encode "slots"
 
-The `y` computation is a three-way slot:
+The `y` computation is a four-way slot:
 
 ```latex
 \item $y \gets \mathrm{PRF}(k, r)$ %:tags: G0
-\item $y \getsr \{0,1\}^\lambda$   %:tags: G1
+\item $y \gets \RF(r)$             %:tags: G1
+\item $y \getsr \{0,1\}^\lambda$   %:tags: G2
 \item $y \gets \OPRF(r)$           %:tags: Red1
 ```
+
+For each game, at most one of these lines survives filtering. They are consecutive, so the chosen line always appears at the right position.
 
 ### Procedure headers
 
 In nicodemus, procedure headers use `\nicodemusheader{...}` above `\begin{nicodemus}` environments:
 
 ```latex
-\nicodemusheader{$\INDCPA_\Enc^\Adversary.\mathsf{Real}()$} %:tags: G0
-\nicodemusheader{Game~1} %:tags: G1
-\nicodemusheader{$\INDCPA_\Enc^\Adversary.\mathsf{Ideal}()$} %:tags: G2
+\nicodemusheader{$\INDCPA_\Enc^\Adversary()$} %:tags: G0
+\nicodemusheader{Game~$\tfgamename{G1}$} %:tags: G1
+\nicodemusheader{Game~$\tfgamename{G2}$} %:tags: G2
+\nicodemusheader{Game~$\tfgamename{G3}$} %:tags: G3
 \nicodemusheader{Reduction $\Bdversary_1^{\OPRF}$} %:tags: Red1
 ```
 

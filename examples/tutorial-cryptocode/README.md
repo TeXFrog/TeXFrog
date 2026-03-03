@@ -16,20 +16,21 @@ Dec(k, (r, c))  =  PRF(k, r) XOR c
 
 **Theorem.** `Enc` is IND-CPA secure if `PRF` is a secure pseudorandom function.
 
-**Proof.** Via a two-hop game sequence:
+**Proof.** Via a three-hop game sequence:
 
 ```
-G0 (Real)  ~_PRF  G1  =  G2 (Ideal)
+G0 (Real)  ~_PRF  G1  ~_birthday  G2  =  G3 (Ideal)
 ```
 
 | Game | What changes |
 |------|-------------|
 | G0 | Oracle computes `y <- PRF(k, r)`, returns `(r, y XOR m_b)` |
-| G1 | Oracle samples `y` at random, returns `(r, y XOR m_b)` |
-| G2 | Oracle samples `c` directly (message not used) |
+| G1 | Oracle computes `y <- RF(r)` (truly random function), returns `(r, y XOR m_b)` |
+| G2 | Oracle samples `y` at random, returns `(r, y XOR m_b)` |
+| G3 | Oracle samples `c` directly (message not used) |
 | Red1 | Reduction: replaces PRF call by querying an external challenger |
 
-G0 to G1 is by PRF security (via Red1). G1 to G2 is a perfect equivalence.
+G0 to G1 is by PRF security (via Red1). G1 to G2 is by a birthday bound on nonce collisions. G2 to G3 is a perfect equivalence.
 
 ## Files in This Directory
 
@@ -62,6 +63,11 @@ games:
     latex_name: 'G_0'
     description: '...'
 
+  - label: Red1
+    latex_name: '\Bdversary_1'
+    description: '...'
+    reduction: true
+
   - label: G1
     latex_name: 'G_1'
     description: '...'
@@ -70,18 +76,17 @@ games:
     latex_name: 'G_2'
     description: '...'
 
-  - label: Red1
-    latex_name: '\Bdversary_1'
+  - label: G3
+    latex_name: 'G_3'
     description: '...'
-    reduction: true
 ```
 
 Each game has a `label` (used in `%:tags:` and as the output filename), a `latex_name` (math-mode content without `$` delimiters), and a `description`. The optional `reduction: true` flag marks an entry as a reduction, which affects how it is displayed in the HTML viewer.
 
 The order of the game list matters:
 
-1. **Diffing.** TeXFrog highlights lines that differ between each game and the one before it. G1 is diffed against G0, G2 against G1, Red1 against G2.
-2. **Range resolution.** Tags like `G0-G2` mean "from G0 to G2 by position in this list" — so `G0-G2` covers G0, G1, G2 and excludes Red1 (which is at position 3).
+1. **Diffing.** TeXFrog highlights lines that differ between each game and the one before it. Red1 is diffed against G0, G1 against Red1, G2 against G1, G3 against G2.
+2. **Range resolution.** Tags like `G0-G2` mean "from G0 to G2 by position in this list" — so `G0-G2` covers G0, Red1, G1, G2 (positions 0–3).
 
 ### `commentary`
 
@@ -101,11 +106,11 @@ Each entry is raw LaTeX, written to `{label}_commentary.tex` and included by the
 ```yaml
 figures:
   - label: all_games
-    games: "G0,G1,G2,Red1"
-    procedure_name: "Games $\tfgamename{G0}$--$\tfgamename{G2}$, Reduction $\tfgamename{Red1}$"
+    games: "G0,G1,G2,G3,Red1"
+    procedure_name: "Games $\\tfgamename{G0}$--$\\tfgamename{G3}$, Reduction $\\tfgamename{Red1}$"
 ```
 
-This produces `fig_all_games.tex`: a consolidated block showing all four games, with game-specific lines annotated by `\tfgamelabel`. The optional `procedure_name` overrides the title of the first procedure header.
+This produces `fig_all_games.tex`: a consolidated block showing all five games, with game-specific lines annotated by `\tfgamelabel`. The optional `procedure_name` overrides the title of the first procedure header.
 
 ---
 
@@ -121,26 +126,27 @@ b' \gets \Adversary^{\mathsf{LR}}() \\
 \pcreturn (b' = b)
 ```
 
-These lines are identical across G0, G1, G2, and Red1.
+These lines are identical across G0, G1, G2, G3, and Red1.
 
 ### Lines with a tag appear only in named games
 
 ```latex
-k \getsr \{0,1\}^\lambda \\ %:tags: G0-G2
+k \getsr \{0,1\}^\lambda \\ %:tags: G0,G1-G3
 ```
 
-The range `G0-G2` resolves to positions 0--2 in the games list: G0, G1, G2. Red1 (position 3) does not get this line.
+The tag `G0,G1-G3` includes G0 (position 0) plus positions from G1 to G3 (positions 2–4): G1, G2, G3. Red1 (position 1) does not get this line.
 
 ### Consecutive variant lines encode "slots"
 
 **This is the most important structural rule:** variant lines for the same logical slot must be consecutive in the source file. TeXFrog filters but never reorders lines.
 
-The `y` computation is a three-way slot:
+The `y` computation is a four-way slot:
 
 ```latex
 y \gets \mathrm{PRF}(k, r) \\ %:tags: G0
-y \getsr \{0,1\}^\lambda \\   %:tags: G1
-y \gets \OPRF(r) \\           %:tags: Red1
+y \gets \RF(r) \\              %:tags: G1
+y \getsr \{0,1\}^\lambda \\    %:tags: G2
+y \gets \OPRF(r) \\            %:tags: Red1
 ```
 
 For each game, at most one of these lines survives filtering. They are consecutive, so the chosen line always appears at the right position.
@@ -153,6 +159,7 @@ Here is how TeXFrog expects procedure headers to be typeset when using cryptocod
 \procedure[linenumbering]{\tfgamename{G0}}{ %:tags: G0
 \procedure[linenumbering]{\tfgamename{G1}}{ %:tags: G1
 \procedure[linenumbering]{\tfgamename{G2}}{ %:tags: G2
+\procedure[linenumbering]{\tfgamename{G3}}{ %:tags: G3
 \procedure[linenumbering]{\tfgamename{Red1}}{ %:tags: Red1
 ```
 
@@ -181,13 +188,14 @@ After running `texfrog latex`, the output directory contains:
 
 ```
 G0.tex              — pseudocode for G0 (no highlighting; first game)
+Red1.tex            — pseudocode for Red1; changed lines wrapped in \tfchanged{}
 G1.tex              — pseudocode for G1; changed lines wrapped in \tfchanged{}
 G2.tex              — pseudocode for G2; changed lines wrapped in \tfchanged{}
-Red1.tex            — pseudocode for Red1; changed lines wrapped in \tfchanged{}
+G3.tex              — pseudocode for G3; changed lines wrapped in \tfchanged{}
 G0_commentary.tex   — LaTeX commentary for G0
 ...
 proof_harness.tex   — \inputs macros, then each game + commentary in order
-fig_all_games.tex   — consolidated figure with all four games annotated
+fig_all_games.tex   — consolidated figure with all five games annotated
 ```
 
 Include the harness in your paper with `\input{proof_harness.tex}`, or include individual game files and figures as needed. See [LaTeX integration](../../docs/latex-integration.md) for details.
@@ -199,11 +207,11 @@ Include the harness in your paper with `\input{proof_harness.tex}`, or include i
 | Concept | Where demonstrated |
 |---------|-------------------|
 | Untagged lines appear in every game | `b`, `b'`, `\pcreturn` lines |
-| Single-game tag | `%:tags: G0`, `%:tags: G2` |
-| Comma-separated tag list | `%:tags: G0,G1,Red1` |
-| Range tag | `%:tags: G0-G2` (positions 0--2, excludes Red1) |
-| Consecutive variant slot | The three `y` lines; the two `c` lines |
-| Changed-line highlighting | `y` highlighted in G1; `c` highlighted in G2 |
+| Single-game tag | `%:tags: G0`, `%:tags: G3` |
+| Comma-separated tag list | `%:tags: G0,G1-G3` |
+| Range tag | `%:tags: G0-G2` (positions 0–3, covers G0, Red1, G1, G2) |
+| Consecutive variant slot | The four `y` lines; the two `c` lines |
+| Changed-line highlighting | `y` highlighted in G1; `c` highlighted in G3 |
 | Consolidated figure | `fig_all_games.tex` annotates game-specific lines |
 | `\tfgamename` | Commentary uses `\tfgamename{G0}` to reference game names |
 

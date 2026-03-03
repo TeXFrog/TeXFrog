@@ -14,16 +14,17 @@
 
 %%% -- Challenge experiment procedure header (one per game/reduction) -------------
 
-		\nicodemusheader{$\INDCPA_\Enc^\Adversary.\mathsf{Real}()$} %:tags: G0
-		\nicodemusheader{Game~1} %:tags: G1
-		\nicodemusheader{$\INDCPA_\Enc^\Adversary.\mathsf{Ideal}()$} %:tags: G2
+		\nicodemusheader{$\INDCPA_\Enc^\Adversary()$} %:tags: G0
+		\nicodemusheader{Game~$\tfgamename{G1}$} %:tags: G1
+		\nicodemusheader{Game~$\tfgamename{G2}$} %:tags: G2
+		\nicodemusheader{Game~$\tfgamename{G3}$} %:tags: G3
 		\nicodemusheader{Reduction $\Bdversary_1^{\OPRF}$} %:tags: Red1
 
 %%% -- Challenge experiment body -------------------------------------------------
 
 		\begin{nicodemus}
-			% PRF key: G0, G1, G2 only (Red1 uses an external PRF oracle, not a local key)
-			\item $k \getsr \{0,1\}^\lambda$ %:tags: G0-G2
+			% PRF key: only Game 0
+			\item $k \getsr \{0,1\}^\lambda$ %:tags: G0
 			% Challenge bit (all games)
 			\item $b \getsr \{0,1\}$
 			% Run adversary with access to the LR encryption oracle (all games)
@@ -40,14 +41,16 @@
 			\item $r \getsr \{0,1\}^\lambda$
 			% G0: compute the PRF output using the secret key
 			\item $y \gets \mathrm{PRF}(k, r)$ %:tags: G0
-			% G1: use a truly random value instead of the PRF output
-			\item $y \getsr \{0,1\}^\lambda$ %:tags: G1
+			% G1: evaluate a truly random function at r
+			\item $y \gets \RF(r)$ %:tags: G1
+			% G2: use independently sampled randomness
+			\item $y \getsr \{0,1\}^\lambda$ %:tags: G2
 			% Red1: query the external PRF oracle (no local key)
 			\item $y \gets \OPRF(r)$ %:tags: Red1
-			% G0, G1, Red1: XOR with the chosen message
-			\item $c \gets y \oplus m_b$ %:tags: G0,G1,Red1
-			% G2: ciphertext is uniformly random, independent of m_b
-			\item $c \getsr \{0,1\}^\lambda$ %:tags: G2
+			% G0, Red1, G1, G2: XOR with the chosen message
+			\item $c \gets y \oplus m_b$ %:tags: G0-G2
+			% G3: ciphertext is uniformly random, independent of m_b
+			\item $c \getsr \{0,1\}^\lambda$ %:tags: G3
 			\item Return $(r, c)$
 		\end{nicodemus}%
 
