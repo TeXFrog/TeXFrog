@@ -2,7 +2,8 @@
 
 This is the reference guide for TeXFrog's two input files: a YAML configuration (`proof.yaml`) and a combined LaTeX source (`games_source.tex`). For a hands-on introduction, start with the [cryptocode tutorial](../examples/tutorial-cryptocode/) or the [nicodemus tutorial](../examples/tutorial-nicodemus/) instead.
 
-> **Tip:** Run `texfrog init` to scaffold a starter proof with commented templates, then modify the generated files. Use `texfrog init --package nicodemus` for nicodemus-flavored templates.
+> [!TIP]
+> Run `texfrog init` to scaffold a starter proof with commented templates, then modify the generated files. Use `texfrog init --package nicodemus` for nicodemus-flavored templates.
 
 ## Overview
 
@@ -127,7 +128,7 @@ figures:
 Each figure has:
 - `label` — used as the output filename: `fig_{label}.tex`
 - `games` — comma-separated list or range of game labels (same syntax as `%:tags:`)
-- `procedure_name` (optional) — custom title for the first procedure header in the consolidated output. Without this, the first game's header is used verbatim. Useful for showing a collective name like "Games $G_0$--$G_9$" instead of a single game's title.
+- `procedure_name` (optional) — custom title for the first procedure header in the consolidated output. Without this, the first game's header is used verbatim. Useful for showing a collective name like `Games $G_0$--$G_9$` instead of a single game's title.
 
 In the generated figure, lines that appear in all selected games are output verbatim. Lines that appear in only some games are annotated with `\tfgamelabel{G1,G3}{line content}`. See [latex-integration.md](latex-integration.md) for customizing the annotation macro.
 
@@ -162,7 +163,7 @@ Ranges are resolved **positionally** — by the order games appear in the YAML f
 
 This lets you insert reductions (e.g. `Red2`) between games without breaking range syntax.
 
-Unknown labels in tags are silently ignored, so a typo like `%:tags: G10` when `G10` doesn't exist will simply cause the line to appear in no game. Run `texfrog check --strict` to catch these — see [Troubleshooting](troubleshooting.md#lines-are-missing-from-a-game).
+Unknown labels in tags will raise a warning on the command line but otherwise are silently ignored, so a typo like `%:tags: G10` when `G10` doesn't exist will simply cause the line to appear in no game. Run `texfrog check --strict` to catch these — see [Troubleshooting](troubleshooting.md#lines-are-missing-from-a-game).
 
 ### Source Ordering Constraint
 
