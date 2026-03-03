@@ -20,7 +20,7 @@ TeXFrog currently supports the [`cryptocode`](https://ctan.org/pkg/cryptocode) a
 
 ## Live Demos
 
-[![TeXFrog HTML proof viewer](docs/images/screenshot-web.png)](https://texfrog.github.io/examples/){:target="_blank"}
+[![TeXFrog HTML proof viewer](https://github.com/TeXFrog/TeXFrog/blob/main/docs/images/screenshot-web.png?raw=true)](https://texfrog.github.io/examples/)
 
 ## What The Source Code Looks Like
 
@@ -49,20 +49,25 @@ LaTeX and Poppler are only needed for the HTML viewer (`texfrog html`). The LaTe
 
 ## Installation and Running
 
-Because TeXFrog is still in preview mode, it is not yet available to install via `pip`. You will need to install it by cloning it from GitHub:
+You can install TeXFrog using Python's package manager, `pip`:
 
 ```bash
-git clone https://github.com/TeXFrog/TeXFrog
-cd TeXFrog
+pip install texfrog
+```
+
+Many Python installations don't let you install global packages, so you'll need to create a virtual environment:
+
+```bash
+cd my_working_directory      # wherever you want to install the venv
 python3 -m venv .venv
 source .venv/bin/activate    # on macOS/Linux; use .venv\Scripts\activate on Windows
-pip install -e .
+pip install texfrog
 ```
 
 When you open a new terminal session and want to run TeXFrog, you will need to reactivate the Python virtual environment:
 
 ```bash
-cd TeXFrog
+cd my_working_directory      # wherever you installed the venv
 source .venv/bin/activate    # on macOS/Linux; use .venv\Scripts\activate on Windows
 ```
 
@@ -89,17 +94,22 @@ Build it immediately:
 texfrog latex proof.yaml -o /tmp/tf_output
 ```
 
-TeXFrog also ships with tutorials you can study:
+The [TeXFrog repository contains tutorials](https://github.com/TeXFrog/TeXFrog/tree/main/examples) you can study:
 
 ```bash
+# Download them from https://github.com/TeXFrog/TeXFrog/tree/main/examples 
+# or clone the repository using the following two lines:
+git clone https://github.com/TeXFrog/TeXFrog
+cd TeXFrog/examples
+
 # Tutorial: IND-CPA proof (4 games/reductions)
-texfrog latex examples/tutorial-cryptocode/proof.yaml -o /tmp/tf_tutorial
+texfrog latex tutorial-cryptocode/proof.yaml
 
 # Same tutorial using the nicodemus package
-texfrog latex examples/tutorial-nicodemus/proof.yaml -o /tmp/tf_tutorial_nic
+texfrog latex tutorial-nicodemus/proof.yaml
 
 # Interactive HTML viewer with live reload
-texfrog html serve examples/tutorial-cryptocode/proof.yaml --live-reload
+texfrog html serve tutorial-cryptocode/proof.yaml --live-reload
 ```
 
 ## Usage
@@ -126,7 +136,7 @@ Parses the proof and runs validation checks (YAML structure, file existence, tag
 texfrog latex proof.yaml [-o OUTPUT_DIR]
 ```
 
-Produces per-game `.tex` files, commentary files, a harness file, and consolidated figures. Output goes to `texfrog_latex/` next to the input file by default. See [LaTeX integration](docs/latex-integration.md) for how to incorporate the output into your paper.
+Produces per-game `.tex` files, commentary files, a harness file, and consolidated figures. Output goes to `texfrog_latex/` next to the input file by default. See [LaTeX integration](https://github.com/TeXFrog/TeXFrog/blob/main/docs/latex-integration.md) for how to incorporate the output into your paper.
 
 ### Generate HTML output
 
@@ -151,22 +161,22 @@ You need two input files:
 - **`proof.yaml`** — declares the list of games and reductions, points to your macro files and source, and optionally specifies commentary, figures, and which pseudocode package to use
 - **`games_source.tex`** — the single combined LaTeX source file with `%:tags:` annotations
 
-See [Writing a proof](docs/writing-proofs.md) for a full guide, and the [tutorials](#included-examples) for worked examples.
+See [Writing a proof](https://github.com/TeXFrog/TeXFrog/blob/main/docs/writing-proofs.md) for a full guide, and the [tutorials](#included-examples) for worked examples.
 
-## Included Examples
+## Available Examples
 
 | Directory | Description | Package | Live Demo |
 |-----------|-------------|---------|-----------|
-| [`examples/tutorial-cryptocode/`](examples/tutorial-cryptocode/) | Small IND-CPA proof walkthrough (4 games/reductions) | `cryptocode` | [View demo](https://texfrog.github.io/demos/tutorial-cryptocode/) |
-| [`examples/tutorial-nicodemus/`](examples/tutorial-nicodemus/) | Same proof using `nicodemus` syntax | `nicodemus` | [View demo](https://texfrog.github.io/demos/tutorial-nicodemus/) |
+| [`examples/tutorial-cryptocode/`](https://github.com/TeXFrog/TeXFrog/tree/main/examples/tutorial-cryptocode) | Small IND-CPA proof walkthrough (4 games/reductions) | `cryptocode` | [View demo](https://texfrog.github.io/demos/tutorial-cryptocode/) |
+| [`examples/tutorial-nicodemus/`](https://github.com/TeXFrog/TeXFrog/tree/main/examples/tutorial-nicodemus) | Same proof using `nicodemus` syntax | `nicodemus` | [View demo](https://texfrog.github.io/demos/tutorial-nicodemus/) |
 
 Comparing the two tutorials side by side shows the syntax differences between pseudocode packages.
 
 ## Documentation
 
-- [Writing a proof](docs/writing-proofs.md) — reference for `proof.yaml` and `games_source.tex`
-- [Using TeXFrog Output in Your LaTeX Paper](docs/latex-integration.md) — how to incorporate LaTeX output into your paper, including customizing highlight macros
-- [Troubleshooting & FAQ](docs/troubleshooting.md) — common problems proof authors may encounter
+- [Writing a proof](https://github.com/TeXFrog/TeXFrog/blob/main/docs/writing-proofs.md) — reference for `proof.yaml` and `games_source.tex`
+- [Using TeXFrog Output in Your LaTeX Paper](https://github.com/TeXFrog/TeXFrog/blob/main/docs/latex-integration.md) — how to incorporate LaTeX output into your paper, including customizing highlight macros
+- [Troubleshooting & FAQ](https://github.com/TeXFrog/TeXFrog/blob/main/docs/troubleshooting.md) — common problems proof authors may encounter
 
 ## Contributing
 
@@ -176,7 +186,6 @@ To set up a development environment:
 
 ```bash
 pip install -e ".[dev]"
-pytest tests/ -q
 ```
 
 ## Acknowledgements
@@ -185,4 +194,4 @@ TeXFrog was originally created by Douglas Stebila, based on discussions with man
 
 ## License
 
-TeXFrog is released under the Apache License 2.0. See [LICENSE.txt](LICENSE.txt) for details.
+TeXFrog is released under the Apache License 2.0. See [LICENSE.txt](https://github.com/TeXFrog/TeXFrog/blob/main/LICENSE.txt) for details.
