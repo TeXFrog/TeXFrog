@@ -38,7 +38,7 @@ body { display: flex; height: 100vh; font-family: sans-serif; }
                 flex-direction: column; gap: 1.5rem; align-items: center;
                 background: #f0f0f0; }
 #game-svg-container { display: flex; gap: 1rem; overflow-x: auto;
-                      width: 100%; }
+                      width: 100%; flex-shrink: 0; }
 .game-panel { text-align: center; flex-shrink: 0; background: #fff;
               padding: 1rem; border-radius: 6px; }
 .game-panel:first-child { margin-left: auto; }
