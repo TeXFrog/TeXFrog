@@ -12,6 +12,7 @@ System requirements (not installed via pip):
 
 from __future__ import annotations
 
+import click
 import concurrent.futures
 import contextlib
 import http.server
@@ -133,6 +134,11 @@ def _pdfcrop(pdf_path: Path) -> Path:
     )
     if result.returncode == 0 and cropped.exists():
         return cropped
+    click.echo(
+        f"Warning: pdfcrop failed (exit code {result.returncode}) for {pdf_path.name}; "
+        "using uncropped PDF (SVG may have extra margins).",
+        err=True,
+    )
     return pdf_path
 
 

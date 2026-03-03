@@ -705,3 +705,30 @@ def test_consolidated_no_procedure_name_preserves_original(tmp_path):
     proc_lines = [l for l in text.splitlines() if r"\procedure" in l]
     assert len(proc_lines) == 1
     assert r"Game $G_0$" in proc_lines[0]
+
+
+# ---------------------------------------------------------------------------
+# _pdfcrop warning on failure
+# ---------------------------------------------------------------------------
+
+
+def test_pdfcrop_failure_emits_warning(tmp_path, capsys):
+    """When pdfcrop returns non-zero, a warning should be printed to stderr."""
+    from unittest.mock import patch, MagicMock
+
+    from texfrog.output.html import _pdfcrop
+
+    pdf = tmp_path / "test.pdf"
+    pdf.write_text("fake pdf")
+
+    mock_result = MagicMock()
+    mock_result.returncode = 1
+
+    with patch("shutil.which", return_value="/usr/bin/pdfcrop"), \
+         patch("subprocess.run", return_value=mock_result):
+        result = _pdfcrop(pdf)
+
+    assert result == pdf  # falls back to original
+    captured = capsys.readouterr()
+    assert "pdfcrop failed" in captured.err
+    assert "test.pdf" in captured.err
