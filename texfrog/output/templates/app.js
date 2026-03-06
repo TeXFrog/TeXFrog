@@ -144,7 +144,7 @@ function showGame(idx) {
   }
 
   // Re-typeset MathJax
-  if (window.MathJax) {
+  if (window.MathJax && MathJax.typesetPromise) {
     MathJax.typesetPromise([
       document.getElementById('game-title'),
       document.getElementById('game-subtitle'),
