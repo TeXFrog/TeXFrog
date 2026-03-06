@@ -42,7 +42,7 @@ Issues = "https://github.com/TeXFrog/TeXFrog/issues"
 texfrog = "texfrog.cli:main"
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest", "pytest-playwright"]
 
 [tool.setuptools.packages.find]
 include = ["texfrog*"]
