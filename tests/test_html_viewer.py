@@ -321,6 +321,20 @@ def test_mobile_sidebar_toggle(page, html_server):
 
 
 @needs_playwright
+def test_medium_width_sidebar_no_descriptions(page, html_server):
+    """At medium width, sidebar is visible but game descriptions are hidden."""
+    page.set_viewport_size({"width": 900, "height": 800})
+    page.goto(html_server)
+    _wait_for_game(page, "G0")
+    # Sidebar visible, hamburger hidden
+    expect(page.locator("#nav")).to_be_visible()
+    expect(page.locator("#nav-toggle")).not_to_be_visible()
+    # Game labels visible, descriptions hidden
+    expect(page.locator("#game-list .game-label").first).to_be_visible()
+    expect(page.locator("#game-list .game-desc").first).not_to_be_visible()
+
+
+@needs_playwright
 def test_desktop_no_hamburger(page, html_server):
     page.set_viewport_size({"width": 1200, "height": 800})
     page.goto(html_server)

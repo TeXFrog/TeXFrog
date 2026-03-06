@@ -92,6 +92,14 @@ body { display: flex; height: 100vh; font-family: sans-serif; }
               justify-content: center; }
 #nav-toggle:hover { background: #e8e8e8; }
 
+/* Medium-width: narrower sidebar, hide game descriptions */
+@media (max-width: 1024px) and (min-width: 769px) {
+  #nav { width: 140px; min-width: auto; }
+  #nav .game-desc { display: none; }
+  #zoom-level { display: none; }
+  #zoom-controls { justify-content: space-between; }
+}
+
 /* Mobile responsive layout */
 @media (max-width: 768px) {
   body { flex-direction: column; }
