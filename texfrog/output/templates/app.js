@@ -32,7 +32,7 @@ function init(gamesData) {
     descDiv.textContent = g.description;
     li.appendChild(labelDiv);
     li.appendChild(descDiv);
-    li.onclick = () => showGame(i);
+    li.onclick = () => { showGame(i); closeNav(); };
     list.appendChild(li);
   });
   // Navigate to hash or first game
@@ -164,6 +164,18 @@ function navigate(delta) {
 
 function toggleHelp() {
   document.getElementById('help-overlay').classList.toggle('visible');
+}
+
+function toggleNav() {
+  const nav = document.getElementById('nav');
+  const backdrop = document.getElementById('nav-backdrop');
+  const isOpen = nav.classList.toggle('open');
+  backdrop.classList.toggle('visible', isOpen);
+}
+
+function closeNav() {
+  document.getElementById('nav').classList.remove('open');
+  document.getElementById('nav-backdrop').classList.remove('visible');
 }
 
 document.addEventListener('keydown', e => {

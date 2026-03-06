@@ -83,3 +83,37 @@ body { display: flex; height: 100vh; font-family: sans-serif; }
                          border-radius: 4px; background: #fff; cursor: pointer;
                          font-size: 0.85rem; display: block; margin-left: auto; }
 #help-content > button:hover { background: #e8e8e8; }
+
+/* Sidebar toggle button (visible only on mobile) */
+#nav-toggle { display: none; position: fixed; top: 0.5rem; left: 0.5rem; z-index: 8500;
+              width: 2.4rem; height: 2.4rem; border: 1px solid #aaa; border-radius: 4px;
+              background: #fff; cursor: pointer; font-size: 1.3rem; line-height: 1;
+              box-shadow: 0 2px 6px rgba(0,0,0,0.15); align-items: center;
+              justify-content: center; }
+#nav-toggle:hover { background: #e8e8e8; }
+
+/* Mobile responsive layout */
+@media (max-width: 768px) {
+  body { flex-direction: column; }
+  #nav-toggle { display: flex; }
+  #nav { position: fixed; top: 0; left: 0; bottom: 0; width: 260px; z-index: 8000;
+         transform: translateX(-100%); transition: transform 0.25s ease;
+         box-shadow: none; }
+  #nav.open { transform: translateX(0); box-shadow: 2px 0 12px rgba(0,0,0,0.2); }
+  #nav .game-desc { display: none; }
+  #nav-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.3);
+                  z-index: 7999; }
+  #nav-backdrop.visible { display: block; }
+  #main { width: 100%; }
+  #controls { padding: 0.75rem 0.5rem 0.75rem 3.2rem; }
+  #controls button { padding: 0.4rem 0.6rem; font-size: 0.85rem; }
+  #game-title { font-size: 1rem; }
+  #game-subtitle { font-size: 0.8rem; }
+  #game-display { padding: 0.75rem; gap: 1rem; }
+  #game-svg-container { flex-direction: column; align-items: center; }
+  .game-panel { width: 100%; }
+  .game-panel:first-child { margin-left: 0; }
+  .game-panel:last-child { margin-right: 0; }
+  .game-panel img { max-width: 100%; height: auto; }
+  #help-btn { bottom: 12px; right: 12px; }
+}
