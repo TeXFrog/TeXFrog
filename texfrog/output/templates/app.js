@@ -35,10 +35,14 @@ function init(gamesData) {
     li.onclick = () => { showGame(i); closeNav(); };
     list.appendChild(li);
   });
-  // Navigate to hash or first game
+  // Navigate to hash, overview, or first game
   const hash = window.location.hash.slice(1);
-  const idx = hash ? games.findIndex(g => g.label === hash) : -1;
-  showGame(idx >= 0 ? idx : 0);
+  if (!hash || hash === 'overview') {
+    showOverview();
+  } else {
+    const idx = games.findIndex(g => g.label === hash);
+    showGame(idx >= 0 ? idx : 0);
+  }
 }
 
 function makePanel(label, latexName, svgSrc) {
@@ -55,14 +59,75 @@ function makePanel(label, latexName, svgSrc) {
   return panel;
 }
 
+function showOverview() {
+  currentIndex = -1;
+  window.location.hash = 'overview';
+
+  // Update sidebar highlight
+  document.querySelectorAll('#game-list li').forEach(li => {
+    li.classList.remove('active');
+  });
+  document.getElementById('nav-overview').classList.add('active');
+
+  // Update title
+  document.getElementById('game-title').textContent = 'Proof Overview';
+  document.getElementById('game-subtitle').textContent = '';
+
+  // Hide game display, show overview
+  document.getElementById('game-display').style.display = 'none';
+  const overview = document.getElementById('overview-display');
+  overview.style.display = 'block';
+  overview.innerHTML = '';
+
+  // Build proof structure diagram
+  const container = document.createElement('div');
+  container.className = 'overview-flow';
+
+  games.forEach((g, i) => {
+    const card = document.createElement('div');
+    card.className = 'overview-card';
+    card.onclick = () => showGame(i);
+
+    const label = document.createElement('div');
+    label.className = 'overview-card-label';
+    label.textContent = `$${g.latex_name}$`;
+    card.appendChild(label);
+
+    if (g.description) {
+      const desc = document.createElement('div');
+      desc.className = 'overview-card-desc';
+      desc.textContent = g.description;
+      card.appendChild(desc);
+    }
+
+    container.appendChild(card);
+  });
+
+  overview.appendChild(container);
+
+  // Re-typeset MathJax
+  if (window.MathJax && MathJax.typesetPromise) {
+    MathJax.typesetPromise([overview]).catch(console.error);
+  }
+
+  // Update buttons
+  document.getElementById('btn-prev').disabled = true;
+  document.getElementById('btn-next').disabled = false;
+}
+
 function showGame(idx) {
   if (idx < 0 || idx >= games.length) return;
   currentIndex = idx;
+
+  // Hide overview, show game display
+  document.getElementById('overview-display').style.display = 'none';
+  document.getElementById('game-display').style.display = 'flex';
 
   const g = games[idx];
   window.location.hash = g.label;
 
   // Update nav highlight
+  document.getElementById('nav-overview').classList.remove('active');
   document.querySelectorAll('#game-list li').forEach((li, i) => {
     li.classList.toggle('active', i === idx);
     if (i === idx) li.scrollIntoView({ block: 'nearest' });
@@ -153,12 +218,21 @@ function showGame(idx) {
     ]).catch(console.error);
   }
 
-  // Update buttons
-  document.getElementById('btn-prev').disabled = (idx === 0);
+  // Update buttons (Prev is never disabled since G0 can go back to overview)
+  document.getElementById('btn-prev').disabled = false;
   document.getElementById('btn-next').disabled = (idx === games.length - 1);
 }
 
 function navigate(delta) {
+  if (currentIndex === -1) {
+    // From overview, Next goes to first game
+    if (delta > 0) showGame(0);
+    return;
+  }
+  if (currentIndex === 0 && delta < 0) {
+    showOverview();
+    return;
+  }
   showGame(currentIndex + delta);
 }
 
@@ -178,12 +252,106 @@ function closeNav() {
   document.getElementById('nav-backdrop').classList.remove('visible');
 }
 
+// --- Print support ---
+function renderAllForPrint() {
+  const pv = document.getElementById('print-view');
+  pv.innerHTML = '';
+
+  const findGame = (label) => games.find(x => x.label === label);
+  const nonRedGames = games.filter(g => !g.reduction);
+
+  games.forEach((g, idx) => {
+    const section = document.createElement('div');
+    section.className = 'print-game';
+
+    const heading = document.createElement('h2');
+    heading.className = 'print-game-title';
+    heading.textContent = `$${g.latex_name}$`;
+    section.appendChild(heading);
+
+    if (g.description) {
+      const desc = document.createElement('p');
+      desc.className = 'print-game-desc';
+      desc.textContent = g.description;
+      section.appendChild(desc);
+    }
+
+    // Build panels matching the interactive view
+    const panels = document.createElement('div');
+    panels.className = 'print-panels';
+
+    if (g.reduction && g.related_games && g.related_games.length > 0) {
+      if (g.related_games.length === 1) {
+        const rg = findGame(g.related_games[0]);
+        if (rg) panels.appendChild(makePrintPanel(rg.label, rg.latex_name, `games/${rg.label}-clean.svg`));
+        panels.appendChild(makePrintPanel(g.label, g.latex_name, `games/${g.label}.svg`));
+      } else {
+        const rg0 = findGame(g.related_games[0]);
+        if (rg0) panels.appendChild(makePrintPanel(rg0.label, rg0.latex_name, `games/${rg0.label}-clean.svg`));
+        panels.appendChild(makePrintPanel(g.label, g.latex_name, `games/${g.label}.svg`));
+        const rg1 = findGame(g.related_games[1]);
+        if (rg1) panels.appendChild(makePrintPanel(rg1.label, rg1.latex_name, `games/${rg1.label}-clean.svg`));
+      }
+    } else if (idx > 0 && !g.reduction) {
+      let prev = null;
+      for (let j = idx - 1; j >= 0; j--) {
+        if (!games[j].reduction) { prev = games[j]; break; }
+      }
+      if (prev) panels.appendChild(makePrintPanel(prev.label, prev.latex_name, `games/${prev.label}-removed.svg`));
+      panels.appendChild(makePrintPanel(g.label, g.latex_name, `games/${g.label}.svg`));
+    } else {
+      panels.appendChild(makePrintPanel(g.label, g.latex_name, `games/${g.label}.svg`));
+    }
+
+    section.appendChild(panels);
+
+    if (g.has_commentary) {
+      const cbox = document.createElement('div');
+      cbox.className = 'print-commentary';
+      const cimg = new Image();
+      cimg.alt = g.label + ' commentary';
+      cimg.src = `games/${g.label}_commentary.svg`;
+      cbox.appendChild(cimg);
+      section.appendChild(cbox);
+    }
+
+    pv.appendChild(section);
+  });
+
+  // Typeset MathJax in print view
+  if (window.MathJax && MathJax.typesetPromise) {
+    MathJax.typesetPromise([pv]).catch(console.error);
+  }
+}
+
+function makePrintPanel(label, latexName, svgSrc) {
+  const panel = document.createElement('div');
+  panel.className = 'print-panel';
+  const header = document.createElement('div');
+  header.className = 'print-panel-header';
+  header.textContent = `$${latexName}$`;
+  panel.appendChild(header);
+  const img = new Image();
+  img.alt = label;
+  img.src = svgSrc;
+  panel.appendChild(img);
+  return panel;
+}
+
+function restoreFromPrint() {
+  document.getElementById('print-view').innerHTML = '';
+}
+
+window.addEventListener('beforeprint', renderAllForPrint);
+window.addEventListener('afterprint', restoreFromPrint);
+
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     document.getElementById('help-overlay').classList.remove('visible');
     return;
   }
   if (e.key === '?') { toggleHelp(); return; }
+  if (e.key === 'Home') { showOverview(); return; }
   if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') navigate(-1);
   if (e.key === 'ArrowRight' || e.key === 'ArrowDown') navigate(+1);
   if (e.key === '+' || e.key === '=') adjustZoom(+0.1);

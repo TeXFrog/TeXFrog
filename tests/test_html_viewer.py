@@ -44,7 +44,7 @@ def test_page_title(page, html_server):
 
 @needs_playwright
 def test_initial_game_selected(page, html_server):
-    page.goto(html_server)
+    page.goto(f"{html_server}#G0")
     _wait_for_game(page, "G0")
     # First sidebar item is active
     first_li = page.locator("#game-list li").nth(0)
@@ -72,7 +72,7 @@ def test_sidebar_populated(page, html_server):
 
 @needs_playwright
 def test_click_sidebar_selects_game(page, html_server):
-    page.goto(html_server)
+    page.goto(f"{html_server}#G0")
     _wait_for_game(page, "G0")
     items = page.locator("#game-list li")
     # Click the 4th item (G2, index 3)
@@ -83,7 +83,7 @@ def test_click_sidebar_selects_game(page, html_server):
 
 @needs_playwright
 def test_active_class_exclusive(page, html_server):
-    page.goto(html_server)
+    page.goto(f"{html_server}#G0")
     _wait_for_game(page, "G0")
     items = page.locator("#game-list li")
     items.nth(1).click()
@@ -96,7 +96,7 @@ def test_active_class_exclusive(page, html_server):
 
 @needs_playwright
 def test_prev_next_buttons(page, html_server):
-    page.goto(html_server)
+    page.goto(f"{html_server}#G0")
     _wait_for_game(page, "G0")
     page.click("#btn-next")
     _wait_for_game(page, "G1")
@@ -111,7 +111,7 @@ def test_prev_next_buttons(page, html_server):
 
 @needs_playwright
 def test_arrow_right(page, html_server):
-    page.goto(html_server)
+    page.goto(f"{html_server}#G0")
     _wait_for_game(page, "G0")
     page.keyboard.press("ArrowRight")
     _wait_for_game(page, "G1")
@@ -119,7 +119,7 @@ def test_arrow_right(page, html_server):
 
 @needs_playwright
 def test_arrow_left(page, html_server):
-    page.goto(html_server)
+    page.goto(f"{html_server}#G0")
     _wait_for_game(page, "G0")
     page.keyboard.press("ArrowRight")
     _wait_for_game(page, "G1")
@@ -129,11 +129,11 @@ def test_arrow_left(page, html_server):
 
 @needs_playwright
 def test_arrow_boundary(page, html_server):
-    page.goto(html_server)
+    page.goto(f"{html_server}#G0")
     _wait_for_game(page, "G0")
-    # ArrowLeft on first game stays at G0
+    # ArrowLeft on first game goes to overview
     page.keyboard.press("ArrowLeft")
-    assert page.evaluate("window.location.hash") == "#G0"
+    assert page.evaluate("window.location.hash") == "#overview"
     # Navigate to last game by clicking through
     last_idx = len(GAMES_DATA) - 1
     last_label = GAMES_DATA[-1]["label"]
@@ -161,7 +161,7 @@ def test_load_with_hash(page, html_server):
 
 @needs_playwright
 def test_hash_updates(page, html_server):
-    page.goto(html_server)
+    page.goto(f"{html_server}#G0")
     _wait_for_game(page, "G0")
     page.keyboard.press("ArrowRight")
     _wait_for_game(page, "G1")
@@ -183,7 +183,7 @@ def test_invalid_hash_fallback(page, html_server):
 
 @needs_playwright
 def test_zoom_in_button(page, html_server):
-    page.goto(html_server)
+    page.goto(f"{html_server}#G0")
     _wait_for_game(page, "G0")
     page.locator("#zoom-controls button", has_text="+").click()
     expect(page.locator("#zoom-level")).to_have_text("110%")
@@ -191,7 +191,7 @@ def test_zoom_in_button(page, html_server):
 
 @needs_playwright
 def test_zoom_out_button(page, html_server):
-    page.goto(html_server)
+    page.goto(f"{html_server}#G0")
     _wait_for_game(page, "G0")
     page.locator("#zoom-controls button:first-child").click()
     expect(page.locator("#zoom-level")).to_have_text("90%")
@@ -199,7 +199,7 @@ def test_zoom_out_button(page, html_server):
 
 @needs_playwright
 def test_zoom_keyboard(page, html_server):
-    page.goto(html_server)
+    page.goto(f"{html_server}#G0")
     _wait_for_game(page, "G0")
     page.keyboard.press("+")
     expect(page.locator("#zoom-level")).to_have_text("110%")
@@ -255,7 +255,7 @@ def test_escape_closes_help(page, html_server):
 
 @needs_playwright
 def test_first_game_single_panel(page, html_server):
-    page.goto(html_server)
+    page.goto(f"{html_server}#G0")
     _wait_for_game(page, "G0")
     panels = page.locator("#game-svg-container .game-panel")
     expect(panels).to_have_count(1)
@@ -290,7 +290,7 @@ def test_commentary_shown(page, html_server):
 @needs_playwright
 def test_no_commentary(page, html_server):
     """G0 has has_commentary=False: commentary-box should be empty."""
-    page.goto(html_server)
+    page.goto(f"{html_server}#G0")
     _wait_for_game(page, "G0")
     expect(page.locator("#commentary-box img")).to_have_count(0)
 
@@ -324,7 +324,7 @@ def test_mobile_sidebar_toggle(page, html_server):
 def test_medium_width_sidebar_no_descriptions(page, html_server):
     """At medium width, sidebar is visible but game descriptions are hidden."""
     page.set_viewport_size({"width": 900, "height": 800})
-    page.goto(html_server)
+    page.goto(f"{html_server}#G0")
     _wait_for_game(page, "G0")
     # Sidebar visible, hamburger hidden
     expect(page.locator("#nav")).to_be_visible()
@@ -347,11 +347,14 @@ def test_desktop_no_hamburger(page, html_server):
 
 
 @needs_playwright
-def test_prev_disabled_first_game(page, html_server):
-    page.goto(html_server)
+def test_prev_at_first_game_goes_to_overview(page, html_server):
+    page.goto(f"{html_server}#G0")
     _wait_for_game(page, "G0")
-    expect(page.locator("#btn-prev")).to_be_disabled()
-    expect(page.locator("#btn-next")).not_to_be_disabled()
+    # Prev is not disabled at G0 — it navigates to overview
+    expect(page.locator("#btn-prev")).not_to_be_disabled()
+    page.click("#btn-prev")
+    page.wait_for_function("window.location.hash === '#overview'")
+    expect(page.locator("#overview-display")).to_be_visible()
 
 
 @needs_playwright
@@ -361,3 +364,102 @@ def test_next_disabled_last_game(page, html_server):
     _wait_for_game(page, last_label)
     expect(page.locator("#btn-next")).to_be_disabled()
     expect(page.locator("#btn-prev")).not_to_be_disabled()
+
+
+# ---------------------------------------------------------------------------
+# J. Overview Page
+# ---------------------------------------------------------------------------
+
+
+@needs_playwright
+def test_overview_shown_on_empty_hash(page, html_server):
+    """Loading with no hash shows the overview as the default landing page."""
+    page.goto(html_server)
+    page.wait_for_function("window.location.hash === '#overview'")
+    expect(page.locator("#overview-display")).to_be_visible()
+    expect(page.locator("#game-display")).not_to_be_visible()
+
+
+@needs_playwright
+def test_overview_shows_all_games(page, html_server):
+    """Overview lists all games as clickable cards."""
+    page.goto(html_server)
+    page.wait_for_function("window.location.hash === '#overview'")
+    cards = page.locator("#overview-display .overview-card")
+    expect(cards).to_have_count(NUM_GAMES)
+
+
+@needs_playwright
+def test_overview_click_navigates(page, html_server):
+    """Clicking a game card in the overview navigates to that game."""
+    page.goto(html_server)
+    page.wait_for_function("window.location.hash === '#overview'")
+    # Click the second card (G1)
+    page.locator("#overview-display .overview-card").nth(1).click()
+    _wait_for_game(page, "G1")
+    expect(page.locator("#game-display")).to_be_visible()
+    expect(page.locator("#overview-display")).not_to_be_visible()
+
+
+@needs_playwright
+def test_overview_hidden_when_game_shown(page, html_server):
+    """Overview is hidden when viewing a specific game."""
+    page.goto(f"{html_server}#G1")
+    _wait_for_game(page, "G1")
+    expect(page.locator("#overview-display")).not_to_be_visible()
+    expect(page.locator("#game-display")).to_be_visible()
+
+
+@needs_playwright
+def test_home_key_shows_overview(page, html_server):
+    """Home key navigates back to overview from any game."""
+    page.goto(f"{html_server}#G1")
+    _wait_for_game(page, "G1")
+    page.keyboard.press("Home")
+    page.wait_for_function("window.location.hash === '#overview'")
+    expect(page.locator("#overview-display")).to_be_visible()
+
+
+@needs_playwright
+def test_next_from_overview_goes_to_first_game(page, html_server):
+    """Next button from overview navigates to the first game."""
+    page.goto(html_server)
+    page.wait_for_function("window.location.hash === '#overview'")
+    page.click("#btn-next")
+    _wait_for_game(page, "G0")
+
+
+@needs_playwright
+def test_prev_from_first_game_goes_to_overview(page, html_server):
+    """Prev from G0 goes back to overview."""
+    page.goto(f"{html_server}#G0")
+    _wait_for_game(page, "G0")
+    page.click("#btn-prev")
+    page.wait_for_function("window.location.hash === '#overview'")
+    expect(page.locator("#overview-display")).to_be_visible()
+
+
+# ---------------------------------------------------------------------------
+# L. Print View
+# ---------------------------------------------------------------------------
+
+
+@needs_playwright
+def test_print_view_rendered_on_beforeprint(page, html_server):
+    """Dispatching beforeprint creates print-view with all game entries."""
+    page.goto(f"{html_server}#G0")
+    _wait_for_game(page, "G0")
+    page.evaluate("window.dispatchEvent(new Event('beforeprint'))")
+    entries = page.locator("#print-view .print-game")
+    expect(entries).to_have_count(NUM_GAMES)
+
+
+@needs_playwright
+def test_print_view_cleared_on_afterprint(page, html_server):
+    """Dispatching afterprint clears the print-view."""
+    page.goto(f"{html_server}#G0")
+    _wait_for_game(page, "G0")
+    page.evaluate("window.dispatchEvent(new Event('beforeprint'))")
+    expect(page.locator("#print-view .print-game")).to_have_count(NUM_GAMES)
+    page.evaluate("window.dispatchEvent(new Event('afterprint'))")
+    expect(page.locator("#print-view .print-game")).to_have_count(0)
