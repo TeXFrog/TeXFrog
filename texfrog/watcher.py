@@ -6,13 +6,14 @@ Monitors proof source files for changes and triggers safe rebuilds.
 from __future__ import annotations
 
 import logging
+import re
 import shutil
 import tempfile
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
 
-import yaml
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
 from watchdog.observers import Observer
 
@@ -33,51 +34,85 @@ def _snapshot_mtimes(files: set[Path]) -> dict[Path, float]:
     return result
 
 
-def collect_watched_files(yaml_path: Path) -> set[Path]:
-    """Return the set of absolute paths that should be monitored.
+def _skip_brace_group(text: str, pos: int) -> int:
+    """Skip a brace group starting at ``{`` at *pos*, return index after ``}``.
 
-    Reads the YAML file to discover the source, macros, and preamble
-    paths.  All paths are resolved relative to the YAML file's parent
-    directory.
-
-    Args:
-        yaml_path: Absolute path to the proof YAML config file.
-
-    Returns:
-        A set of resolved absolute paths including the YAML file itself,
-        the source .tex file, all macro files, and the preamble file
-        (if specified).
+    Handles nested braces.  Returns -1 if no matching close brace is found.
     """
-    paths: set[Path] = {yaml_path}
-    base_dir = yaml_path.parent
+    if pos >= len(text) or text[pos] != "{":
+        return -1
+    depth = 0
+    i = pos
+    while i < len(text):
+        ch = text[i]
+        if ch == "\\":
+            i += 2
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return i + 1
+        i += 1
+    return -1
+
+
+def _collect_watched_files_tex(tex_path: Path) -> set[Path]:
+    """Collect watched files from a .tex proof file."""
+    paths: set[Path] = {tex_path}
+    base_dir = tex_path.parent
 
     try:
-        with yaml_path.open("r", encoding="utf-8") as fh:
-            data = yaml.safe_load(fh)
+        text = tex_path.read_text(encoding="utf-8")
     except Exception:
         return paths
 
-    if not isinstance(data, dict):
-        return paths
+    for m in re.finditer(r"\\tfmacrofile\{([^}]+)\}", text):
+        paths.add((base_dir / m.group(1).strip()).resolve())
 
-    source_rel = data.get("source")
-    if source_rel:
-        paths.add((base_dir / source_rel).resolve())
+    for m in re.finditer(r"\\tfpreamble\{([^}]+)\}", text):
+        paths.add((base_dir / m.group(1).strip()).resolve())
 
-    for macro_rel in data.get("macros", []):
-        paths.add((base_dir / macro_rel).resolve())
+    # \tfcommentary{source}{label}{file} — skip first two brace groups
+    # (which may contain nested braces), then extract the third.
+    for m in re.finditer(r"\\tfcommentary\s*\{", text):
+        pos = m.end() - 1  # opening brace of first group
+        pos = _skip_brace_group(text, pos)
+        if pos == -1:
+            continue
+        # skip whitespace
+        while pos < len(text) and text[pos] in " \t\n":
+            pos += 1
+        pos = _skip_brace_group(text, pos)
+        if pos == -1:
+            continue
+        # skip whitespace
+        while pos < len(text) and text[pos] in " \t\n":
+            pos += 1
+        if pos < len(text) and text[pos] == "{":
+            end = _skip_brace_group(text, pos)
+            if end != -1:
+                file_path = text[pos + 1 : end - 1].strip()
+                paths.add((base_dir / file_path).resolve())
 
-    preamble_rel = data.get("preamble")
-    if preamble_rel:
-        paths.add((base_dir / preamble_rel).resolve())
-
-    raw_commentary = data.get("commentary") or {}
-    if isinstance(raw_commentary, dict):
-        for file_rel in raw_commentary.values():
-            if isinstance(file_rel, str) and file_rel.strip():
-                paths.add((base_dir / file_rel).resolve())
+    for m in re.finditer(r"\\input\{([^}]+)\}", text):
+        paths.add((base_dir / m.group(1).strip()).resolve())
 
     return paths
+
+
+def collect_watched_files(input_path: Path) -> set[Path]:
+    """Return the set of absolute paths that should be monitored.
+
+    Args:
+        input_path: Absolute path to the proof .tex file.
+
+    Returns:
+        A set of resolved absolute paths including the input file itself
+        and all referenced source/macro/commentary files.
+    """
+    return _collect_watched_files_tex(input_path)
 
 
 class _DebouncedHandler(FileSystemEventHandler):
@@ -90,7 +125,7 @@ class _DebouncedHandler(FileSystemEventHandler):
     def __init__(
         self,
         watched_files: set[Path],
-        on_change: callable,
+        on_change: Callable[[], None],
         debounce_seconds: float = 0.5,
     ) -> None:
         super().__init__()
@@ -138,7 +173,7 @@ class _DebouncedHandler(FileSystemEventHandler):
 
 
 def safe_rebuild(
-    yaml_path: Path,
+    input_path: Path,
     output_dir: Path,
     keep_tmp: bool,
 ) -> bool:
@@ -150,26 +185,27 @@ def safe_rebuild(
     Returns:
         ``True`` if the rebuild succeeded, ``False`` otherwise.
     """
-    from .parser import parse_proof, validate_tags
-    from .output.html import generate_html
+    from .output.html import build_all_proofs
+    from .tex_parser import parse_tex_proofs
+    from .validate import validate_proof
 
     logger.info("Rebuilding …")
     start = time.monotonic()
 
     try:
-        proof = parse_proof(yaml_path)
+        proofs = parse_tex_proofs(input_path)
+        for proof in proofs:
+            for msg in validate_proof(proof, input_path.parent):
+                logger.warning(msg)
     except Exception as exc:
         logger.error("Parse error (keeping existing site): %s", exc)
         return False
-
-    for msg in validate_tags(proof):
-        logger.warning(msg)
 
     staging_dir = Path(tempfile.mkdtemp(
         prefix="texfrog_live_", dir=output_dir.parent,
     ))
     try:
-        generate_html(proof, yaml_path.parent, staging_dir, keep_tmp=keep_tmp)
+        build_all_proofs(proofs, input_path.parent, staging_dir, keep_tmp=keep_tmp)
     except Exception as exc:
         logger.error("Build error (keeping existing site): %s", exc)
         shutil.rmtree(staging_dir, ignore_errors=True)
@@ -197,7 +233,7 @@ def safe_rebuild(
 
 
 def start_watcher(
-    yaml_path: Path,
+    input_path: Path,
     output_dir: Path,
     keep_tmp: bool,
     version: list[int],
@@ -206,7 +242,7 @@ def start_watcher(
     """Start watching proof source files for changes.
 
     Args:
-        yaml_path: Absolute path to the proof YAML config.
+        input_path: Absolute path to the proof .tex file.
         output_dir: Destination directory for the HTML site.
         keep_tmp: Whether to preserve intermediate files.
         version: A mutable ``[int]`` list.  ``version[0]`` is incremented
@@ -216,7 +252,7 @@ def start_watcher(
     Returns:
         The running watchdog ``Observer`` instance.
     """
-    watched = collect_watched_files(yaml_path)
+    watched = collect_watched_files(input_path)
     watched_dirs = {p.parent for p in watched}
     rebuild_lock = threading.Lock()
     last_mtimes = _snapshot_mtimes(watched)
@@ -231,13 +267,13 @@ def start_watcher(
             # successful build.  macOS FSEvents can deliver duplicate
             # events well after the debounce window, so we must guard
             # against redundant rebuilds of unchanged content.
-            current_watched = collect_watched_files(yaml_path)
+            current_watched = collect_watched_files(input_path)
             current_mtimes = _snapshot_mtimes(current_watched)
             if current_mtimes == last_mtimes:
                 logger.info("No file changes detected, skipping rebuild.")
                 return
 
-            success = safe_rebuild(yaml_path, output_dir, keep_tmp)
+            success = safe_rebuild(input_path, output_dir, keep_tmp)
             if success:
                 version[0] += 1
                 logger.info("Version bumped to %d", version[0])

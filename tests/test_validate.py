@@ -6,19 +6,14 @@ from pathlib import Path
 
 import pytest
 
-from texfrog.model import Figure, Game, Proof, SourceLine
+from texfrog.model import Figure, Game, Proof
 from texfrog.validate import validate_proof
-
-
-def _make_line(content: str, tags=None) -> SourceLine:
-    """Helper to create a SourceLine."""
-    return SourceLine(content=content, tags=tags, original=content)
 
 
 def _make_proof(
     *,
     games=None,
-    source_lines=None,
+    source_text=None,
     macros=None,
     commentary=None,
     figures=None,
@@ -33,16 +28,17 @@ def _make_proof(
             Game(label="G1", latex_name="G_1", description="Game 1",
                  reduction=False, related_games=[]),
         ]
-    if source_lines is None:
-        source_lines = [
-            _make_line("common line"),
-            _make_line("only G0", tags=frozenset({"G0"})),
-            _make_line("only G1", tags=frozenset({"G1"})),
-        ]
+    if source_text is None:
+        source_text = (
+            "common line\n"
+            r"\tfonly{G0}{only G0}" "\n"
+            r"\tfonly{G1}{only G1}"
+        )
     return Proof(
+        source_name="main",
         macros=macros or [],
         games=games,
-        source_lines=source_lines,
+        source_text=source_text,
         commentary=commentary or {},
         figures=figures or [],
         package=package,
@@ -80,11 +76,9 @@ class TestValidateProof:
             Game(label="G1", latex_name="G_1", description="Game 1",
                  reduction=False, related_games=[]),
         ]
-        # All tagged lines are for G0 only — G1 gets just the common line
-        source_lines = [
-            _make_line("tagged for G0", tags=frozenset({"G0"})),
-        ]
-        proof = _make_proof(games=games, source_lines=source_lines)
+        # All tagged content is for G0 only — G1 gets nothing
+        source_text = r"\tfonly{G0}{tagged for G0}"
+        proof = _make_proof(games=games, source_text=source_text)
         warnings = validate_proof(proof, tmp_path)
         assert any("G1" in w and "empty" in w for w in warnings)
 
@@ -106,26 +100,14 @@ class TestValidateProof:
         warnings = validate_proof(proof, tmp_path)
         assert not any("commentary" in w.lower() for w in warnings)
 
-    def test_includes_tag_warnings(self, tmp_path):
-        """validate_proof should include unknown-tag warnings from validate_tags."""
-        source_lines = [
-            _make_line("bad tag", tags=frozenset({"G0", "TYPO"})),
-            _make_line("good", tags=frozenset({"G1"})),
-        ]
-        proof = _make_proof(source_lines=source_lines)
-        warnings = validate_proof(proof, tmp_path)
-        assert any("TYPO" in w for w in warnings)
-
     def test_multiple_warnings_combined(self, tmp_path):
         """Multiple issues should each produce a warning."""
-        source_lines = [
-            _make_line("only G0", tags=frozenset({"G0"})),
-        ]
+        source_text = r"\tfonly{G0}{only G0}"
         proof = _make_proof(
-            source_lines=source_lines,
+            source_text=source_text,
             macros=["missing.tex"],
             commentary={"G99": "orphan"},
         )
         warnings = validate_proof(proof, tmp_path)
-        # Should have: unused game G1, empty game G1, missing macro, unknown commentary
+        # Should have: empty game G1, missing macro, unknown commentary
         assert len(warnings) >= 3

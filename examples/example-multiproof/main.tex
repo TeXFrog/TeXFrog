@@ -1,0 +1,129 @@
+\documentclass{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[n,advantage,operators,sets,adversary,landau,probability,notions,logic,ff,mm,primitives,events,complexity,oracles,asymptotics,keys]{cryptocode}
+\usepackage[package=cryptocode]{texfrog}
+
+\input{macros.tex}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Proof 1: IND-CPA security
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\tfgames{indcpa}{G0, G1, Red1, G2}
+\tfgamename{indcpa}{G0}{G_0}
+\tfgamename{indcpa}{G1}{G_1}
+\tfgamename{indcpa}{Red1}{\Bdversary_1}
+\tfgamename{indcpa}{G2}{G_2}
+
+\tfdescription{indcpa}{G0}{Starting game (real IND-CPA).}
+\tfdescription{indcpa}{G1}{Replace PRF with truly random function.}
+\tfdescription{indcpa}{Red1}{Reduction to PRF security.}
+\tfdescription{indcpa}{G2}{Ciphertext independent of message.}
+
+\tfreduction{indcpa}{Red1}
+\tfrelatedgames{indcpa}{Red1}{G0, G1}
+
+\tfmacrofile{macros.tex}
+
+\begin{tfsource}{indcpa}
+\begin{pcvstack}[boxed]
+  \procedure[linenumbering]{%
+    \tfonly*{G0}{Game $\tfgamename{G0} = \INDCPA_\Enc^\Adversary()$}%
+    \tfonly*{G1}{Game $\tfgamename{G1}$}%
+    \tfonly*{G2}{Game $\tfgamename{G2}$}%
+    \tfonly*{Red1}{Reduction $\Bdversary_1^{\OPRF}$}%
+    \tffigonly{Games $\tfgamename{G0}$--$\tfgamename{G2}$}%
+  }{
+    \tfonly{G0}{k \getsr \{0,1\}^\lambda \\}
+    b \getsr \{0,1\} \\
+    b' \gets \Adversary^{\mathsf{LR}}() \\
+    \pcreturn (b' = b)
+  }
+  \pclb
+  \procedure[linenumbering]{$\mathsf{LR}(m_0, m_1)$}{
+    r \getsr \{0,1\}^\lambda \\
+    \tfonly{G0}{y \gets \mathrm{PRF}(k, r) \\}
+    \tfonly{G1}{y \gets \RF(r) \\}
+    \tfonly{Red1}{y \gets \OPRF(r) \\}
+    \tfonly{G0-G1}{c \gets y \oplus m_b \\}
+    \tfonly{G2}{c \getsr \{0,1\}^\lambda \\}
+    \pcreturn (r, c)
+  }
+\end{pcvstack}
+\end{tfsource}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Proof 2: INT-CTXT security (unforgeability of encrypt-then-MAC)
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\tfgames{intctxt}{H0, H1, H2}
+\tfgamename{intctxt}{H0}{H_0}
+\tfgamename{intctxt}{H1}{H_1}
+\tfgamename{intctxt}{H2}{H_2}
+
+\tfdescription{intctxt}{H0}{Starting game (real INT-CTXT).}
+\tfdescription{intctxt}{H1}{Replace encryption with random ciphertext.}
+\tfdescription{intctxt}{H2}{MAC verification always rejects forgeries.}
+
+\begin{tfsource}{intctxt}
+\begin{pcvstack}[boxed]
+  \procedure[linenumbering]{%
+    \tfonly*{H0}{Game $\tfgamename{H0}$}%
+    \tfonly*{H1}{Game $\tfgamename{H1}$}%
+    \tfonly*{H2}{Game $\tfgamename{H2}$}%
+    \tffigonly{Games $\tfgamename{H0}$--$\tfgamename{H2}$}%
+  }{
+    k_e \getsr \{0,1\}^\lambda \\
+    k_m \getsr \{0,1\}^\lambda \\
+    b \gets \Adversary^{\mathsf{Enc}, \mathsf{Dec}}() \\
+    \pcreturn b
+  }
+  \pclb
+  \procedure[linenumbering]{$\mathsf{Enc}(m)$}{
+    \tfonly{H0}{c \gets \Enc(k_e, m) \\}
+    \tfonly{H1-H2}{c \getsr \{0,1\}^{|m|} \\}
+    \tau \gets \MAC(k_m, c) \\
+    \pcreturn (c, \tau)
+  }
+  \pclb
+  \procedure[linenumbering]{$\mathsf{Dec}(c, \tau)$}{
+    \tfonly{H0-H1}{\pcif \Verify(k_m, c, \tau) \pcthen \\}
+    \tfonly{H0-H1}{\pcind \pcreturn \Dec(k_e, c) \\}
+    \tfonly{H2}{\pcreturn \bot}
+    \tfonly{H0-H1}{\pcreturn \bot}
+  }
+\end{pcvstack}
+\end{tfsource}
+
+\begin{document}
+
+\section*{Multi-Proof Example}
+
+This document contains two independent game-hopping proofs.
+
+\subsection*{Proof 1: IND-CPA Security}
+
+\paragraph{Game $\tfgamename{indcpa}{G0}$.}
+\tfrendergame{indcpa}{G0}
+
+\paragraph{Game $\tfgamename{indcpa}{G1}$ (diff against $\tfgamename{indcpa}{G0}$).}
+\tfrendergame[diff=G0]{indcpa}{G1}
+
+\paragraph{Reduction $\tfgamename{indcpa}{Red1}$ (diff against $\tfgamename{indcpa}{G1}$).}
+\tfrendergame[diff=G1]{indcpa}{Red1}
+
+\paragraph{Game $\tfgamename{indcpa}{G2}$ (diff against $\tfgamename{indcpa}{G1}$).}
+\tfrendergame[diff=G1]{indcpa}{G2}
+
+\subsection*{Proof 2: INT-CTXT Security}
+
+\paragraph{Game $\tfgamename{intctxt}{H0}$.}
+\tfrendergame{intctxt}{H0}
+
+\paragraph{Game $\tfgamename{intctxt}{H1}$ (diff against $\tfgamename{intctxt}{H0}$).}
+\tfrendergame[diff=H0]{intctxt}{H1}
+
+\paragraph{Game $\tfgamename{intctxt}{H2}$ (diff against $\tfgamename{intctxt}{H1}$).}
+\tfrendergame[diff=H1]{intctxt}{H2}
+
+\end{document}

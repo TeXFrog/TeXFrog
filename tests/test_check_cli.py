@@ -12,49 +12,46 @@ from texfrog.cli import main
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
-def _write_minimal_proof(tmp_path: Path, *, extra_yaml: str = "") -> Path:
-    """Write a minimal valid proof and return the YAML path."""
-    source = tmp_path / "source.tex"
-    source.write_text(
+def _write_minimal_proof(tmp_path: Path, *, extra_tex: str = "") -> Path:
+    """Write a minimal valid .tex proof and return its path."""
+    content = (
+        r"\tfgames{main}{G0, G1}" "\n"
+        r"\tfgamename{main}{G0}{G_0}" "\n"
+        r"\tfgamename{main}{G1}{G_1}" "\n"
+        r"\tfdescription{main}{G0}{Game 0}" "\n"
+        r"\tfdescription{main}{G1}{Game 1}" "\n"
+        + extra_tex +
+        r"\begin{tfsource}{main}" "\n"
         "common line\n"
-        "only G0 %:tags: G0\n"
-        "only G1 %:tags: G1\n",
-        encoding="utf-8",
+        r"\tfonly{G0}{only G0}" "\n"
+        r"\tfonly{G1}{only G1}" "\n"
+        r"\end{tfsource}" "\n"
     )
-    yaml_content = (
-        "source: source.tex\n"
-        "games:\n"
-        "  - label: G0\n"
-        "    latex_name: G_0\n"
-        "    description: Game 0\n"
-        "  - label: G1\n"
-        "    latex_name: G_1\n"
-        "    description: Game 1\n"
-    )
-    if extra_yaml:
-        yaml_content += extra_yaml
-    yaml_path = tmp_path / "proof.yaml"
-    yaml_path.write_text(yaml_content, encoding="utf-8")
-    return yaml_path
+    tex_path = tmp_path / "proof.tex"
+    tex_path.write_text(content, encoding="utf-8")
+    return tex_path
 
 
 class TestCheckCommand:
     """Tests for ``texfrog check``."""
 
     def test_valid_proof(self, tmp_path):
-        yaml_path = _write_minimal_proof(tmp_path)
+        tex_path = _write_minimal_proof(tmp_path)
         runner = CliRunner()
-        result = runner.invoke(main, ["check", str(yaml_path)])
+        result = runner.invoke(main, ["check", str(tex_path)])
         assert result.exit_code == 0
         assert "valid" in result.output.lower()
 
-    def test_invalid_yaml_missing_games(self, tmp_path):
-        yaml_path = tmp_path / "proof.yaml"
-        source = tmp_path / "source.tex"
-        source.write_text("line\n", encoding="utf-8")
-        yaml_path.write_text("source: source.tex\n", encoding="utf-8")
+    def test_invalid_missing_games(self, tmp_path):
+        tex_path = tmp_path / "proof.tex"
+        tex_path.write_text(
+            r"\begin{tfsource}{main}" "\n"
+            "line\n"
+            r"\end{tfsource}" "\n",
+            encoding="utf-8",
+        )
         runner = CliRunner()
-        result = runner.invoke(main, ["check", str(yaml_path)])
+        result = runner.invoke(main, ["check", str(tex_path)])
         assert result.exit_code == 1
         assert "error" in result.output.lower()
 
@@ -63,12 +60,12 @@ class TestCheckCommand:
         commentary_dir = tmp_path / "commentary"
         commentary_dir.mkdir()
         (commentary_dir / "G99.tex").write_text("orphan\n", encoding="utf-8")
-        yaml_path = _write_minimal_proof(
+        tex_path = _write_minimal_proof(
             tmp_path,
-            extra_yaml="commentary:\n  G99: commentary/G99.tex\n",
+            extra_tex=r"\tfcommentary{main}{G99}{commentary/G99.tex}" "\n",
         )
         runner = CliRunner()
-        result = runner.invoke(main, ["check", str(yaml_path)])
+        result = runner.invoke(main, ["check", str(tex_path)])
         assert result.exit_code == 0
         assert "warning" in result.output.lower()
 
@@ -77,16 +74,16 @@ class TestCheckCommand:
         commentary_dir = tmp_path / "commentary"
         commentary_dir.mkdir()
         (commentary_dir / "G99.tex").write_text("orphan\n", encoding="utf-8")
-        yaml_path = _write_minimal_proof(
+        tex_path = _write_minimal_proof(
             tmp_path,
-            extra_yaml="commentary:\n  G99: commentary/G99.tex\n",
+            extra_tex=r"\tfcommentary{main}{G99}{commentary/G99.tex}" "\n",
         )
         runner = CliRunner()
-        result = runner.invoke(main, ["check", "--strict", str(yaml_path)])
+        result = runner.invoke(main, ["check", "--strict", str(tex_path)])
         assert result.exit_code == 1
 
     def test_directory_input(self, tmp_path):
-        """Passing a directory should resolve to proof.yaml inside it."""
+        """Passing a directory should resolve to proof.tex inside it."""
         _write_minimal_proof(tmp_path)
         runner = CliRunner()
         result = runner.invoke(main, ["check", str(tmp_path)])
@@ -95,7 +92,7 @@ class TestCheckCommand:
 
     def test_tutorial_cryptocode_strict(self):
         """The cryptocode tutorial should pass in strict mode."""
-        tutorial = REPO_ROOT / "examples" / "tutorial-cryptocode" / "proof.yaml"
+        tutorial = REPO_ROOT / "examples" / "tutorial-cryptocode" / "main.tex"
         if not tutorial.exists():
             pytest.skip("examples/tutorial-cryptocode not found")
         runner = CliRunner()
@@ -104,9 +101,47 @@ class TestCheckCommand:
 
     def test_tutorial_nicodemus_strict(self):
         """The nicodemus tutorial should pass in strict mode."""
-        tutorial = REPO_ROOT / "examples" / "tutorial-nicodemus" / "proof.yaml"
+        tutorial = REPO_ROOT / "examples" / "tutorial-nicodemus" / "main.tex"
         if not tutorial.exists():
             pytest.skip("examples/tutorial-nicodemus not found")
         runner = CliRunner()
         result = runner.invoke(main, ["check", "--strict", str(tutorial)])
         assert result.exit_code == 0, result.output
+
+    def test_multiproof_check(self, tmp_path):
+        """``texfrog check`` on a multi-proof document reports each proof."""
+        tex_path = tmp_path / "multi.tex"
+        tex_path.write_text(
+            r"\tfgames{alpha}{A0, A1}" "\n"
+            r"\tfgamename{alpha}{A0}{A_0}" "\n"
+            r"\tfgamename{alpha}{A1}{A_1}" "\n"
+            r"\tfdescription{alpha}{A0}{Game A0.}" "\n"
+            r"\tfdescription{alpha}{A1}{Game A1.}" "\n"
+            r"\tfgames{beta}{B0}" "\n"
+            r"\tfgamename{beta}{B0}{B_0}" "\n"
+            r"\tfdescription{beta}{B0}{Game B0.}" "\n"
+            r"\begin{tfsource}{alpha}" "\n"
+            r"\tfonly{A0}{a0} \tfonly{A1}{a1}" "\n"
+            r"\end{tfsource}" "\n"
+            r"\begin{tfsource}{beta}" "\n"
+            "b0\n"
+            r"\end{tfsource}" "\n",
+            encoding="utf-8",
+        )
+        runner = CliRunner()
+        result = runner.invoke(main, ["check", str(tex_path)])
+        assert result.exit_code == 0
+        assert "[alpha]" in result.output
+        assert "[beta]" in result.output
+        assert "valid" in result.output.lower()
+
+    def test_example_multiproof_check(self):
+        """The example-multiproof example should pass check."""
+        example = REPO_ROOT / "examples" / "example-multiproof" / "main.tex"
+        if not example.exists():
+            pytest.skip("examples/example-multiproof not found")
+        runner = CliRunner()
+        result = runner.invoke(main, ["check", str(example)])
+        assert result.exit_code == 0, result.output
+        assert "[indcpa]" in result.output
+        assert "[intctxt]" in result.output

@@ -15,6 +15,7 @@ from __future__ import annotations
 import click
 import concurrent.futures
 import contextlib
+import html as html_module
 import http.server
 import importlib.resources
 import json
@@ -26,15 +27,75 @@ import sys
 import tempfile
 import threading
 import webbrowser
+from collections.abc import Callable
 from pathlib import Path
 from typing import Optional
 
 from jinja2 import Environment, PackageLoader
 
-from ..filter import compute_removed_lines, filter_for_game
+from ..filter import (
+    compute_changed_lines,
+    compute_removed_lines,
+    wrap_changed_line,
+)
 from ..model import Proof
 from ..packages import get_profile
-from .latex import _write_game_file, generate_latex
+from ..tex_parser import filter_for_game_from_text
+
+# Macro used to highlight changed lines.
+_CHANGED_MACRO = r"\tfchanged"
+
+# ---------------------------------------------------------------------------
+# Per-game LaTeX file writers
+# ---------------------------------------------------------------------------
+
+
+def _write_game_file(
+    game_label: str,
+    current_lines: list[str],
+    changed_indices: set[int],
+    out_path: Path,
+    macro: str = _CHANGED_MACRO,
+    procedure_header_cmd: str | None = None,
+) -> None:
+    """Write per-game LaTeX file with changed lines highlighted.
+
+    Args:
+        game_label: The game/reduction label (used only in a leading comment).
+        current_lines: Filtered content lines for this game.
+        changed_indices: 0-based indices of lines to wrap with a highlighting macro.
+        out_path: Destination file path.
+        macro: LaTeX macro name to use for wrapping (default ``\\tfchanged``).
+        procedure_header_cmd: Package-specific command name (without backslash)
+            for procedure headers that should never be wrapped.
+    """
+    parts: list[str] = [f"% TeXFrog output for game: {game_label}\n"]
+    for i, line in enumerate(current_lines):
+        # Skip blank lines — they arise from excluded tagged content and can
+        # cause LaTeX dimension errors inside pseudocode environments
+        # (e.g. varwidth used internally by cryptocode's pcvstack).
+        if not line.strip():
+            continue
+        if i in changed_indices:
+            parts.append(
+                wrap_changed_line(line, macro, procedure_header_cmd) + "\n"
+            )
+        else:
+            parts.append(line + "\n")
+    out_path.write_text("".join(parts), encoding="utf-8")
+
+
+def _write_commentary_file(game_label: str, text: str, out_path: Path) -> None:
+    """Write a per-game commentary LaTeX file.
+
+    Args:
+        game_label: The game/reduction label (used only in a leading comment).
+        text: Raw LaTeX commentary text.
+        out_path: Destination file path.
+    """
+    content = f"% TeXFrog commentary for game: {game_label}\n{text}"
+    out_path.write_text(content, encoding="utf-8")
+
 
 # ---------------------------------------------------------------------------
 # LaTeX wrapper template used to compile individual game files to PDF
@@ -288,6 +349,15 @@ def _extract_mathjax_macros(macro_paths: list[str], proof_dir: Path) -> str:
     Collects lines that start with ``\\newcommand``, ``\\renewcommand``,
     ``\\providecommand``, ``\\DeclareMathOperator``, or ``\\def`` so that
     MathJax can render the same custom commands used in the LaTeX source.
+
+    .. note::
+
+       Only *single-line* definitions with balanced braces are collected.
+       Multi-line ``\\newcommand`` definitions are skipped because they
+       often contain LaTeX-only constructs that MathJax cannot handle, and
+       collecting just the opening line would produce invalid TeX.  If a
+       macro does not appear in the HTML viewer, check whether its
+       definition spans multiple lines in the macro file.
     """
     MACRO_PREFIXES = (
         "\\newcommand", "\\renewcommand", "\\providecommand",
@@ -350,7 +420,8 @@ def _expand_tfgamename(text: str, game_names: dict[str, str]) -> str:
         r"|(?<!\\)\$"                   # unescaped $
         r"|\\[(\[]"                     # \( or \[
         r"|\\[)\]]"                     # \) or \]
-        r"|\\tfgamename\{([^}]+)\}"
+        r"|\\tfgamename\{([^}]+)\}\{([^}]+)\}"  # 2-arg: \tfgamename{source}{label}
+        r"|\\tfgamename\{([^}]+)\}"              # 1-arg: \tfgamename{label}
     )
     parts: list[str] = []
     last_end = 0
@@ -370,8 +441,11 @@ def _expand_tfgamename(text: str, game_names: dict[str, str]) -> str:
             in_math = False
             parts.append(tok)
         else:
-            # \tfgamename match
-            label = m.group(1)
+            # \tfgamename match — extract label from whichever form matched
+            if m.group(2) is not None:
+                label = m.group(2)     # 2-arg form: group(1)=source, group(2)=label
+            else:
+                label = m.group(3)     # 1-arg form: group(3)=label
             name = game_names.get(label)
             if name is None:
                 parts.append(tok)       # leave unrecognised labels unchanged
@@ -425,14 +499,69 @@ def generate_html(
         proof.package, user_preamble, commentary=True,
     )
 
-    # Step 1: generate LaTeX files in a temp directory.
+    # Step 1: generate per-game LaTeX files in a temp directory.
     with contextlib.ExitStack() as stack:
         if keep_tmp:
             latex_dir = Path(tempfile.mkdtemp(prefix="texfrog_"))
             print(f"  Keeping intermediate files in {latex_dir}", file=sys.stderr)
         else:
             latex_dir = Path(stack.enter_context(tempfile.TemporaryDirectory()))
-        generate_latex(proof, latex_dir)
+
+        ordered_labels = [g.label for g in proof.games]
+
+        def _filter_game(label: str) -> list[str]:
+            return filter_for_game_from_text(
+                proof.source_text, label, ordered_labels,
+            )
+
+        def _filter_game_for_diff(label: str) -> list[str]:
+            """Like _filter_game but strips \\tfonly* content for diff."""
+            return filter_for_game_from_text(
+                proof.source_text, label, ordered_labels,
+                strip_star=True,
+            )
+
+        # Build filtered lines per game, compute diffs, and write .tex files.
+        for i, game in enumerate(proof.games):
+            label = game.label
+            game_lines = _filter_game(label)
+
+            # Compute changed lines relative to previous game.
+            # Use diff lines (with \tfonly* stripped) so that per-game headers
+            # (which change between every game) are not highlighted.
+            # Non-reduction games diff against the previous non-reduction game
+            # (skipping intervening reductions); reductions diff against the
+            # immediately preceding entry.
+            if i == 0:
+                changed: set[int] = set()
+            else:
+                if game.reduction:
+                    prev_label = ordered_labels[i - 1]
+                else:
+                    prev_label = None
+                    for j in range(i - 1, -1, -1):
+                        if not proof.games[j].reduction:
+                            prev_label = ordered_labels[j]
+                            break
+                if prev_label is None:
+                    changed = set()
+                else:
+                    changed = compute_changed_lines(
+                        _filter_game_for_diff(prev_label),
+                        _filter_game_for_diff(label),
+                    )
+
+            _write_game_file(
+                label, game_lines, changed, latex_dir / f"{label}.tex",
+                procedure_header_cmd=proc_hdr_cmd,
+            )
+
+            # Write commentary file if commentary exists.
+            commentary = proof.commentary.get(label, "")
+            if commentary.strip():
+                _write_commentary_file(
+                    label, commentary, latex_dir / f"{label}_commentary.tex"
+                )
 
         # Generate removed-highlight .tex files for the side-by-side view.
         # Each non-reduction game (except the last one) may appear as the
@@ -441,10 +570,13 @@ def generate_html(
         # use the related_games display instead.
         non_red_games = [g for g in proof.games if not g.reduction]
         for i, game in enumerate(non_red_games[:-1]):
-            prev_lines = filter_for_game(proof.source_lines, game.label)
+            prev_lines = _filter_game(game.label)
             next_game = non_red_games[i + 1]
-            next_lines = filter_for_game(proof.source_lines, next_game.label)
-            removed_indices = compute_removed_lines(prev_lines, next_lines)
+            next_lines = _filter_game(next_game.label)
+            # Use diff lines (with \tfonly* stripped) for change detection
+            prev_diff = _filter_game_for_diff(game.label)
+            next_diff = _filter_game_for_diff(next_game.label)
+            removed_indices = compute_removed_lines(prev_diff, next_diff)
             _write_game_file(
                 game.label, prev_lines, removed_indices,
                 latex_dir / f"{game.label}-removed.tex",
@@ -458,7 +590,7 @@ def generate_html(
             if game.related_games:
                 clean_labels.update(game.related_games)
         for label in clean_labels:
-            clean_lines = filter_for_game(proof.source_lines, label)
+            clean_lines = _filter_game(label)
             _write_game_file(
                 label, clean_lines, set(),
                 latex_dir / f"{label}-clean.tex",
@@ -567,6 +699,79 @@ def generate_html(
     (output_dir / "app.js").write_text(
         _load_template_resource("app.js"), encoding="utf-8"
     )
+
+
+def generate_index_page(proofs: list[Proof], output_dir: Path) -> None:
+    """Generate a top-level index page linking to each proof's HTML viewer.
+
+    Args:
+        proofs: List of Proof objects (one per source).
+        output_dir: Root output directory containing per-proof subdirectories.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    links = []
+    for proof in proofs:
+        n_games = sum(1 for g in proof.games if not g.reduction)
+        n_reductions = sum(1 for g in proof.games if g.reduction)
+        escaped_name = html_module.escape(proof.source_name)
+        links.append(
+            f'<li><a href="{escaped_name}/index.html">'
+            f"<strong>{escaped_name}</strong></a> "
+            f"— {n_games} game{'s' if n_games != 1 else ''}, "
+            f"{n_reductions} reduction{'s' if n_reductions != 1 else ''}"
+            f"</li>"
+        )
+    html = (
+        "<!DOCTYPE html>\n"
+        '<html lang="en">\n<head>\n'
+        '<meta charset="utf-8">\n'
+        "<title>TeXFrog Proofs</title>\n"
+        "<style>\n"
+        "  body { font-family: system-ui, sans-serif; max-width: 600px; "
+        "margin: 2rem auto; padding: 0 1rem; }\n"
+        "  ul { list-style: none; padding: 0; }\n"
+        "  li { margin: 0.5rem 0; }\n"
+        "  a { text-decoration: none; color: #0066cc; }\n"
+        "  a:hover { text-decoration: underline; }\n"
+        "</style>\n"
+        "</head>\n<body>\n"
+        "<h1>TeXFrog Proofs</h1>\n"
+        f"<ul>\n{''.join(links)}\n</ul>\n"
+        "</body>\n</html>\n"
+    )
+    (output_dir / "index.html").write_text(html, encoding="utf-8")
+
+
+def build_all_proofs(
+    proofs: list[Proof],
+    proof_dir: Path,
+    output_dir: Path,
+    *,
+    keep_tmp: bool = False,
+    on_proof_start: Callable[[str], None] | None = None,
+) -> None:
+    """Build HTML output for one or more proofs.
+
+    For a single proof, builds directly into *output_dir*.  For multiple
+    proofs, builds each into a subdirectory and generates an index page.
+
+    Args:
+        proofs: Parsed proof objects.
+        proof_dir: Directory containing the source .tex file.
+        output_dir: Destination directory for the HTML site.
+        keep_tmp: Whether to preserve intermediate files.
+        on_proof_start: Optional callback invoked with each proof's source
+            name before building it (useful for progress messages).
+    """
+    if len(proofs) == 1:
+        generate_html(proofs[0], proof_dir, output_dir, keep_tmp=keep_tmp)
+    else:
+        for proof in proofs:
+            if on_proof_start is not None:
+                on_proof_start(proof.source_name)
+            proof_out = output_dir / proof.source_name
+            generate_html(proof, proof_dir, proof_out, keep_tmp=keep_tmp)
+        generate_index_page(proofs, output_dir)
 
 
 def serve_html(html_dir: Path, port: int = 8080, open_browser: bool = True) -> None:

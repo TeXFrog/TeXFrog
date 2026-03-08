@@ -8,11 +8,11 @@
 
 TeXFrog helps cryptographers manage game-hopping proofs in LaTeX. If you have ever maintained a dozen nearly-identical game files by hand, copying lines between them and trying to keep highlights consistent, TeXFrog is meant to solve that problem.
 
-**Key idea:** Write your pseudocode once in a single source file. Tag each line with the games it belongs to using `%:tags:` comments. TeXFrog produces:
+**Key idea:** Write your pseudocode once in a single `.tex` file. Tag content with the games it belongs to using `\tfonly{games}{content}` commands. TeXFrog produces:
 
-- Individual per-game `.tex` files with changed lines automatically highlighted
-- Consolidated comparison figures showing multiple games side by side
-- An interactive HTML viewer for navigating the proof in a browser
+- Individual per-game renderings with changed lines automatically highlighted (via `pdflatex` — no extra tools needed)
+- Consolidated comparison figures showing multiple games side by side (via `pdflatex`)
+- An interactive HTML viewer for navigating the proof in a browser (via the optional Python CLI)
 
 All from that one source file.
 
@@ -24,32 +24,60 @@ TeXFrog currently supports the [`cryptocode`](https://ctan.org/pkg/cryptocode) a
 
 ## What The Source Code Looks Like
 
-A snippet of the combined source file (`games_source.tex`):
+A snippet of the source file:
 
 ```latex
-k \getsr \{0,1\}^\lambda \\                       %:tags: G0-G2
+\tfonly{G0-G2}{k \getsr \{0,1\}^\lambda \\}
 ...
-y \gets \mathrm{PRF}(k, r) \\                     %:tags: G0
-y \getsr \{0,1\}^\lambda \\                       %:tags: G1
-y \gets \OPRF(r) \\                               %:tags: Red1
+\tfonly{G0}{y \gets \mathrm{PRF}(k, r) \\}
+\tfonly{G1}{y \getsr \{0,1\}^\lambda \\}
+\tfonly{Red1}{y \gets \OPRF(r) \\}
 ...
-c \gets y \oplus m_b \\                           %:tags: G0,G1,Red1
-c \getsr \{0,1\}^\lambda \\                       %:tags: G2
+\tfonly{G0,G1,Red1}{c \gets y \oplus m_b \\}
+\tfonly{G2}{c \getsr \{0,1\}^\lambda \\}
 ```
 
-Lines with no `%:tags:` comment appear in every game. Lines with tags appear only in the listed games. Ranges like `G0-G2` are resolved by position in the game list, so reductions interleaved between games work naturally.
+Content outside `\tfonly` appears in every game. Content inside `\tfonly{tags}{...}` appears only in the listed games. Ranges like `G0-G2` are resolved by position in the game list, so reductions interleaved between games work naturally.
 
-## Requirements
+When you want to include game figures in a certain spot in your paper:
+
+```latex
+\tfrendergame{myproof}{G1}
+\tfrendergame[diff=G1]{myproof}{G2}
+```
+
+## Installation
+
+TeXFrog has two components. Most users only need the LaTeX package.
+
+### Option 1: LaTeX package only (no Python required)
+
+If you just want to write game-hopping proofs in LaTeX with automatic diff highlighting and consolidated figures, all you need is the `texfrog.sty` file. No Python, no command line tools, no virtual environments.
+
+**Local installation:**
+
+1. Download [`texfrog.sty`](https://github.com/TeXFrog/TeXFrog/blob/main/latex/texfrog.sty) from the repository.
+2. Place it in the same directory as your `.tex` file (or anywhere TeX can find it).
+3. Add `\usepackage[package=cryptocode]{texfrog}` to your preamble.
+4. Compile with `pdflatex` as usual.
+
+**On Overleaf:** Upload `texfrog.sty` to your project and use it like any other local package.
+
+This gives you everything needed to render individual games (`\tfrendergame`), consolidated comparison figures (`\tfrenderfigure`), and automatic change highlighting — all at compile time. See the [tutorial-cryptocode-quickstart](https://github.com/TeXFrog/TeXFrog/tree/main/examples/tutorial-cryptocode-quickstart) example for a complete working document.
+
+### Option 2: Full installation (Python CLI + LaTeX package)
+
+The Python CLI adds an interactive HTML proof viewer, validation, scaffolding, and live-reload. Install it if you want the `texfrog` command-line tool.
+
+**Requirements:**
 
 - **Python** >= 3.10
 - **LaTeX** — [TeX Live](https://tug.org/texlive/) or [MacTeX](https://tug.org/mactex/) (for `pdflatex` and `pdfcrop`)
 - **Poppler** or **pdf2svg** — for `pdftocairo` (`brew install poppler` on macOS), or `pdf2svg` as an alternative
 
-LaTeX and Poppler are only needed for the HTML viewer (`texfrog html`). The LaTeX output mode (`texfrog latex`) works with Python alone.
+LaTeX and Poppler are needed for the HTML viewer (`texfrog html`).
 
-## Installation and Running
-
-You can install TeXFrog using Python's package manager, `pip`:
+**Installation:**
 
 ```bash
 pip install texfrog
@@ -75,7 +103,13 @@ After activating the virtual environment, you can `cd` to any directory on your 
 
 ## Quick Start
 
-The fastest way to start a new proof is with `texfrog init`. This creates a minimal, runnable proof (`proof.yaml`, `games_source.tex`, `macros.tex`, and `commentary/*.tex`) with comments explaining each field.
+### Starting from the LaTeX package only
+
+The fastest way to get started without Python is to copy the [tutorial-cryptocode-quickstart](https://github.com/TeXFrog/TeXFrog/tree/main/examples/tutorial-cryptocode-quickstart) example and modify it. Download `texfrog.sty`, `main.tex`, and `macros.tex`, then compile with `pdflatex`. On Overleaf, upload all three files to a new project.
+
+### Starting with the Python CLI
+
+The fastest way to start a new proof is with `texfrog init`. This creates a minimal, runnable proof (`proof.tex`, `macros.tex`, and `commentary/*.tex`) with comments explaining each field.
 
 ```bash
 # Scaffold a new proof in the current directory using cryptocode for pseudocode
@@ -88,28 +122,16 @@ texfrog init mydirectory
 texfrog init myproof --package nicodemus
 ```
 
-Build it immediately:
-
-```bash
-texfrog latex proof.yaml -o /tmp/tf_output
-```
-
 The [TeXFrog repository contains tutorials](https://github.com/TeXFrog/TeXFrog/tree/main/examples) you can study:
 
 ```bash
-# Download them from https://github.com/TeXFrog/TeXFrog/tree/main/examples 
+# Download them from https://github.com/TeXFrog/TeXFrog/tree/main/examples
 # or clone the repository using the following two lines:
 git clone https://github.com/TeXFrog/TeXFrog
 cd TeXFrog/examples
 
-# Tutorial: IND-CPA proof (4 games/reductions)
-texfrog latex tutorial-cryptocode/proof.yaml
-
-# Same tutorial using the nicodemus package
-texfrog latex tutorial-nicodemus/proof.yaml
-
 # Interactive HTML viewer with live reload
-texfrog html serve tutorial-cryptocode/proof.yaml --live-reload
+texfrog html serve tutorial-cryptocode/main.tex
 ```
 
 ## Usage
@@ -125,23 +147,15 @@ Creates starter files in `DIRECTORY` (default: current directory). The `--packag
 ### Validate a proof
 
 ```bash
-texfrog check proof.yaml [--strict]
+texfrog check proof.tex [--strict]
 ```
 
-Parses the proof and runs validation checks (YAML structure, file existence, tag consistency, empty games, commentary references) without generating any output. Prints a summary and exits with code 0 if valid. With `--strict`, exits with code 1 if there are any warnings.
-
-### Generate LaTeX output
-
-```bash
-texfrog latex proof.yaml [-o OUTPUT_DIR]
-```
-
-Produces per-game `.tex` files, commentary files, a harness file, and consolidated figures. Output goes to `texfrog_latex/` next to the input file by default. See [LaTeX integration](https://github.com/TeXFrog/TeXFrog/blob/main/docs/latex-integration.md) for how to incorporate the output into your paper.
+Parses the proof and runs validation checks (file existence, tag consistency, empty games, commentary references) without generating any output. Prints a summary and exits with code 0 if valid. With `--strict`, exits with code 1 if there are any warnings.
 
 ### Generate HTML output
 
 ```bash
-texfrog html build proof.yaml [-o OUTPUT_DIR]
+texfrog html build proof.tex [-o OUTPUT_DIR]
 ```
 
 Compiles each game to SVG via `pdflatex` and produces a self-contained HTML site. Open `index.html` in any browser. Games are shown side by side with changed lines highlighted, and you can navigate with arrow keys.
@@ -149,33 +163,35 @@ Compiles each game to SVG via `pdflatex` and produces a self-contained HTML site
 ### Open in a local web server
 
 ```bash
-texfrog html serve proof.yaml [--port 8080] [--live-reload]
+texfrog html serve proof.tex [--port 8080] [--no-live-reload]
 ```
 
-Builds the HTML site, starts a local server, and opens your browser. With `--live-reload`, TeXFrog watches your source files and automatically rebuilds and refreshes the web browser when you save changes.
+Builds the HTML site, starts a local server, and opens your browser. By default, TeXFrog watches your source files and automatically rebuilds and refreshes the web browser when you save changes. Use `--no-live-reload` to disable this.
 
 ## Writing a Proof
 
-You need two input files:
+You need a single `.tex` file that serves as both the LaTeX document and the TeXFrog source:
 
-- **`proof.yaml`** — declares the list of games and reductions, points to your macro files and source, and optionally specifies commentary, figures, and which pseudocode package to use
-- **`games_source.tex`** — the single combined LaTeX source file with `%:tags:` annotations
+- **`proof.tex`** — declares the list of games and reductions, contains the pseudocode source with `\tfonly` tags, and optionally specifies commentary, figures, and which pseudocode package to use
 
 See [Writing a proof](https://github.com/TeXFrog/TeXFrog/blob/main/docs/writing-proofs.md) for a full guide, and the [tutorials](#included-examples) for worked examples.
 
 ## Available Examples
 
+All examples compile directly with `pdflatex` — no Python needed. Just place `texfrog.sty` in the same directory.
+
 | Directory | Description | Package | Live Demo |
 |-----------|-------------|---------|-----------|
-| [`examples/tutorial-cryptocode/`](https://github.com/TeXFrog/TeXFrog/tree/main/examples/tutorial-cryptocode) | Small IND-CPA proof walkthrough (4 games/reductions) | `cryptocode` | [View demo](https://texfrog.github.io/demos/tutorial-cryptocode/) |
+| [`examples/tutorial-cryptocode-quickstart/`](https://github.com/TeXFrog/TeXFrog/tree/main/examples/tutorial-cryptocode-quickstart) | Minimal IND-CPA proof (recommended starting point) | `cryptocode` | |
+| [`examples/tutorial-cryptocode/`](https://github.com/TeXFrog/TeXFrog/tree/main/examples/tutorial-cryptocode) | Same proof with detailed walkthrough and commentary | `cryptocode` | [View demo](https://texfrog.github.io/demos/tutorial-cryptocode/) |
 | [`examples/tutorial-nicodemus/`](https://github.com/TeXFrog/TeXFrog/tree/main/examples/tutorial-nicodemus) | Same proof using `nicodemus` syntax | `nicodemus` | [View demo](https://texfrog.github.io/demos/tutorial-nicodemus/) |
+| [`examples/example-multiproof/`](https://github.com/TeXFrog/TeXFrog/tree/main/examples/example-multiproof) | Multiple proofs in one document | `cryptocode` | |
 
-Comparing the two tutorials side by side shows the syntax differences between pseudocode packages.
+Comparing the cryptocode and nicodemus tutorials shows the syntax differences between pseudocode packages.
 
 ## Documentation
 
-- [Writing a proof](https://github.com/TeXFrog/TeXFrog/blob/main/docs/writing-proofs.md) — reference for `proof.yaml` and `games_source.tex`
-- [Using TeXFrog Output in Your LaTeX Paper](https://github.com/TeXFrog/TeXFrog/blob/main/docs/latex-integration.md) — how to incorporate LaTeX output into your paper, including customizing highlight macros
+- [Writing a proof](https://github.com/TeXFrog/TeXFrog/blob/main/docs/writing-proofs.md) — reference for writing a TeXFrog proof
 - [Troubleshooting & FAQ](https://github.com/TeXFrog/TeXFrog/blob/main/docs/troubleshooting.md) — common problems proof authors may encounter
 
 ## Contributing

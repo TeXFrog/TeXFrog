@@ -1,0 +1,63 @@
+{
+  "name": "texfrog",
+  "displayName": "TeXFrog",
+  "description": "Highlight game-based cryptographic proofs in LaTeX",
+  "version": "0.0.1",
+  "publisher": "texfrog",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TeXFrog/TeXFrog"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://texfrog.github.io/",
+  "bugs": {
+    "url": "https://github.com/TeXFrog/TeXFrog/issues"
+  },
+  "keywords": [
+    "latex",
+    "cryptography",
+    "game-based proofs"
+  ],
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:latex"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "texfrog.selectGame",
+        "title": "TeXFrog: Select Game"
+      },
+      {
+        "command": "texfrog.clearGame",
+        "title": "TeXFrog: Clear Game Selection"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "texfrog.selectGame",
+        "key": "ctrl+k ctrl+g",
+        "mac": "cmd+k cmd+g",
+        "when": "editorLangId == latex"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "npx tsx --require ./src/test/setup.ts --test src/test/*.test.ts",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.5",
+    "@types/vscode": "^1.80.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.3.0"
+  }
+}

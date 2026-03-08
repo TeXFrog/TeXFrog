@@ -10,92 +10,80 @@ from texfrog.watcher import collect_watched_files
 
 
 class TestCollectWatchedFiles:
-    """Tests for collect_watched_files."""
+    """Tests for collect_watched_files (tex format)."""
 
-    def test_includes_yaml_and_source(self, tmp_path: Path) -> None:
-        yaml_file = tmp_path / "proof.yaml"
-        source_file = tmp_path / "source.tex"
-        source_file.write_text("line1\n")
-        yaml_file.write_text(
-            "source: source.tex\nmacros: []\n"
-            "games:\n  - label: G0\n    latex_name: G_0\n    description: d\n"
+    def test_includes_tex_file(self, tmp_path: Path) -> None:
+        tex_file = tmp_path / "proof.tex"
+        tex_file.write_text(
+            r"\tfgames{main}{G0}" "\n"
+            r"\begin{tfsource}{main}" "\n"
+            "line\n"
+            r"\end{tfsource}" "\n"
         )
-        watched = collect_watched_files(yaml_file)
-        assert yaml_file in watched
-        assert source_file.resolve() in watched
+        watched = collect_watched_files(tex_file)
+        assert tex_file in watched
 
-    def test_includes_macros(self, tmp_path: Path) -> None:
-        yaml_file = tmp_path / "proof.yaml"
+    def test_includes_macrofile(self, tmp_path: Path) -> None:
+        tex_file = tmp_path / "proof.tex"
         macro = tmp_path / "macros.tex"
         macro.write_text("")
-        yaml_file.write_text(
-            "source: source.tex\nmacros:\n  - macros.tex\n"
-            "games:\n  - label: G0\n    latex_name: G_0\n    description: d\n"
+        tex_file.write_text(
+            r"\tfmacrofile{macros.tex}" "\n"
+            r"\tfgames{main}{G0}" "\n"
+            r"\begin{tfsource}{main}" "\n"
+            "line\n"
+            r"\end{tfsource}" "\n"
         )
-        watched = collect_watched_files(yaml_file)
+        watched = collect_watched_files(tex_file)
         assert macro.resolve() in watched
 
     def test_includes_preamble(self, tmp_path: Path) -> None:
-        yaml_file = tmp_path / "proof.yaml"
+        tex_file = tmp_path / "proof.tex"
         preamble = tmp_path / "preamble.tex"
         preamble.write_text("")
-        yaml_file.write_text(
-            "source: source.tex\npreamble: preamble.tex\nmacros: []\n"
-            "games:\n  - label: G0\n    latex_name: G_0\n    description: d\n"
+        tex_file.write_text(
+            r"\tfpreamble{preamble.tex}" "\n"
+            r"\tfgames{main}{G0}" "\n"
+            r"\begin{tfsource}{main}" "\n"
+            "line\n"
+            r"\end{tfsource}" "\n"
         )
-        watched = collect_watched_files(yaml_file)
+        watched = collect_watched_files(tex_file)
         assert preamble.resolve() in watched
 
-    def test_invalid_yaml_returns_yaml_only(self, tmp_path: Path) -> None:
-        yaml_file = tmp_path / "proof.yaml"
-        yaml_file.write_text("{{{{bad yaml")
-        watched = collect_watched_files(yaml_file)
-        assert watched == {yaml_file}
-
-    def test_non_dict_yaml_returns_yaml_only(self, tmp_path: Path) -> None:
-        yaml_file = tmp_path / "proof.yaml"
-        yaml_file.write_text("- just a list\n- not a dict\n")
-        watched = collect_watched_files(yaml_file)
-        assert watched == {yaml_file}
-
-    def test_multiple_macros(self, tmp_path: Path) -> None:
-        yaml_file = tmp_path / "proof.yaml"
-        m1 = tmp_path / "macros.tex"
-        m2 = tmp_path / "extra.sty"
-        m1.write_text("")
-        m2.write_text("")
-        yaml_file.write_text(
-            "source: source.tex\nmacros:\n  - macros.tex\n  - extra.sty\n"
-            "games:\n  - label: G0\n    latex_name: G_0\n    description: d\n"
-        )
-        watched = collect_watched_files(yaml_file)
-        assert m1.resolve() in watched
-        assert m2.resolve() in watched
-
-    def test_includes_commentary_files(self, tmp_path: Path) -> None:
-        yaml_file = tmp_path / "proof.yaml"
+    def test_includes_commentary(self, tmp_path: Path) -> None:
+        tex_file = tmp_path / "proof.tex"
         commentary_dir = tmp_path / "commentary"
         commentary_dir.mkdir()
         comm_file = commentary_dir / "G0.tex"
         comm_file.write_text("commentary text")
-        yaml_file.write_text(
-            "source: source.tex\nmacros: []\n"
-            "commentary:\n  G0: commentary/G0.tex\n"
-            "games:\n  - label: G0\n    latex_name: G_0\n    description: d\n"
+        tex_file.write_text(
+            r"\tfgames{main}{G0}" "\n"
+            r"\tfcommentary{main}{G0}{commentary/G0.tex}" "\n"
+            r"\begin{tfsource}{main}" "\n"
+            "line\n"
+            r"\end{tfsource}" "\n"
         )
-        watched = collect_watched_files(yaml_file)
+        watched = collect_watched_files(tex_file)
         assert comm_file.resolve() in watched
 
-    def test_no_optional_fields(self, tmp_path: Path) -> None:
-        """YAML with only source and games — no macros or preamble."""
-        yaml_file = tmp_path / "proof.yaml"
-        source_file = tmp_path / "source.tex"
-        source_file.write_text("")
-        yaml_file.write_text(
-            "source: source.tex\n"
-            "games:\n  - label: G0\n    latex_name: G_0\n    description: d\n"
+    def test_includes_input_files(self, tmp_path: Path) -> None:
+        tex_file = tmp_path / "proof.tex"
+        input_file = tmp_path / "extra.tex"
+        input_file.write_text("")
+        tex_file.write_text(
+            r"\input{extra.tex}" "\n"
+            r"\tfgames{main}{G0}" "\n"
+            r"\begin{tfsource}{main}" "\n"
+            "line\n"
+            r"\end{tfsource}" "\n"
         )
-        watched = collect_watched_files(yaml_file)
-        assert yaml_file in watched
-        assert source_file.resolve() in watched
-        assert len(watched) == 2
+        watched = collect_watched_files(tex_file)
+        assert input_file.resolve() in watched
+
+    def test_unreadable_file_returns_self_only(self, tmp_path: Path) -> None:
+        tex_file = tmp_path / "proof.tex"
+        # File doesn't exist yet — collect should handle gracefully
+        tex_file.write_text("")
+        watched = collect_watched_files(tex_file)
+        assert tex_file in watched

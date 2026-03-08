@@ -8,3 +8,13 @@ texfrog.egg-info
 bundle_preview.sh
 examples/example-compositekems/
 examples/example-ntor/
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.synctex.gz
+*.fdb_latexmk
+*.fls
+
+# Claude Code
+.claude/settings.local.json

@@ -5,8 +5,6 @@ from __future__ import annotations
 import difflib
 import re
 
-from .model import SourceLine
-
 # Matches a trailing \\ possibly followed by whitespace at end of a line.
 _TRAILING_BACKSLASH_BS = re.compile(r"\\\\(\s*)$")
 
@@ -47,32 +45,6 @@ def _strip_trailing_newline_sep(lines: list[str]) -> list[str]:
     return result
 
 
-def filter_for_game(source_lines: list[SourceLine], label: str) -> list[str]:
-    """Return the filtered list of content lines for the given game label.
-
-    A line is included if:
-    * Its ``tags`` field is ``None`` (untagged — appears in all games), OR
-    * The given ``label`` is in its ``tags`` set.
-
-    The ``%:tags:`` comment has already been stripped from ``SourceLine.content``
-    by the parser.  This function returns those content strings, with the
-    trailing ``\\`` removed from the last non-empty included line (see
-    :func:`_strip_trailing_newline_sep`).
-
-    Args:
-        source_lines: All lines from the combined source file.
-        label: The game/reduction label to filter for.
-
-    Returns:
-        List of content strings for the game, ready to be written to a file.
-    """
-    included: list[str] = []
-    for sl in source_lines:
-        if sl.tags is None or label in sl.tags:
-            included.append(sl.content)
-    return _strip_trailing_newline_sep(included)
-
-
 def compute_removed_lines(prev_lines: list[str], curr_lines: list[str]) -> set[int]:
     """Compute which lines in ``prev_lines`` are deleted or replaced in ``curr_lines``.
 
@@ -91,7 +63,9 @@ def compute_removed_lines(prev_lines: list[str], curr_lines: list[str]) -> set[i
         return set()
 
     removed: set[int] = set()
-    matcher = difflib.SequenceMatcher(None, prev_lines, curr_lines, autojunk=False)
+    matcher = difflib.SequenceMatcher(
+        lambda x: not x.strip(), prev_lines, curr_lines, autojunk=False,
+    )
     for tag, i1, i2, _j1, _j2 in matcher.get_opcodes():
         if tag in ("delete", "replace"):
             removed.update(range(i1, i2))
@@ -117,7 +91,9 @@ def compute_changed_lines(prev_lines: list[str], curr_lines: list[str]) -> set[i
         return set()
 
     changed: set[int] = set()
-    matcher = difflib.SequenceMatcher(None, prev_lines, curr_lines, autojunk=False)
+    matcher = difflib.SequenceMatcher(
+        lambda x: not x.strip(), prev_lines, curr_lines, autojunk=False,
+    )
     for tag, _i1, _i2, j1, j2 in matcher.get_opcodes():
         if tag in ("insert", "replace"):
             changed.update(range(j1, j2))
@@ -190,6 +166,11 @@ def wrap_changed_line(
     # Don't wrap layout-only commands that control column/box dimensions.
     # These vary between games but are not proof content.
     if trimmed.startswith(r"\markersetlen"):
+        return line
+    # Don't wrap structural box commands (\nicodemusbox, \nicodemusboxNew).
+    # These take a second argument on the following line ({%...}%) and
+    # wrapping them in \tfchanged would steal that argument's closing brace.
+    if trimmed.startswith(r"\nicodemusbox"):
         return line
     # Don't wrap environment boundaries (\begin{...} / \end{...}) when they
     # appear as standalone structural lines.  Wrapping \begin{nicodemus}

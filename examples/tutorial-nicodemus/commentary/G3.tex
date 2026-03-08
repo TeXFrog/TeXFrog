@@ -1,10 +1,10 @@
 \textbf{Claim.}
-  Games \tfgamename{G2} and \tfgamename{G3} are perfectly indistinguishable.
+  Games \tfgamename{indcpa}{G2} and \tfgamename{indcpa}{G3} are perfectly indistinguishable.
 
-In \tfgamename{G2}, each query samples a uniform $y$ independently.
+In \tfgamename{indcpa}{G2}, each query samples a uniform $y$ independently.
 Since $c = y \oplus m_b$ with uniform $y$, the ciphertext $c$ is
 uniformly distributed regardless of $m_b$.
-Game \tfgamename{G3} makes this explicit by sampling $c$ directly.
+Game \tfgamename{indcpa}{G3} makes this explicit by sampling $c$ directly.
 
-In Game \tfgamename{G3} the adversary's view is identically distributed for $b = 0$ and $b = 1$,
+In Game \tfgamename{indcpa}{G3} the adversary's view is identically distributed for $b = 0$ and $b = 1$,
 so $\Pr[b' = b] = \tfrac{1}{2}$ and the IND-CPA advantage is~$0$.
