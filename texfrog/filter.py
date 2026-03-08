@@ -191,6 +191,11 @@ def wrap_changed_line(
     # These vary between games but are not proof content.
     if trimmed.startswith(r"\markersetlen"):
         return line
+    # Don't wrap structural box commands (\nicodemusbox, \nicodemusboxNew).
+    # These take a second argument on the following line ({%...}%) and
+    # wrapping them in \tfchanged would steal that argument's closing brace.
+    if trimmed.startswith(r"\nicodemusbox"):
+        return line
     # Don't wrap environment boundaries (\begin{...} / \end{...}) when they
     # appear as standalone structural lines.  Wrapping \begin{nicodemus}
     # in \tfchanged would start the environment inside an \adjustbox, then

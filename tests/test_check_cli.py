@@ -95,7 +95,7 @@ class TestCheckCommand:
 
     def test_tutorial_cryptocode_strict(self):
         """The cryptocode tutorial should pass in strict mode."""
-        tutorial = REPO_ROOT / "examples" / "tutorial-cryptocode" / "proof.yaml"
+        tutorial = REPO_ROOT / "examples" / "tutorial-cryptocode" / "main.tex"
         if not tutorial.exists():
             pytest.skip("examples/tutorial-cryptocode not found")
         runner = CliRunner()
@@ -104,7 +104,7 @@ class TestCheckCommand:
 
     def test_tutorial_nicodemus_strict(self):
         """The nicodemus tutorial should pass in strict mode."""
-        tutorial = REPO_ROOT / "examples" / "tutorial-nicodemus" / "proof.yaml"
+        tutorial = REPO_ROOT / "examples" / "tutorial-nicodemus" / "main.tex"
         if not tutorial.exists():
             pytest.skip("examples/tutorial-nicodemus not found")
         runner = CliRunner()

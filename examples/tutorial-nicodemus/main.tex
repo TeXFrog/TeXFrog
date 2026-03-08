@@ -10,6 +10,70 @@
 
 \newtheorem{theorem}{Theorem}
 
+%%% Game registration
+\tfgames{G0, G1, Red1, G2, G3}
+\tfgamename{G0}{G_0}
+\tfgamename{G1}{G_1}
+\tfgamename{Red1}{\Bdversary_1}
+\tfgamename{G2}{G_2}
+\tfgamename{G3}{G_3}
+
+\tfdescription{G0}{$\INDCPA_\Enc^\Adversary()$: The IND-CPA game. The LR oracle encrypts using the actual PRF.}
+\tfdescription{G1}{Replace $\mathrm{PRF}(k, r)$ with a truly random function $\RF(r)$.}
+\tfdescription{Red1}{Reduction against PRF security, simulating Games \tfgamename{G0} and \tfgamename{G1} via an external PRF challenger.}
+\tfdescription{G2}{Replace $\RF(r)$ with independently sampled randomness.}
+\tfdescription{G3}{Ciphertext is uniformly random, independent of $m_b$.}
+
+\tfreduction{Red1}
+\tfrelatedgames{Red1}{G0, G1}
+
+\tfmacrofile{macros.tex}
+\tfmacrofile{nicodemus.sty}
+
+\tfcommentary{G0}{commentary/G0.tex}
+\tfcommentary{G1}{commentary/G1.tex}
+\tfcommentary{Red1}{commentary/Red1.tex}
+\tfcommentary{G2}{commentary/G2.tex}
+\tfcommentary{G3}{commentary/G3.tex}
+
+\tffigure[Games $\tfgamename{G0}$--$\tfgamename{G3}$, Reduction $\tfgamename{Red1}$]{all_games}{G0,G1,G2,G3,Red1}
+
+%%% Proof source
+\begin{tfsource}{indcpa}
+\begin{tabular}[t]{l}
+	\nicodemusboxNew{250pt}{%
+
+		\tfonly*{G0}{\nicodemusheader{$\INDCPA_\Enc^\Adversary()$}}
+		\tfonly*{G1}{\nicodemusheader{Game~$\tfgamename{G1}$}}
+		\tfonly*{G2}{\nicodemusheader{Game~$\tfgamename{G2}$}}
+		\tfonly*{G3}{\nicodemusheader{Game~$\tfgamename{G3}$}}
+		\tfonly*{Red1}{\nicodemusheader{Reduction $\Bdversary_1^{\OPRF}$}}
+		\tffigonly{\nicodemusheader{Games $\tfgamename{G0}$--$\tfgamename{G3}$}}
+
+		\begin{nicodemus}
+			\tfonly{G0}{\item $k \getsr \{0,1\}^\lambda$}
+			\item $b \getsr \{0,1\}$
+			\item $b' \gets \Adversary^{\mathsf{LR}}()$
+			\item Return $(b' = b)$
+		\end{nicodemus}%
+		\medskip
+
+		\nicodemusheader{Oracle $\mathsf{LR}(m_0, m_1)$}
+		\begin{nicodemus}
+			\item $r \getsr \{0,1\}^\lambda$
+			\tfonly{G0}{\item $y \gets \mathrm{PRF}(k, r)$}
+			\tfonly{G1}{\item $y \gets \RF(r)$}
+			\tfonly{G2}{\item $y \getsr \{0,1\}^\lambda$}
+			\tfonly{Red1}{\item $y \gets \OPRF(r)$}
+			\tfonly{G0-G2}{\item $c \gets y \oplus m_b$}
+			\tfonly{G3}{\item $c \getsr \{0,1\}^\lambda$}
+			\item Return $(r, c)$
+		\end{nicodemus}%
+
+	}%
+\end{tabular}%
+\end{tfsource}
+
 \title{IND-CPA Security of PRF-Based Symmetric Encryption\\
 {\large A TeXFrog Tutorial (using the \texttt{nicodemus} package)}}
 \author{}
@@ -50,57 +114,57 @@ We proceed via a sequence of games. Figure~\ref{fig:all-games} shows all the gam
 
 \begin{figure}[ht]
 \centering
-\input{fig_all_games.tex}
+\tfrenderfigure{indcpa}{G0,G1,G2,G3,Red1}
 \caption{Consolidated figure showing games $\tfgamename{G0}$--$\tfgamename{G3}$ and Reduction $\tfgamename{Red1}$.}
 \label{fig:all-games}
 \end{figure}
 
 \paragraph{Game~$\tfgamename{G0}$.}
-\input{G0_commentary.tex}
+\input{commentary/G0.tex}
 
 \begin{figure}[ht]
 \centering
-\input{G0.tex}
+\tfrendergame{indcpa}{G0}
 \caption{Game~$\tfgamename{G0}$: $\INDCPA_\Enc^\Adversary()$: The IND-CPA game. The LR oracle encrypts using the actual PRF.}
 \label{fig:G0}
 \end{figure}
 
 \paragraph{Game~$\tfgamename{G1}$.}
-\input{G1_commentary.tex}
+\input{commentary/G1.tex}
 
 \begin{figure}[ht]
 \centering
-\input{G1.tex}
+\tfrendergame{indcpa}{G1}
 \caption{Game~$\tfgamename{G1}$: Replace $\mathrm{PRF}(k, r)$ with a truly random function $\RF(r)$.}
 \label{fig:G1}
 \end{figure}
 
 \paragraph{Reduction~$\tfgamename{Red1}$.}
-\input{Red1_commentary.tex}
+\input{commentary/Red1.tex}
 
 \begin{figure}[ht]
 \centering
-\input{Red1.tex}
+\tfrendergame{indcpa}{Red1}
 \caption{Reduction~$\tfgamename{Red1}$: Reduction against PRF security, simulating Games~\tfgamename{G0} and~\tfgamename{G1} via an external PRF challenger.}
 \label{fig:Red1}
 \end{figure}
 
 \paragraph{Game~$\tfgamename{G2}$.}
-\input{G2_commentary.tex}
+\input{commentary/G2.tex}
 
 \begin{figure}[ht]
 \centering
-\input{G2.tex}
+\tfrendergame{indcpa}{G2}
 \caption{Game~$\tfgamename{G2}$: Replace $\RF(r)$ with independently sampled randomness.}
 \label{fig:G2}
 \end{figure}
 
 \paragraph{Game~$\tfgamename{G3}$.}
-\input{G3_commentary.tex}
+\input{commentary/G3.tex}
 
 \begin{figure}[ht]
 \centering
-\input{G3.tex}
+\tfrendergame{indcpa}{G3}
 \caption{Game~$\tfgamename{G3}$: Ciphertext is uniformly random, independent of~$m_b$.}
 \label{fig:G3}
 \end{figure}

@@ -27,11 +27,12 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 # The texfrog entrypoint lives next to the running Python interpreter.
 TEXFROG = str(Path(sys.executable).parent / "texfrog")
 
-# Tutorial directories to test (YAML-based).
-_YAML_TUTORIAL_NAMES = ["tutorial-cryptocode", "tutorial-nicodemus"]
-
-# Tutorial directories to test (pure LaTeX .tex-based).
-_TEX_TUTORIAL_NAMES = ["tutorial-pure-latex"]
+# Tutorial directories to test (pure LaTeX .tex-based, main.tex entry point).
+_TEX_TUTORIAL_NAMES = [
+    "tutorial-pure-latex",
+    "tutorial-cryptocode",
+    "tutorial-nicodemus",
+]
 
 # ---------------------------------------------------------------------------
 # Skip markers
@@ -46,43 +47,6 @@ needs_html_tools = pytest.mark.skipif(
     shutil.which("pdflatex") is None or _find_svg_converter() is None,
     reason="pdflatex and/or SVG converter (pdf2svg/pdftocairo) not on PATH",
 )
-
-# ---------------------------------------------------------------------------
-# texfrog html build (YAML-based tutorials)
-# ---------------------------------------------------------------------------
-
-
-@needs_html_tools
-@pytest.mark.parametrize("tutorial_name", _YAML_TUTORIAL_NAMES)
-def test_texfrog_html_build(tmp_path, tutorial_name):
-    """``texfrog html build`` produces a complete site with SVGs (YAML input)."""
-    from texfrog.parser import parse_proof
-
-    tutorial_dir = _PROJECT_ROOT / "examples" / tutorial_name
-    yaml_path = tutorial_dir / "proof.yaml"
-    proof = parse_proof(yaml_path)
-    game_labels = [g.label for g in proof.games]
-
-    out = tmp_path / "html"
-
-    result = subprocess.run(
-        [TEXFROG, "html", "build", str(yaml_path), "-o", str(out)],
-        capture_output=True, text=True, timeout=120,
-    )
-    assert result.returncode == 0, f"texfrog html build failed:\n{result.stderr}"
-
-    # Site scaffolding.
-    assert (out / "index.html").exists()
-    assert (out / "style.css").exists()
-    assert (out / "app.js").exists()
-
-    # Every game should have a non-empty SVG.
-    games_dir = out / "games"
-    for label in game_labels:
-        svg = games_dir / f"{label}.svg"
-        assert svg.exists(), f"SVG not produced for {label}"
-        assert svg.stat().st_size > 100, f"SVG suspiciously small for {label}"
-
 
 # ---------------------------------------------------------------------------
 # texfrog html build (pure LaTeX .tex-based tutorials)

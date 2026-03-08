@@ -7,6 +7,7 @@ from pathlib import Path
 from .filter import filter_for_game
 from .model import Proof
 from .parser import validate_tags
+from .tex_parser import filter_for_game_from_text
 
 
 def validate_proof(proof: Proof, base_dir: Path) -> list[str]:
@@ -26,9 +27,11 @@ def validate_proof(proof: Proof, base_dir: Path) -> list[str]:
         A list of warning strings, one per issue found.
     """
     warnings: list[str] = []
+    ordered_labels = [g.label for g in proof.games]
 
-    # Tag validation (unknown tags, unused games)
-    warnings.extend(validate_tags(proof))
+    # Tag validation (unknown tags, unused games) — YAML format only
+    if proof.source_lines:
+        warnings.extend(validate_tags(proof))
 
     # Macro file existence
     for macro_rel in proof.macros:
@@ -38,7 +41,12 @@ def validate_proof(proof: Proof, base_dir: Path) -> list[str]:
 
     # Empty games (zero lines after filtering)
     for game in proof.games:
-        lines = filter_for_game(proof.source_lines, game.label)
+        if proof.source_text is not None:
+            lines = filter_for_game_from_text(
+                proof.source_text, game.label, ordered_labels,
+            )
+        else:
+            lines = filter_for_game(proof.source_lines, game.label)
         if not lines:
             warnings.append(
                 f"Game '{game.label}' produces an empty game "
