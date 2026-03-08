@@ -298,7 +298,7 @@ Reductions support a `related_games` field listing zero, one, or two game labels
 
 ### Live Reload (`watcher.py` + `output/html.py`)
 
-When `--live-reload` is passed to `html serve`, the tool watches the proof's source
+By default, `html serve` watches the proof's source
 files (input `.tex`, macros, preamble, commentary files) using `watchdog`
 and automatically rebuilds + reloads the browser on changes.
 
@@ -336,7 +336,7 @@ Built with Click. Entry point: `texfrog` → `texfrog.cli:main`.
 texfrog init [DIRECTORY] [--package cryptocode|nicodemus]
 texfrog check INPUT [--strict]
 texfrog html build INPUT [-o DIR] [--keep-tmp]
-texfrog html serve INPUT [-o DIR] [--port 8080] [--no-browser] [--live-reload]
+texfrog html serve INPUT [-o DIR] [--port 8080] [--no-browser] [--no-live-reload]
 ```
 
 INPUT can be a `.tex` file with TeXFrog commands or a directory containing `proof.tex`.

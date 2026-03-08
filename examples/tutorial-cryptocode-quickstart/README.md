@@ -80,4 +80,4 @@ The default highlight is a light blue background. To change it, redefine `\tfcha
 - Modify `main.tex` to add a new game or change lines, then recompile to see how highlighting updates automatically.
 - [Writing a proof](../../docs/writing-proofs.md) --- full reference for the `.tex` input format.
 - [tutorial-cryptocode/](../tutorial-cryptocode/) --- the same proof with a more detailed walkthrough and commentary files.
-- If you install the Python CLI, you can also run `texfrog html serve main.tex --live-reload` to get an interactive HTML proof viewer.
+- If you install the Python CLI, you can also run `texfrog html serve main.tex` to get an interactive HTML proof viewer.

@@ -19,7 +19,7 @@ pip install -e ".[dev]"          # if reinstall needed
 ```bash
 .venv/bin/texfrog check examples/tutorial-cryptocode-quickstart/main.tex
 .venv/bin/texfrog html build examples/tutorial-cryptocode-quickstart/main.tex -o /tmp/tfhtml
-.venv/bin/texfrog html serve --live-reload examples/tutorial-cryptocode-quickstart/main.tex -o /tmp/tfhtml
+.venv/bin/texfrog html serve examples/tutorial-cryptocode-quickstart/main.tex -o /tmp/tfhtml
 
 # Scaffold a new proof
 .venv/bin/texfrog init /tmp/tfinit                        # cryptocode (default)

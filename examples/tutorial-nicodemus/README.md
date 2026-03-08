@@ -130,7 +130,7 @@ If you have the Python CLI installed, you can also build an interactive HTML vie
 texfrog html build examples/tutorial-nicodemus/main.tex -o /tmp/tf_tutorial_nic_html
 
 # Or build and open in your browser with live reload
-texfrog html serve examples/tutorial-nicodemus/main.tex --live-reload
+texfrog html serve examples/tutorial-nicodemus/main.tex
 ```
 
 ---

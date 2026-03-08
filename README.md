@@ -124,7 +124,7 @@ git clone https://github.com/TeXFrog/TeXFrog
 cd TeXFrog/examples
 
 # Interactive HTML viewer with live reload
-texfrog html serve tutorial-cryptocode/main.tex --live-reload
+texfrog html serve tutorial-cryptocode/main.tex
 ```
 
 ## Usage
@@ -156,10 +156,10 @@ Compiles each game to SVG via `pdflatex` and produces a self-contained HTML site
 ### Open in a local web server
 
 ```bash
-texfrog html serve proof.tex [--port 8080] [--live-reload]
+texfrog html serve proof.tex [--port 8080] [--no-live-reload]
 ```
 
-Builds the HTML site, starts a local server, and opens your browser. With `--live-reload`, TeXFrog watches your source files and automatically rebuilds and refreshes the web browser when you save changes.
+Builds the HTML site, starts a local server, and opens your browser. By default, TeXFrog watches your source files and automatically rebuilds and refreshes the web browser when you save changes. Use `--no-live-reload` to disable this.
 
 ## Writing a Proof
 

@@ -224,10 +224,10 @@ def html_build_cmd(input_file: str, output_dir: str | None, keep_tmp: bool) -> N
     help="Keep intermediate LaTeX/PDF files in a temp directory.",
 )
 @click.option(
-    "--live-reload",
+    "--no-live-reload",
     is_flag=True,
     default=False,
-    help="Watch source files and rebuild/reload automatically on changes.",
+    help="Disable watching source files and automatic rebuild/reload on changes.",
 )
 def html_serve_cmd(
     input_file: str,
@@ -235,7 +235,7 @@ def html_serve_cmd(
     port: int,
     no_browser: bool,
     keep_tmp: bool,
-    live_reload: bool,
+    no_live_reload: bool,
 ) -> None:
     """Build and serve the interactive HTML proof viewer on localhost.
 
@@ -274,7 +274,7 @@ def html_serve_cmd(
         click.echo(f"Error building HTML: {exc}", err=True)
         sys.exit(1)
 
-    if live_reload:
+    if not no_live_reload:
         import logging
 
         from .output.html import serve_html_live
