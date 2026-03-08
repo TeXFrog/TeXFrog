@@ -27,6 +27,7 @@ class Figure:
 @dataclass
 class Proof:
     """The top-level proof object, parsed from a .tex input file."""
+    source_name: str                # Name from \begin{tfsource}{name}
     macros: list[str]               # Paths to macro .tex files (relative to input dir)
     games: list[Game]               # All games/reductions in order
     source_text: str                # Raw tfsource body (\tfonly format)

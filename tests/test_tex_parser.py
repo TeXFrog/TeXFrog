@@ -13,9 +13,12 @@ from texfrog.tex_parser import (
     resolve_tfonly,
     filter_for_game_from_text,
     parse_tex_proof,
+    parse_tex_proofs,
     _extract_one_arg,
     _extract_two_args,
+    _extract_three_args,
     _extract_opt_two_args,
+    _extract_one_plus_opt_two_args,
     _extract_tfsource,
     _extract_texfrog_package_option,
 )
@@ -169,14 +172,26 @@ class TestExtractTexfrogPackageOption:
 
 class TestExtractTwoArgs:
     def test_simple(self):
-        text = r"\tfgamename{G0}{G_0}"
-        result = _extract_two_args(text, "tfgamename")
-        assert result == [("G0", "G_0")]
+        text = r"\tfgames{s}{G0,G1}"
+        result = _extract_two_args(text, "tfgames")
+        assert result == [("s", "G0,G1")]
 
     def test_with_latex_content(self):
-        text = r"\tfgamename{Red1}{\mathcal{B}_1}"
-        result = _extract_two_args(text, "tfgamename")
-        assert result == [("Red1", r"\mathcal{B}_1")]
+        text = r"\tfreduction{s}{Red1}"
+        result = _extract_two_args(text, "tfreduction")
+        assert result == [("s", "Red1")]
+
+
+class TestExtractThreeArgs:
+    def test_simple(self):
+        text = r"\tfgamename{s}{G0}{G_0}"
+        result = _extract_three_args(text, "tfgamename")
+        assert result == [("s", "G0", "G_0")]
+
+    def test_with_latex_content(self):
+        text = r"\tfgamename{s}{Red1}{\mathcal{B}_1}"
+        result = _extract_three_args(text, "tfgamename")
+        assert result == [("s", "Red1", r"\mathcal{B}_1")]
 
 
 class TestExtractOptTwoArgs:
@@ -189,6 +204,18 @@ class TestExtractOptTwoArgs:
         text = r"\tffigure[My Figure]{all}{G0,G1}"
         result = _extract_opt_two_args(text, "tffigure")
         assert result == [("My Figure", "all", "G0,G1")]
+
+
+class TestExtractOnePlusOptTwoArgs:
+    def test_no_opt(self):
+        text = r"\tffigure{s}{all}{G0,G1}"
+        result = _extract_one_plus_opt_two_args(text, "tffigure")
+        assert result == [("s", None, "all", "G0,G1")]
+
+    def test_with_opt(self):
+        text = r"\tffigure{s}[My Figure]{all}{G0,G1}"
+        result = _extract_one_plus_opt_two_args(text, "tffigure")
+        assert result == [("s", "My Figure", "all", "G0,G1")]
 
 
 # ---------------------------------------------------------------------------
@@ -371,19 +398,19 @@ class TestParseTexProof:
             r"\begin{tfsource}{s}body\end{tfsource}",
             encoding="utf-8",
         )
-        with pytest.raises(ValueError, match="tfgames"):
+        with pytest.raises(ValueError, match=r"Source 's' has no \\tfgames definition"):
             parse_tex_proof(tex)
 
     def test_missing_tfsource_raises(self, tmp_path):
         tex = tmp_path / "bad.tex"
-        tex.write_text(r"\tfgames{G0}", encoding="utf-8")
+        tex.write_text(r"\tfgames{s}{G0}", encoding="utf-8")
         with pytest.raises(ValueError, match="tfsource"):
             parse_tex_proof(tex)
 
     def test_unsafe_label_raises(self, tmp_path):
         tex = tmp_path / "bad.tex"
         tex.write_text(
-            "\\tfgames{G 0}\n"
+            "\\tfgames{s}{G 0}\n"
             "\\begin{tfsource}{s}body\\end{tfsource}",
             encoding="utf-8",
         )
@@ -393,8 +420,8 @@ class TestParseTexProof:
     def test_related_games_on_non_reduction_raises(self, tmp_path):
         tex = tmp_path / "bad.tex"
         tex.write_text(
-            "\\tfgames{G0, G1}\n"
-            "\\tfrelatedgames{G0}{G1}\n"
+            "\\tfgames{s}{G0, G1}\n"
+            "\\tfrelatedgames{s}{G0}{G1}\n"
             "\\begin{tfsource}{s}body\\end{tfsource}",
             encoding="utf-8",
         )
@@ -404,11 +431,178 @@ class TestParseTexProof:
     def test_unknown_related_game_raises(self, tmp_path):
         tex = tmp_path / "bad.tex"
         tex.write_text(
-            "\\tfgames{G0, Red1}\n"
-            "\\tfreduction{Red1}\n"
-            "\\tfrelatedgames{Red1}{G0, G99}\n"
+            "\\tfgames{s}{G0, Red1}\n"
+            "\\tfreduction{s}{Red1}\n"
+            "\\tfrelatedgames{s}{Red1}{G0, G99}\n"
             "\\begin{tfsource}{s}body\\end{tfsource}",
             encoding="utf-8",
         )
         with pytest.raises(ValueError, match="unknown related game"):
             parse_tex_proof(tex)
+
+    def test_multiple_tfsource_raises(self, tmp_path):
+        tex = tmp_path / "multi.tex"
+        tex.write_text(
+            "\\tfgames{s1}{G0}\n"
+            "\\tfgames{s2}{G1}\n"
+            "\\begin{tfsource}{s1}body1\\end{tfsource}\n"
+            "\\begin{tfsource}{s2}body2\\end{tfsource}",
+            encoding="utf-8",
+        )
+        with pytest.raises(ValueError, match="Expected exactly one proof"):
+            parse_tex_proof(tex)
+
+
+# ---------------------------------------------------------------------------
+# parse_tex_proofs — multi-proof documents
+# ---------------------------------------------------------------------------
+
+
+class TestParseTexProofsMulti:
+    """Tests for documents with multiple independent proofs."""
+
+    def _write_multiproof(self, tmp_path: Path) -> Path:
+        """Write a minimal two-proof .tex document."""
+        tex = tmp_path / "multi.tex"
+        tex.write_text(
+            "\\tfgames{alpha}{A0, A1}\n"
+            "\\tfgamename{alpha}{A0}{A_0}\n"
+            "\\tfgamename{alpha}{A1}{A_1}\n"
+            "\\tfdescription{alpha}{A0}{First game of alpha.}\n"
+            "\\tfdescription{alpha}{A1}{Second game of alpha.}\n"
+            "\\tfmacrofile{macros.tex}\n"
+            "\n"
+            "\\tfgames{beta}{B0, B1, RedB}\n"
+            "\\tfgamename{beta}{B0}{B_0}\n"
+            "\\tfgamename{beta}{B1}{B_1}\n"
+            "\\tfgamename{beta}{RedB}{\\mathcal{R}}\n"
+            "\\tfdescription{beta}{B0}{First game of beta.}\n"
+            "\\tfdescription{beta}{B1}{Second game of beta.}\n"
+            "\\tfdescription{beta}{RedB}{Reduction in beta.}\n"
+            "\\tfreduction{beta}{RedB}\n"
+            "\\tfrelatedgames{beta}{RedB}{B0, B1}\n"
+            "\n"
+            "\\begin{tfsource}{alpha}\n"
+            "  \\tfonly{A0}{alpha-line-A0}\n"
+            "  \\tfonly{A1}{alpha-line-A1}\n"
+            "  common-alpha\n"
+            "\\end{tfsource}\n"
+            "\n"
+            "\\begin{tfsource}{beta}\n"
+            "  \\tfonly{B0}{beta-line-B0}\n"
+            "  \\tfonly{B1}{beta-line-B1}\n"
+            "  common-beta\n"
+            "\\end{tfsource}\n",
+            encoding="utf-8",
+        )
+        return tex
+
+    def test_returns_two_proofs(self, tmp_path):
+        tex = self._write_multiproof(tmp_path)
+        proofs = parse_tex_proofs(tex)
+        assert len(proofs) == 2
+
+    def test_proof_source_names(self, tmp_path):
+        tex = self._write_multiproof(tmp_path)
+        proofs = parse_tex_proofs(tex)
+        names = {p.source_name for p in proofs}
+        assert names == {"alpha", "beta"}
+
+    def test_games_are_independent(self, tmp_path):
+        tex = self._write_multiproof(tmp_path)
+        proofs = parse_tex_proofs(tex)
+        by_name = {p.source_name: p for p in proofs}
+        alpha = by_name["alpha"]
+        beta = by_name["beta"]
+        assert [g.label for g in alpha.games] == ["A0", "A1"]
+        assert [g.label for g in beta.games] == ["B0", "B1", "RedB"]
+
+    def test_reductions_are_per_proof(self, tmp_path):
+        tex = self._write_multiproof(tmp_path)
+        proofs = parse_tex_proofs(tex)
+        by_name = {p.source_name: p for p in proofs}
+        # alpha has no reductions
+        assert all(not g.reduction for g in by_name["alpha"].games)
+        # beta has RedB as a reduction
+        red = [g for g in by_name["beta"].games if g.reduction]
+        assert len(red) == 1
+        assert red[0].label == "RedB"
+        assert red[0].related_games == ["B0", "B1"]
+
+    def test_source_text_is_independent(self, tmp_path):
+        tex = self._write_multiproof(tmp_path)
+        proofs = parse_tex_proofs(tex)
+        by_name = {p.source_name: p for p in proofs}
+        assert "common-alpha" in by_name["alpha"].source_text
+        assert "common-beta" not in by_name["alpha"].source_text
+        assert "common-beta" in by_name["beta"].source_text
+        assert "common-alpha" not in by_name["beta"].source_text
+
+    def test_macros_shared_across_proofs(self, tmp_path):
+        tex = self._write_multiproof(tmp_path)
+        proofs = parse_tex_proofs(tex)
+        for proof in proofs:
+            assert "macros.tex" in proof.macros
+
+    def test_descriptions_are_per_proof(self, tmp_path):
+        tex = self._write_multiproof(tmp_path)
+        proofs = parse_tex_proofs(tex)
+        by_name = {p.source_name: p for p in proofs}
+        alpha_g0 = by_name["alpha"].games[0]
+        assert alpha_g0.description == "First game of alpha."
+        beta_g0 = by_name["beta"].games[0]
+        assert beta_g0.description == "First game of beta."
+
+    def test_latex_names_are_per_proof(self, tmp_path):
+        tex = self._write_multiproof(tmp_path)
+        proofs = parse_tex_proofs(tex)
+        by_name = {p.source_name: p for p in proofs}
+        assert by_name["alpha"].games[0].latex_name == "A_0"
+        assert by_name["beta"].games[0].latex_name == "B_0"
+
+    def test_parse_tex_proof_rejects_multi(self, tmp_path):
+        tex = self._write_multiproof(tmp_path)
+        with pytest.raises(ValueError, match="Expected exactly one proof"):
+            parse_tex_proof(tex)
+
+    def test_example_multiproof(self):
+        """The example-multiproof example should parse into two proofs."""
+        example = Path(__file__).resolve().parent.parent / "examples" / "example-multiproof" / "main.tex"
+        if not example.exists():
+            pytest.skip("examples/example-multiproof not found")
+        proofs = parse_tex_proofs(example)
+        assert len(proofs) == 2
+        names = {p.source_name for p in proofs}
+        assert names == {"indcpa", "intctxt"}
+
+    def test_tfsource_without_matching_tfgames_raises(self, tmp_path):
+        """A tfsource block with no corresponding \\tfgames should error."""
+        tex = tmp_path / "bad.tex"
+        tex.write_text(
+            "\\tfgames{alpha}{A0}\n"
+            "\\begin{tfsource}{alpha}body\\end{tfsource}\n"
+            "\\begin{tfsource}{orphan}body2\\end{tfsource}\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(ValueError, match="orphan"):
+            parse_tex_proofs(tex)
+
+    def test_figures_are_per_proof(self, tmp_path):
+        tex = tmp_path / "figs.tex"
+        tex.write_text(
+            "\\tfgames{p1}{X0, X1}\n"
+            "\\tfgames{p2}{Y0, Y1}\n"
+            "\\tffigure{p1}{fig1}{X0,X1}\n"
+            "\\tffigure{p2}[My Title]{fig2}{Y0,Y1}\n"
+            "\\begin{tfsource}{p1}body1\\end{tfsource}\n"
+            "\\begin{tfsource}{p2}body2\\end{tfsource}\n",
+            encoding="utf-8",
+        )
+        proofs = parse_tex_proofs(tex)
+        by_name = {p.source_name: p for p in proofs}
+        assert len(by_name["p1"].figures) == 1
+        assert by_name["p1"].figures[0].label == "fig1"
+        assert by_name["p1"].figures[0].procedure_name is None
+        assert len(by_name["p2"].figures) == 1
+        assert by_name["p2"].figures[0].label == "fig2"
+        assert by_name["p2"].figures[0].procedure_name == "My Title"

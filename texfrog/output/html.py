@@ -409,7 +409,8 @@ def _expand_tfgamename(text: str, game_names: dict[str, str]) -> str:
         r"|(?<!\\)\$"                   # unescaped $
         r"|\\[(\[]"                     # \( or \[
         r"|\\[)\]]"                     # \) or \]
-        r"|\\tfgamename\{([^}]+)\}"
+        r"|\\tfgamename\{([^}]+)\}\{([^}]+)\}"  # 2-arg: \tfgamename{source}{label}
+        r"|\\tfgamename\{([^}]+)\}"              # 1-arg: \tfgamename{label}
     )
     parts: list[str] = []
     last_end = 0
@@ -429,8 +430,11 @@ def _expand_tfgamename(text: str, game_names: dict[str, str]) -> str:
             in_math = False
             parts.append(tok)
         else:
-            # \tfgamename match
-            label = m.group(1)
+            # \tfgamename match — extract label from whichever form matched
+            if m.group(2) is not None:
+                label = m.group(2)     # 2-arg form: group(1)=source, group(2)=label
+            else:
+                label = m.group(3)     # 1-arg form: group(3)=label
             name = game_names.get(label)
             if name is None:
                 parts.append(tok)       # leave unrecognised labels unchanged
@@ -684,6 +688,46 @@ def generate_html(
     (output_dir / "app.js").write_text(
         _load_template_resource("app.js"), encoding="utf-8"
     )
+
+
+def generate_index_page(proofs: list[Proof], output_dir: Path) -> None:
+    """Generate a top-level index page linking to each proof's HTML viewer.
+
+    Args:
+        proofs: List of Proof objects (one per source).
+        output_dir: Root output directory containing per-proof subdirectories.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    links = []
+    for proof in proofs:
+        n_games = sum(1 for g in proof.games if not g.reduction)
+        n_reductions = sum(1 for g in proof.games if g.reduction)
+        links.append(
+            f'<li><a href="{proof.source_name}/index.html">'
+            f"<strong>{proof.source_name}</strong></a> "
+            f"— {n_games} game{'s' if n_games != 1 else ''}, "
+            f"{n_reductions} reduction{'s' if n_reductions != 1 else ''}"
+            f"</li>"
+        )
+    html = (
+        "<!DOCTYPE html>\n"
+        '<html lang="en">\n<head>\n'
+        '<meta charset="utf-8">\n'
+        "<title>TeXFrog Proofs</title>\n"
+        "<style>\n"
+        "  body { font-family: system-ui, sans-serif; max-width: 600px; "
+        "margin: 2rem auto; padding: 0 1rem; }\n"
+        "  ul { list-style: none; padding: 0; }\n"
+        "  li { margin: 0.5rem 0; }\n"
+        "  a { text-decoration: none; color: #0066cc; }\n"
+        "  a:hover { text-decoration: underline; }\n"
+        "</style>\n"
+        "</head>\n<body>\n"
+        "<h1>TeXFrog Proofs</h1>\n"
+        f"<ul>\n{''.join(links)}\n</ul>\n"
+        "</body>\n</html>\n"
+    )
+    (output_dir / "index.html").write_text(html, encoding="utf-8")
 
 
 def serve_html(html_dir: Path, port: int = 8080, open_browser: bool = True) -> None:

@@ -14,26 +14,26 @@ CRYPTOCODE_TEX = r"""\documentclass{article}
 \input{macros.tex}
 
 %%% Game registration (order matters for range resolution)
-\tfgames{G0, G1, Red1, G2}
-\tfgamename{G0}{G_0}
-\tfgamename{G1}{G_1}
-\tfgamename{Red1}{\Bdversary}
-\tfgamename{G2}{G_2}
+\tfgames{myproof}{G0, G1, Red1, G2}
+\tfgamename{myproof}{G0}{G_0}
+\tfgamename{myproof}{G1}{G_1}
+\tfgamename{myproof}{Red1}{\Bdversary}
+\tfgamename{myproof}{G2}{G_2}
 
-\tfdescription{G0}{The starting game.}
-\tfdescription{G1}{Replace the real value with a random one.}
-\tfdescription{Red1}{Reduction bridging \tfgamename{G0} and \tfgamename{G1}.}
-\tfdescription{G2}{The final game, where the adversary has no advantage.}
+\tfdescription{myproof}{G0}{The starting game.}
+\tfdescription{myproof}{G1}{Replace the real value with a random one.}
+\tfdescription{myproof}{Red1}{Reduction bridging \tfgamename{myproof}{G0} and \tfgamename{myproof}{G1}.}
+\tfdescription{myproof}{G2}{The final game, where the adversary has no advantage.}
 
-\tfreduction{Red1}
-\tfrelatedgames{Red1}{G0, G1}
+\tfreduction{myproof}{Red1}
+\tfrelatedgames{myproof}{Red1}{G0, G1}
 
 \tfmacrofile{macros.tex}
 
-\tfcommentary{G0}{commentary/G0.tex}
-\tfcommentary{G1}{commentary/G1.tex}
-\tfcommentary{Red1}{commentary/Red1.tex}
-\tfcommentary{G2}{commentary/G2.tex}
+\tfcommentary{myproof}{G0}{commentary/G0.tex}
+\tfcommentary{myproof}{G1}{commentary/G1.tex}
+\tfcommentary{myproof}{Red1}{commentary/Red1.tex}
+\tfcommentary{myproof}{G2}{commentary/G2.tex}
 
 %%% Proof source
 %%% Lines tagged with \tfonly{labels}{content} appear only in the listed games.
@@ -61,16 +61,16 @@ CRYPTOCODE_TEX = r"""\documentclass{article}
 
 \section*{My Game-Hopping Proof}
 
-\subsection*{Game $\tfgamename{G0}$}
+\subsection*{Game $\tfgamename{myproof}{G0}$}
 \tfrendergame{myproof}{G0}
 
-\subsection*{Game $\tfgamename{G1}$}
+\subsection*{Game $\tfgamename{myproof}{G1}$}
 \tfrendergame[diff=G0]{myproof}{G1}
 
-\subsection*{Reduction $\tfgamename{Red1}$}
+\subsection*{Reduction $\tfgamename{myproof}{Red1}$}
 \tfrendergame[diff=G1]{myproof}{Red1}
 
-\subsection*{Game $\tfgamename{G2}$}
+\subsection*{Game $\tfgamename{myproof}{G2}$}
 \tfrendergame[diff=G1]{myproof}{G2}
 
 \subsection*{Consolidated figure}
@@ -100,26 +100,26 @@ NICODEMUS_TEX = r"""\documentclass{article}
 \input{macros.tex}
 
 %%% Game registration (order matters for range resolution)
-\tfgames{G0, G1, Red1, G2}
-\tfgamename{G0}{G_0}
-\tfgamename{G1}{G_1}
-\tfgamename{Red1}{\Bdversary}
-\tfgamename{G2}{G_2}
+\tfgames{myproof}{G0, G1, Red1, G2}
+\tfgamename{myproof}{G0}{G_0}
+\tfgamename{myproof}{G1}{G_1}
+\tfgamename{myproof}{Red1}{\Bdversary}
+\tfgamename{myproof}{G2}{G_2}
 
-\tfdescription{G0}{The starting game.}
-\tfdescription{G1}{Replace the real value with a random one.}
-\tfdescription{Red1}{Reduction bridging \tfgamename{G0} and \tfgamename{G1}.}
-\tfdescription{G2}{The final game, where the adversary has no advantage.}
+\tfdescription{myproof}{G0}{The starting game.}
+\tfdescription{myproof}{G1}{Replace the real value with a random one.}
+\tfdescription{myproof}{Red1}{Reduction bridging \tfgamename{myproof}{G0} and \tfgamename{myproof}{G1}.}
+\tfdescription{myproof}{G2}{The final game, where the adversary has no advantage.}
 
-\tfreduction{Red1}
-\tfrelatedgames{Red1}{G0, G1}
+\tfreduction{myproof}{Red1}
+\tfrelatedgames{myproof}{Red1}{G0, G1}
 
 \tfmacrofile{macros.tex}
 
-\tfcommentary{G0}{commentary/G0.tex}
-\tfcommentary{G1}{commentary/G1.tex}
-\tfcommentary{Red1}{commentary/Red1.tex}
-\tfcommentary{G2}{commentary/G2.tex}
+\tfcommentary{myproof}{G0}{commentary/G0.tex}
+\tfcommentary{myproof}{G1}{commentary/G1.tex}
+\tfcommentary{myproof}{Red1}{commentary/Red1.tex}
+\tfcommentary{myproof}{G2}{commentary/G2.tex}
 
 %%% Proof source
 %%% Lines tagged with \tfonly{labels}{content} appear only in the listed games.
@@ -148,16 +148,16 @@ NICODEMUS_TEX = r"""\documentclass{article}
 
 \section*{My Game-Hopping Proof}
 
-\subsection*{Game $\tfgamename{G0}$}
+\subsection*{Game $\tfgamename{myproof}{G0}$}
 \tfrendergame{myproof}{G0}
 
-\subsection*{Game $\tfgamename{G1}$}
+\subsection*{Game $\tfgamename{myproof}{G1}$}
 \tfrendergame[diff=G0]{myproof}{G1}
 
-\subsection*{Reduction $\tfgamename{Red1}$}
+\subsection*{Reduction $\tfgamename{myproof}{Red1}$}
 \tfrendergame[diff=G1]{myproof}{Red1}
 
-\subsection*{Game $\tfgamename{G2}$}
+\subsection*{Game $\tfgamename{myproof}{G2}$}
 \tfrendergame[diff=G1]{myproof}{G2}
 
 \subsection*{Consolidated figure}
@@ -182,10 +182,10 @@ NICODEMUS_MACROS = r"""% Custom macros for this proof.
 COMMENTARY_G0 = r"""The starting game.
 """
 
-COMMENTARY_G1 = r"""Games \tfgamename{G0} and \tfgamename{G1} differ in how $y$ is computed.
+COMMENTARY_G1 = r"""Games \tfgamename{myproof}{G0} and \tfgamename{myproof}{G1} differ in how $y$ is computed.
 """
 
-COMMENTARY_RED1 = r"""Reduction \tfgamename{Red1} queries an external oracle instead of
+COMMENTARY_RED1 = r"""Reduction \tfgamename{myproof}{Red1} queries an external oracle instead of
 computing $f(k)$ directly.
 """
 

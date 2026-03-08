@@ -24,19 +24,19 @@ A minimal `.tex` file looks like this:
 
 \input{macros.tex}
 
-\tfgames{G0, G1, Red1, G2}
-\tfgamename{G0}{G_0}
-\tfgamename{G1}{G_1}
-\tfgamename{Red1}{\Bdversary_1}
-\tfgamename{G2}{G_2}
+\tfgames{myproof}{G0, G1, Red1, G2}
+\tfgamename{myproof}{G0}{G_0}
+\tfgamename{myproof}{G1}{G_1}
+\tfgamename{myproof}{Red1}{\Bdversary_1}
+\tfgamename{myproof}{G2}{G_2}
 
-\tfdescription{G0}{The starting game.}
-\tfdescription{G1}{Replace PRF with random function.}
-\tfdescription{Red1}{Reduction to PRF security.}
-\tfdescription{G2}{Replace random function output with uniform randomness.}
+\tfdescription{myproof}{G0}{The starting game.}
+\tfdescription{myproof}{G1}{Replace PRF with random function.}
+\tfdescription{myproof}{Red1}{Reduction to PRF security.}
+\tfdescription{myproof}{G2}{Replace random function output with uniform randomness.}
 
-\tfreduction{Red1}
-\tfrelatedgames{Red1}{G0, G1}
+\tfreduction{myproof}{Red1}
+\tfrelatedgames{myproof}{Red1}{G0, G1}
 
 \tfmacrofile{macros.tex}
 
@@ -50,6 +50,9 @@ A minimal `.tex` file looks like this:
 \tfrenderfigure{myproof}{G0,G1,G2}
 \end{document}
 ```
+
+> [!NOTE]
+> Multiple independent proofs can be defined in a single document by using different source names. Each proof has its own `\tfgames`, `\tfgamename`, `\tfdescription`, etc., all sharing the same source name, and its own `\begin{tfsource}{name}...\end{tfsource}` block.
 
 ### Package Selection
 
@@ -66,29 +69,29 @@ This controls how TeXFrog generates macro definitions (e.g., whether `\tfchanged
 
 Register the games and reductions in your proof using the following commands. These must appear in the preamble (before `\begin{document}`).
 
-**`\tfgames{G0, G1, Red1, G2}`** declares the ordered list of all games and reductions. The order here is the canonical sequence of the proof --- it determines which games are "adjacent" for diff highlighting, and it defines what tag ranges like `G0-G2` mean.
+**`\tfgames{source}{G0, G1, Red1, G2}`** declares the ordered list of all games and reductions for the named source. The order here is the canonical sequence of the proof --- it determines which games are "adjacent" for diff highlighting, and it defines what tag ranges like `G0-G2` mean.
 
-**`\tfgamename{label}{latex_name}`** sets the display name for a game. The `latex_name` is math-mode content without `$` delimiters (e.g., `G_0` or `\indcca_\QSH^\adv.\REAL()`). It is rendered via `\ensuremath` in LaTeX and `$...$` in the HTML viewer.
+**`\tfgamename{source}{label}{latex_name}`** sets the display name for a game. The `latex_name` is math-mode content without `$` delimiters (e.g., `G_0` or `\indcca_\QSH^\adv.\REAL()`). It is rendered via `\ensuremath` in LaTeX and `$...$` in the HTML viewer. Inside a `tfsource` body, `\tfgamename{label}` (1-arg form) can be used as a shorthand that looks up the name from the active source.
 
 ```latex
-\tfgamename{G0}{G_0}
-\tfgamename{Red1}{\Bdversary_1}
+\tfgamename{myproof}{G0}{G_0}
+\tfgamename{myproof}{Red1}{\Bdversary_1}
 ```
 
-**`\tfdescription{label}{text}`** sets a one-sentence LaTeX description shown in the HTML viewer sidebar.
+**`\tfdescription{source}{label}{text}`** sets a one-sentence LaTeX description shown in the HTML viewer sidebar.
 
 ```latex
-\tfdescription{G0}{The starting game (real IND-CCA game).}
-\tfdescription{G1}{Replace $\key_2$ with a fresh $\key_2^*$ from encapsulation.}
+\tfdescription{myproof}{G0}{The starting game (real IND-CCA game).}
+\tfdescription{myproof}{G1}{Replace $\key_2$ with a fresh $\key_2^*$ from encapsulation.}
 ```
 
-**`\tfreduction{label}`** marks a game as a reduction. In the HTML viewer, reductions are displayed alone rather than side-by-side with the previous game (unless `\tfrelatedgames` is set).
+**`\tfreduction{source}{label}`** marks a game as a reduction. In the HTML viewer, reductions are displayed alone rather than side-by-side with the previous game (unless `\tfrelatedgames` is set).
 
-**`\tfrelatedgames{label}{G0, G1}`** specifies zero, one, or two game labels to display alongside a reduction in the HTML viewer. Only valid for games marked with `\tfreduction`. Clean (unhighlighted) versions of these games are shown next to the reduction: one related game gives a 2-panel layout, two gives a 3-panel layout with the reduction in the middle.
+**`\tfrelatedgames{source}{label}{G0, G1}`** specifies zero, one, or two game labels to display alongside a reduction in the HTML viewer. Only valid for games marked with `\tfreduction`. Clean (unhighlighted) versions of these games are shown next to the reduction: one related game gives a 2-panel layout, two gives a 3-panel layout with the reduction in the middle.
 
 ```latex
-\tfreduction{Red2}
-\tfrelatedgames{Red2}{G1, G2}
+\tfreduction{myproof}{Red2}
+\tfrelatedgames{myproof}{Red2}{G1, G2}
 ```
 
 Labels can be anything: `G0`, `Red2`, `Hybrid3`, `BadEvent` --- TeXFrog treats them as arbitrary strings.
@@ -114,11 +117,11 @@ Labels can be anything: `G0`, `Red2`, `Hybrid3`, `BadEvent` --- TeXFrog treats t
 
 ### Commentary
 
-**`\tfcommentary{label}{commentary/G0.tex}`** associates per-game commentary with a game. The value is a path (relative to the `.tex` file) to a `.tex` file containing free-form LaTeX. Commentary is rendered in the HTML viewer below the game pseudocode.
+**`\tfcommentary{source}{label}{commentary/G0.tex}`** associates per-game commentary with a game. The value is a path (relative to the `.tex` file) to a `.tex` file containing free-form LaTeX. Commentary is rendered in the HTML viewer below the game pseudocode.
 
 ```latex
-\tfcommentary{G0}{commentary/G0.tex}
-\tfcommentary{G1}{commentary/G1.tex}
+\tfcommentary{myproof}{G0}{commentary/G0.tex}
+\tfcommentary{myproof}{G1}{commentary/G1.tex}
 ```
 
 Each commentary file contains raw LaTeX --- environments, math, and display equations all work. For example, `commentary/G1.tex` might contain:
@@ -130,17 +133,17 @@ Each commentary file contains raw LaTeX --- environments, math, and display equa
 This follows by inlining the decapsulation result.
 ```
 
-You can use `\tfgamename{G1}` in commentary to reference a game's `latex_name`.
+You can use `\tfgamename{myproof}{G1}` in commentary to reference a game's `latex_name`.
 
 **HTML viewer:** Commentary is compiled through the same LaTeX -> PDF -> SVG pipeline as game pseudocode, so any LaTeX commands or environments used in commentary (e.g., `\newtheorem{claim}{Claim}`) must be defined in your macros file. The packages available in the HTML compilation wrapper include your selected pseudocode package (e.g., `cryptocode` or `nicodemus`), plus `amsfonts`, `amsmath`, `amsthm`, `adjustbox`, and `xcolor`. Additional packages can be added via `\tfpreamble`.
 
 ### Figures
 
-**`\tffigure[procedure_name]{label}{games}`** declares a consolidated figure showing multiple games side by side, for use as a comparison table in your paper. The Python HTML tool uses this metadata; `texfrog.sty` provides `\tfrenderfigure` for the LaTeX side.
+**`\tffigure{source}[procedure_name]{label}{games}`** declares a consolidated figure showing multiple games side by side, for use as a comparison table in your paper. The Python HTML tool uses this metadata; `texfrog.sty` provides `\tfrenderfigure` for the LaTeX side.
 
 ```latex
-\tffigure{start_end}{G0,G9}
-\tffigure[Games $G_0$--$G_9$]{main_proof}{G0-G2,G8,G9}
+\tffigure{myproof}{start_end}{G0,G9}
+\tffigure{myproof}[Games $G_0$--$G_9$]{main_proof}{G0-G2,G8,G9}
 ```
 
 Each figure has:
@@ -208,7 +211,7 @@ The `tags` argument in `\tfonly{tags}{content}` specifies which games should inc
 
 ### Range Resolution
 
-Ranges are resolved **positionally** --- by the order games appear in the `\tfgames` declaration, not alphabetically or numerically. Given the game list `\tfgames{G0, G1, G2, Red2, G3, G4}`, the tag `G1-G3` includes `G1`, `G2`, `Red2`, and `G3`, because `Red2` sits between `G2` and `G3` in the sequence.
+Ranges are resolved **positionally** --- by the order games appear in the `\tfgames` declaration, not alphabetically or numerically. Given the game list `\tfgames{myproof}{G0, G1, G2, Red2, G3, G4}`, the tag `G1-G3` includes `G1`, `G2`, `Red2`, and `G3`, because `Red2` sits between `G2` and `G3` in the sequence.
 
 This lets you insert reductions (e.g., `Red2`) between games without breaking range syntax.
 

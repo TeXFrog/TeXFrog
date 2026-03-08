@@ -10,31 +10,31 @@
 \newtheorem{theorem}{Theorem}
 
 %%% Game registration
-\tfgames{G0, G1, Red1, G2, G3}
-\tfgamename{G0}{G_0}
-\tfgamename{G1}{G_1}
-\tfgamename{Red1}{\Bdversary_1}
-\tfgamename{G2}{G_2}
-\tfgamename{G3}{G_3}
+\tfgames{indcpa}{G0, G1, Red1, G2, G3}
+\tfgamename{indcpa}{G0}{G_0}
+\tfgamename{indcpa}{G1}{G_1}
+\tfgamename{indcpa}{Red1}{\Bdversary_1}
+\tfgamename{indcpa}{G2}{G_2}
+\tfgamename{indcpa}{G3}{G_3}
 
-\tfdescription{G0}{$\INDCPA_\Enc^\Adversary()$: The IND-CPA game. The LR oracle encrypts using the actual PRF.}
-\tfdescription{G1}{Replace $\mathrm{PRF}(k, r)$ with a truly random function $\RF(r)$.}
-\tfdescription{Red1}{Reduction against PRF security, simulating Games \tfgamename{G0} and \tfgamename{G1} via an external PRF challenger.}
-\tfdescription{G2}{Replace $\RF(r)$ with independently sampled randomness.}
-\tfdescription{G3}{Ciphertext is uniformly random, independent of $m_b$.}
+\tfdescription{indcpa}{G0}{$\INDCPA_\Enc^\Adversary()$: The IND-CPA game. The LR oracle encrypts using the actual PRF.}
+\tfdescription{indcpa}{G1}{Replace $\mathrm{PRF}(k, r)$ with a truly random function $\RF(r)$.}
+\tfdescription{indcpa}{Red1}{Reduction against PRF security, simulating Games \tfgamename{indcpa}{G0} and \tfgamename{indcpa}{G1} via an external PRF challenger.}
+\tfdescription{indcpa}{G2}{Replace $\RF(r)$ with independently sampled randomness.}
+\tfdescription{indcpa}{G3}{Ciphertext is uniformly random, independent of $m_b$.}
 
-\tfreduction{Red1}
-\tfrelatedgames{Red1}{G0, G1}
+\tfreduction{indcpa}{Red1}
+\tfrelatedgames{indcpa}{Red1}{G0, G1}
 
 \tfmacrofile{macros.tex}
 
-\tfcommentary{G0}{commentary/G0.tex}
-\tfcommentary{G1}{commentary/G1.tex}
-\tfcommentary{Red1}{commentary/Red1.tex}
-\tfcommentary{G2}{commentary/G2.tex}
-\tfcommentary{G3}{commentary/G3.tex}
+\tfcommentary{indcpa}{G0}{commentary/G0.tex}
+\tfcommentary{indcpa}{G1}{commentary/G1.tex}
+\tfcommentary{indcpa}{Red1}{commentary/Red1.tex}
+\tfcommentary{indcpa}{G2}{commentary/G2.tex}
+\tfcommentary{indcpa}{G3}{commentary/G3.tex}
 
-\tffigure[Games $\tfgamename{G0}$--$\tfgamename{G3}$, Reduction $\tfgamename{Red1}$]{all_games}{G0,G1,G2,G3,Red1}
+\tffigure{indcpa}[Games $\tfgamename{indcpa}{G0}$--$\tfgamename{indcpa}{G3}$, Reduction $\tfgamename{indcpa}{Red1}$]{all_games}{G0,G1,G2,G3,Red1}
 
 %%% Proof source
 \begin{tfsource}{indcpa}
@@ -107,57 +107,57 @@ We proceed via a sequence of games. Figure~\ref{fig:all-games} shows all the gam
 \begin{figure}[ht]
 \centering
 \tfrenderfigure{indcpa}{G0,G1,G2,G3,Red1}
-\caption{Consolidated figure showing games $\tfgamename{G0}$--$\tfgamename{G3}$ and Reduction $\tfgamename{Red1}$.}
+\caption{Consolidated figure showing games $\tfgamename{indcpa}{G0}$--$\tfgamename{indcpa}{G3}$ and Reduction $\tfgamename{indcpa}{Red1}$.}
 \label{fig:all-games}
 \end{figure}
 
-\paragraph{Game~$\tfgamename{G0}$.}
+\paragraph{Game~$\tfgamename{indcpa}{G0}$.}
 \input{commentary/G0.tex}
 
 \begin{figure}[ht]
 \centering
 \tfrendergame{indcpa}{G0}
-\caption{Game~$\tfgamename{G0}$: $\INDCPA_\Enc^\Adversary()$: The IND-CPA game. The LR oracle encrypts using the actual PRF.}
+\caption{Game~$\tfgamename{indcpa}{G0}$: $\INDCPA_\Enc^\Adversary()$: The IND-CPA game. The LR oracle encrypts using the actual PRF.}
 \label{fig:G0}
 \end{figure}
 
-\paragraph{Game~$\tfgamename{G1}$.}
+\paragraph{Game~$\tfgamename{indcpa}{G1}$.}
 \input{commentary/G1.tex}
 
 \begin{figure}[ht]
 \centering
 \tfrendergame[diff=G0]{indcpa}{G1}
-\caption{Game~$\tfgamename{G1}$: Replace $\mathrm{PRF}(k, r)$ with a truly random function $\RF(r)$.}
+\caption{Game~$\tfgamename{indcpa}{G1}$: Replace $\mathrm{PRF}(k, r)$ with a truly random function $\RF(r)$.}
 \label{fig:G1}
 \end{figure}
 
-\paragraph{Reduction~$\tfgamename{Red1}$.}
+\paragraph{Reduction~$\tfgamename{indcpa}{Red1}$.}
 \input{commentary/Red1.tex}
 
 \begin{figure}[ht]
 \centering
 \tfrendergame[diff=G1]{indcpa}{Red1}
-\caption{Reduction~$\tfgamename{Red1}$: Reduction against PRF security, simulating Games~\tfgamename{G0} and~\tfgamename{G1} via an external PRF challenger.}
+\caption{Reduction~$\tfgamename{indcpa}{Red1}$: Reduction against PRF security, simulating Games~\tfgamename{indcpa}{G0} and~\tfgamename{indcpa}{G1} via an external PRF challenger.}
 \label{fig:Red1}
 \end{figure}
 
-\paragraph{Game~$\tfgamename{G2}$.}
+\paragraph{Game~$\tfgamename{indcpa}{G2}$.}
 \input{commentary/G2.tex}
 
 \begin{figure}[ht]
 \centering
 \tfrendergame[diff=G1]{indcpa}{G2}
-\caption{Game~$\tfgamename{G2}$: Replace $\RF(r)$ with independently sampled randomness.}
+\caption{Game~$\tfgamename{indcpa}{G2}$: Replace $\RF(r)$ with independently sampled randomness.}
 \label{fig:G2}
 \end{figure}
 
-\paragraph{Game~$\tfgamename{G3}$.}
+\paragraph{Game~$\tfgamename{indcpa}{G3}$.}
 \input{commentary/G3.tex}
 
 \begin{figure}[ht]
 \centering
 \tfrendergame[diff=G2]{indcpa}{G3}
-\caption{Game~$\tfgamename{G3}$: Ciphertext is uniformly random, independent of~$m_b$.}
+\caption{Game~$\tfgamename{indcpa}{G3}$: Ciphertext is uniformly random, independent of~$m_b$.}
 \label{fig:G3}
 \end{figure}
 

@@ -32,6 +32,7 @@ def make_proof() -> Proof:
         "G1": r"\begin{claim}G0 and G1 are equiv.\end{claim}" + "\n",
     }
     return Proof(
+        source_name="main",
         macros=["macros.tex"],
         games=games,
         source_text=source_text,
@@ -170,6 +171,7 @@ def test_game_after_reduction_diffs_against_previous_game(tmp_path):
         r"\tfonly{Red}{    red_line \\}"
     )
     proof = Proof(
+        source_name="main",
         macros=[], games=games, source_text=source_text,
         commentary={}, figures=[],
     )
@@ -196,6 +198,7 @@ def test_reduction_diffs_against_immediately_preceding(tmp_path):
         r"\tfonly{Red}{    red_only \\}"
     )
     proof = Proof(
+        source_name="main",
         macros=[], games=games, source_text=source_text,
         commentary={}, figures=[],
     )
@@ -227,6 +230,7 @@ def test_nicodemus_game_item_prefix_outside_tfchanged(tmp_path):
         "\t\t\\end{nicodemus}%"
     )
     proof = Proof(
+        source_name="main",
         macros=[], games=games, source_text=source_text,
         commentary={}, figures=[], package="nicodemus",
     )

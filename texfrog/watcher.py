@@ -49,7 +49,7 @@ def _collect_watched_files_tex(tex_path: Path) -> set[Path]:
     for m in re.finditer(r"\\tfpreamble\{([^}]+)\}", text):
         paths.add((base_dir / m.group(1).strip()).resolve())
 
-    for m in re.finditer(r"\\tfcommentary\{[^}]+\}\{([^}]+)\}", text):
+    for m in re.finditer(r"\\tfcommentary\{[^}]+\}\{[^}]+\}\{([^}]+)\}", text):
         paths.add((base_dir / m.group(1).strip()).resolve())
 
     for m in re.finditer(r"\\input\{([^}]+)\}", text):
@@ -141,17 +141,18 @@ def safe_rebuild(
     Returns:
         ``True`` if the rebuild succeeded, ``False`` otherwise.
     """
-    from .output.html import generate_html
-    from .tex_parser import parse_tex_proof
+    from .output.html import generate_html, generate_index_page
+    from .tex_parser import parse_tex_proofs
     from .validate import validate_proof
 
     logger.info("Rebuilding …")
     start = time.monotonic()
 
     try:
-        proof = parse_tex_proof(input_path)
-        for msg in validate_proof(proof, input_path.parent):
-            logger.warning(msg)
+        proofs = parse_tex_proofs(input_path)
+        for proof in proofs:
+            for msg in validate_proof(proof, input_path.parent):
+                logger.warning(msg)
     except Exception as exc:
         logger.error("Parse error (keeping existing site): %s", exc)
         return False
@@ -160,7 +161,13 @@ def safe_rebuild(
         prefix="texfrog_live_", dir=output_dir.parent,
     ))
     try:
-        generate_html(proof, input_path.parent, staging_dir, keep_tmp=keep_tmp)
+        if len(proofs) == 1:
+            generate_html(proofs[0], input_path.parent, staging_dir, keep_tmp=keep_tmp)
+        else:
+            for proof in proofs:
+                proof_out = staging_dir / proof.source_name
+                generate_html(proof, input_path.parent, proof_out, keep_tmp=keep_tmp)
+            generate_index_page(proofs, staging_dir)
     except Exception as exc:
         logger.error("Build error (keeping existing site): %s", exc)
         shutil.rmtree(staging_dir, ignore_errors=True)

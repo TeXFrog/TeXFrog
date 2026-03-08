@@ -7,7 +7,7 @@ from pathlib import Path
 
 import click
 
-from .tex_parser import parse_tex_proof
+from .tex_parser import parse_tex_proofs
 from .validate import validate_proof
 
 
@@ -117,7 +117,7 @@ def check_cmd(input_file: str, strict: bool) -> None:
 
     click.echo(f"Parsing {file_path} …")
     try:
-        proof = parse_tex_proof(file_path)
+        proofs = parse_tex_proofs(file_path)
     except (ValueError, FileNotFoundError) as exc:
         click.echo(f"Error: {exc}", err=True)
         sys.exit(1)
@@ -125,22 +125,27 @@ def check_cmd(input_file: str, strict: bool) -> None:
         click.echo(f"Unexpected error parsing input: {type(exc).__name__}: {exc}", err=True)
         sys.exit(1)
 
-    warnings = _show_warnings(proof, file_path.parent)
+    all_warnings: list[str] = []
+    for proof in proofs:
+        prefix = f"[{proof.source_name}] " if len(proofs) > 1 else ""
+        warnings = _show_warnings(proof, file_path.parent)
+        all_warnings.extend(warnings)
 
-    n_games = sum(1 for g in proof.games if not g.reduction)
-    n_reductions = sum(1 for g in proof.games if g.reduction)
-    n_figs = len(proof.figures)
+        n_games = sum(1 for g in proof.games if not g.reduction)
+        n_reductions = sum(1 for g in proof.games if g.reduction)
+        n_figs = len(proof.figures)
 
-    if warnings:
-        click.echo(f"Proof has {len(warnings)} warning(s).")
+        if not warnings:
+            parts = []
+            parts.append(f"{n_games} game{'s' if n_games != 1 else ''}")
+            parts.append(f"{n_reductions} reduction{'s' if n_reductions != 1 else ''}")
+            parts.append(f"{n_figs} figure{'s' if n_figs != 1 else ''}")
+            click.echo(f"{prefix}Proof is valid ({', '.join(parts)}).")
+
+    if all_warnings:
+        click.echo(f"Total: {len(all_warnings)} warning(s) across {len(proofs)} proof(s).")
         if strict:
             sys.exit(1)
-    else:
-        parts = []
-        parts.append(f"{n_games} game{'s' if n_games != 1 else ''}")
-        parts.append(f"{n_reductions} reduction{'s' if n_reductions != 1 else ''}")
-        parts.append(f"{n_figs} figure{'s' if n_figs != 1 else ''}")
-        click.echo(f"Proof is valid ({', '.join(parts)}).")
 
 
 # ---------------------------------------------------------------------------
@@ -173,7 +178,7 @@ def html_build_cmd(input_file: str, output_dir: str | None, keep_tmp: bool) -> N
     proof.tex.  Requires pdflatex and pdf2svg (or pdftocairo).
     """
     from .deps import MissingDependencyError, check_html_deps
-    from .output.html import generate_html
+    from .output.html import generate_html, generate_index_page
 
     try:
         check_html_deps()
@@ -189,7 +194,7 @@ def html_build_cmd(input_file: str, output_dir: str | None, keep_tmp: bool) -> N
 
     click.echo(f"Parsing {file_path} …")
     try:
-        proof = parse_tex_proof(file_path)
+        proofs = parse_tex_proofs(file_path)
     except (ValueError, FileNotFoundError) as exc:
         click.echo(f"Error: {exc}", err=True)
         sys.exit(1)
@@ -199,7 +204,14 @@ def html_build_cmd(input_file: str, output_dir: str | None, keep_tmp: bool) -> N
 
     click.echo(f"Building HTML site in {out} …")
     try:
-        generate_html(proof, file_path.parent, out, keep_tmp=keep_tmp)
+        if len(proofs) == 1:
+            generate_html(proofs[0], file_path.parent, out, keep_tmp=keep_tmp)
+        else:
+            for proof in proofs:
+                proof_out = out / proof.source_name
+                click.echo(f"  Building proof '{proof.source_name}' …")
+                generate_html(proof, file_path.parent, proof_out, keep_tmp=keep_tmp)
+            generate_index_page(proofs, out)
     except Exception as exc:
         click.echo(f"Error building HTML: {exc}", err=True)
         sys.exit(1)
@@ -243,7 +255,7 @@ def html_serve_cmd(
     proof.tex.
     """
     from .deps import MissingDependencyError, check_html_deps
-    from .output.html import generate_html, serve_html
+    from .output.html import generate_html, generate_index_page, serve_html
 
     try:
         check_html_deps()
@@ -259,7 +271,7 @@ def html_serve_cmd(
 
     click.echo(f"Parsing {file_path} …")
     try:
-        proof = parse_tex_proof(file_path)
+        proofs = parse_tex_proofs(file_path)
     except (ValueError, FileNotFoundError) as exc:
         click.echo(f"Error: {exc}", err=True)
         sys.exit(1)
@@ -269,7 +281,14 @@ def html_serve_cmd(
 
     click.echo(f"Building HTML site in {out} …")
     try:
-        generate_html(proof, file_path.parent, out, keep_tmp=keep_tmp)
+        if len(proofs) == 1:
+            generate_html(proofs[0], file_path.parent, out, keep_tmp=keep_tmp)
+        else:
+            for proof in proofs:
+                proof_out = out / proof.source_name
+                click.echo(f"  Building proof '{proof.source_name}' …")
+                generate_html(proof, file_path.parent, proof_out, keep_tmp=keep_tmp)
+            generate_index_page(proofs, out)
     except Exception as exc:
         click.echo(f"Error building HTML: {exc}", err=True)
         sys.exit(1)

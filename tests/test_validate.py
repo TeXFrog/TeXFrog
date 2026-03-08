@@ -35,6 +35,7 @@ def _make_proof(
             r"\tfonly{G1}{only G1}"
         )
     return Proof(
+        source_name="main",
         macros=macros or [],
         games=games,
         source_text=source_text,

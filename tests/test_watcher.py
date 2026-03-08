@@ -15,7 +15,7 @@ class TestCollectWatchedFiles:
     def test_includes_tex_file(self, tmp_path: Path) -> None:
         tex_file = tmp_path / "proof.tex"
         tex_file.write_text(
-            r"\tfgames{G0}" "\n"
+            r"\tfgames{main}{G0}" "\n"
             r"\begin{tfsource}{main}" "\n"
             "line\n"
             r"\end{tfsource}" "\n"
@@ -29,7 +29,7 @@ class TestCollectWatchedFiles:
         macro.write_text("")
         tex_file.write_text(
             r"\tfmacrofile{macros.tex}" "\n"
-            r"\tfgames{G0}" "\n"
+            r"\tfgames{main}{G0}" "\n"
             r"\begin{tfsource}{main}" "\n"
             "line\n"
             r"\end{tfsource}" "\n"
@@ -43,7 +43,7 @@ class TestCollectWatchedFiles:
         preamble.write_text("")
         tex_file.write_text(
             r"\tfpreamble{preamble.tex}" "\n"
-            r"\tfgames{G0}" "\n"
+            r"\tfgames{main}{G0}" "\n"
             r"\begin{tfsource}{main}" "\n"
             "line\n"
             r"\end{tfsource}" "\n"
@@ -58,8 +58,8 @@ class TestCollectWatchedFiles:
         comm_file = commentary_dir / "G0.tex"
         comm_file.write_text("commentary text")
         tex_file.write_text(
-            r"\tfgames{G0}" "\n"
-            r"\tfcommentary{G0}{commentary/G0.tex}" "\n"
+            r"\tfgames{main}{G0}" "\n"
+            r"\tfcommentary{main}{G0}{commentary/G0.tex}" "\n"
             r"\begin{tfsource}{main}" "\n"
             "line\n"
             r"\end{tfsource}" "\n"
@@ -73,7 +73,7 @@ class TestCollectWatchedFiles:
         input_file.write_text("")
         tex_file.write_text(
             r"\input{extra.tex}" "\n"
-            r"\tfgames{G0}" "\n"
+            r"\tfgames{main}{G0}" "\n"
             r"\begin{tfsource}{main}" "\n"
             "line\n"
             r"\end{tfsource}" "\n"

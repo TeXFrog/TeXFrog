@@ -33,11 +33,17 @@ System requirements (not pip): `pdflatex`, `pdftocairo` (or `pdf2svg`), `pdfcrop
 The `.tex` file is the single source of truth. It uses the `texfrog.sty` LaTeX package
 for compilation and is parsed by `texfrog/tex_parser.py` for HTML export.
 
-Key commands: `\tfgames`, `\tfgamename`, `\tfdescription`, `\tfreduction`,
-`\tfrelatedgames`, `\tfmacrofile`, `\tfpreamble`, `\tfcommentary`,
-`\tffigure`, `\begin{tfsource}...\end{tfsource}`, `\tfonly{tags}{content}`,
-`\tfonly*{tags}{content}` (suppressed in figures), `\tffigonly{content}` (figure-only),
-`\tfrendergame`, `\tfrenderfigure`.
+Key commands (most take a `source` name as their first argument to support
+multiple proofs per document):
+- `\tfgames{source}{games}`, `\tfgamename{source}{label}{name}` (define),
+  `\tfdescription{source}{label}{desc}`, `\tfreduction{source}{label}`,
+  `\tfrelatedgames{source}{label}{games}`, `\tfcommentary{source}{label}{file}`,
+  `\tffigure{source}[opt]{label}{games}`
+- `\tfgamename{label}` (1-arg lookup inside `tfsource` body, uses active source)
+- Unchanged (no source arg): `\tfmacrofile{path}`, `\tfpreamble{path}`,
+  `\tfonly{tags}{content}`, `\tfonly*{tags}{content}`, `\tffigonly{content}`,
+  `\tfrendergame[opt]{source}{game}`, `\tfrenderfigure{source}{games}`,
+  `\begin{tfsource}{name}...\end{tfsource}`
 
 Package option: `\usepackage[package=cryptocode]{texfrog}` or `package=nicodemus`.
 
@@ -50,8 +56,9 @@ Package option: `\usepackage[package=cryptocode]{texfrog}` or `package=nicodemus
 - **`\tfchanged` wrapping skips**: lines ending with `{` (procedure headers) and
   pure comment lines (starting with `%`). For nicodemus, `\item` prefix is kept
   outside `\tfchanged{}`.
-- **`latex_name` is math-mode content** without `$` delimiters. `\tfgamename{label}`
-  wraps it in `\ensuremath` (LaTeX) or `$...$` (HTML/MathJax).
+- **`latex_name` is math-mode content** without `$` delimiters. `\tfgamename{source}{label}`
+  (or 1-arg `\tfgamename{label}` inside `tfsource`) wraps it in `\ensuremath` (LaTeX)
+  or `$...$` (HTML/MathJax).
 - **Blank lines are stripped** from per-game `.tex` output to avoid `varwidth`
   dimension errors inside `pcvstack` environments.
 

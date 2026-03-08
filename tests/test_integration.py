@@ -83,3 +83,44 @@ def test_texfrog_html_build_tex(tmp_path, tutorial_name):
         svg = games_dir / f"{label}.svg"
         assert svg.exists(), f"SVG not produced for {label}"
         assert svg.stat().st_size > 100, f"SVG suspiciously small for {label}"
+
+
+@needs_html_tools
+def test_texfrog_html_build_multiproof(tmp_path):
+    """``texfrog html build`` on a multi-proof document creates per-proof subdirectories."""
+    from texfrog.tex_parser import parse_tex_proofs
+
+    tex_path = _PROJECT_ROOT / "examples" / "example-multiproof" / "main.tex"
+    if not tex_path.exists():
+        pytest.skip("examples/example-multiproof not found")
+
+    proofs = parse_tex_proofs(tex_path)
+    assert len(proofs) == 2
+
+    out = tmp_path / "html"
+
+    result = subprocess.run(
+        [TEXFROG, "html", "build", str(tex_path), "-o", str(out)],
+        capture_output=True, text=True, timeout=180,
+    )
+    assert result.returncode == 0, f"texfrog html build failed:\n{result.stderr}"
+
+    # Top-level index page should exist.
+    assert (out / "index.html").exists()
+    index_html = (out / "index.html").read_text(encoding="utf-8")
+    assert "indcpa" in index_html
+    assert "intctxt" in index_html
+
+    # Each proof should have its own subdirectory with full site scaffolding.
+    for proof in proofs:
+        proof_dir = out / proof.source_name
+        assert (proof_dir / "index.html").exists(), f"Missing index.html for {proof.source_name}"
+        assert (proof_dir / "style.css").exists(), f"Missing style.css for {proof.source_name}"
+        assert (proof_dir / "app.js").exists(), f"Missing app.js for {proof.source_name}"
+
+        # Every game should have a non-empty SVG.
+        games_dir = proof_dir / "games"
+        for game in proof.games:
+            svg = games_dir / f"{game.label}.svg"
+            assert svg.exists(), f"SVG not produced for {proof.source_name}/{game.label}"
+            assert svg.stat().st_size > 100, f"SVG suspiciously small for {proof.source_name}/{game.label}"

@@ -15,11 +15,11 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 def _write_minimal_proof(tmp_path: Path, *, extra_tex: str = "") -> Path:
     """Write a minimal valid .tex proof and return its path."""
     content = (
-        r"\tfgames{G0, G1}" "\n"
-        r"\tfgamename{G0}{G_0}" "\n"
-        r"\tfgamename{G1}{G_1}" "\n"
-        r"\tfdescription{G0}{Game 0}" "\n"
-        r"\tfdescription{G1}{Game 1}" "\n"
+        r"\tfgames{main}{G0, G1}" "\n"
+        r"\tfgamename{main}{G0}{G_0}" "\n"
+        r"\tfgamename{main}{G1}{G_1}" "\n"
+        r"\tfdescription{main}{G0}{Game 0}" "\n"
+        r"\tfdescription{main}{G1}{Game 1}" "\n"
         + extra_tex +
         r"\begin{tfsource}{main}" "\n"
         "common line\n"
@@ -62,7 +62,7 @@ class TestCheckCommand:
         (commentary_dir / "G99.tex").write_text("orphan\n", encoding="utf-8")
         tex_path = _write_minimal_proof(
             tmp_path,
-            extra_tex=r"\tfcommentary{G99}{commentary/G99.tex}" "\n",
+            extra_tex=r"\tfcommentary{main}{G99}{commentary/G99.tex}" "\n",
         )
         runner = CliRunner()
         result = runner.invoke(main, ["check", str(tex_path)])
@@ -76,7 +76,7 @@ class TestCheckCommand:
         (commentary_dir / "G99.tex").write_text("orphan\n", encoding="utf-8")
         tex_path = _write_minimal_proof(
             tmp_path,
-            extra_tex=r"\tfcommentary{G99}{commentary/G99.tex}" "\n",
+            extra_tex=r"\tfcommentary{main}{G99}{commentary/G99.tex}" "\n",
         )
         runner = CliRunner()
         result = runner.invoke(main, ["check", "--strict", str(tex_path)])
@@ -107,3 +107,41 @@ class TestCheckCommand:
         runner = CliRunner()
         result = runner.invoke(main, ["check", "--strict", str(tutorial)])
         assert result.exit_code == 0, result.output
+
+    def test_multiproof_check(self, tmp_path):
+        """``texfrog check`` on a multi-proof document reports each proof."""
+        tex_path = tmp_path / "multi.tex"
+        tex_path.write_text(
+            r"\tfgames{alpha}{A0, A1}" "\n"
+            r"\tfgamename{alpha}{A0}{A_0}" "\n"
+            r"\tfgamename{alpha}{A1}{A_1}" "\n"
+            r"\tfdescription{alpha}{A0}{Game A0.}" "\n"
+            r"\tfdescription{alpha}{A1}{Game A1.}" "\n"
+            r"\tfgames{beta}{B0}" "\n"
+            r"\tfgamename{beta}{B0}{B_0}" "\n"
+            r"\tfdescription{beta}{B0}{Game B0.}" "\n"
+            r"\begin{tfsource}{alpha}" "\n"
+            r"\tfonly{A0}{a0} \tfonly{A1}{a1}" "\n"
+            r"\end{tfsource}" "\n"
+            r"\begin{tfsource}{beta}" "\n"
+            "b0\n"
+            r"\end{tfsource}" "\n",
+            encoding="utf-8",
+        )
+        runner = CliRunner()
+        result = runner.invoke(main, ["check", str(tex_path)])
+        assert result.exit_code == 0
+        assert "[alpha]" in result.output
+        assert "[beta]" in result.output
+        assert "valid" in result.output.lower()
+
+    def test_example_multiproof_check(self):
+        """The example-multiproof example should pass check."""
+        example = REPO_ROOT / "examples" / "example-multiproof" / "main.tex"
+        if not example.exists():
+            pytest.skip("examples/example-multiproof not found")
+        runner = CliRunner()
+        result = runner.invoke(main, ["check", str(example)])
+        assert result.exit_code == 0, result.output
+        assert "[indcpa]" in result.output
+        assert "[intctxt]" in result.output

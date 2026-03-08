@@ -185,13 +185,15 @@ Yes. Labels are arbitrary strings matching `[A-Za-z0-9_-]`. Common patterns: `G0
 Add it to the `\tfgames` list at the position where it logically sits in the proof sequence. Use `\tfreduction` and optionally `\tfrelatedgames`:
 
 ```latex
-\tfgames{
-  {G1}{\mathsf{G}_1}{First game.}
-  {Red2}{\bdv_2}{Reduction against IND-CCA security.}
-  {G2}{\mathsf{G}_2}{Second game.}
-}
-\tfreduction{Red2}
-\tfrelatedgames{Red2}{G1,G2}
+\tfgames{myproof}{G1, Red2, G2}
+\tfgamename{myproof}{G1}{\mathsf{G}_1}
+\tfgamename{myproof}{Red2}{\bdv_2}
+\tfgamename{myproof}{G2}{\mathsf{G}_2}
+\tfdescription{myproof}{G1}{First game.}
+\tfdescription{myproof}{Red2}{Reduction against IND-CCA security.}
+\tfdescription{myproof}{G2}{Second game.}
+\tfreduction{myproof}{Red2}
+\tfrelatedgames{myproof}{Red2}{G1,G2}
 ```
 
 Reductions are included in tag ranges — `G1-G2` in this example includes `Red2`.

@@ -16,6 +16,10 @@
 % Variables
 % ----------------------------------------------------------------------
 
+% Active source name (set by rendering commands)
+\tl_new:N \g__tf_current_source_tl
+
+% Active working copies of per-source data (populated by \__tf_activate_source:n)
 % Ordered sequence of game labels
 \seq_new:N \g__tf_games_seq
 
@@ -94,44 +98,77 @@
 \box_new:N \g__tf_scratch_box
 
 % ======================================================================
-% Game registration
+% Variant declarations for dynamic (c-type) variable names
 % ======================================================================
 
-% \tfgames{G0, G1, Red1, G2, G3}
-\NewDocumentCommand{\tfgames}{ m }
+\cs_generate_variant:Nn \seq_gclear_new:N { c }
+\cs_generate_variant:Nn \seq_gput_right:Nn { cn }
+\cs_generate_variant:Nn \seq_gset_eq:NN { Nc }
+\cs_generate_variant:Nn \prop_gclear_new:N { c }
+\cs_generate_variant:Nn \prop_gput:Nnn { cnn }
+\cs_generate_variant:Nn \prop_gset_eq:NN { Nc }
+\cs_generate_variant:Nn \prop_get:NnNTF { cnNTF }
+
+% ======================================================================
+% Source activation (copies per-source data into active working vars)
+% ======================================================================
+
+\cs_new_protected:Nn \__tf_activate_source:n
   {
-    \seq_gclear:N \g__tf_games_seq
-    \clist_map_inline:nn { #1 }
+    \tl_gset:Nn \g__tf_current_source_tl { #1 }
+    \seq_gset_eq:Nc \g__tf_games_seq { g__tf_source_ #1 _games_seq }
+    \prop_gset_eq:Nc \g__tf_gamename_prop { g__tf_source_ #1 _gamename_prop }
+    \prop_gset_eq:Nc \g__tf_reduction_prop { g__tf_source_ #1 _reduction_prop }
+    \prop_gset_eq:Nc \g__tf_related_prop { g__tf_source_ #1 _related_prop }
+  }
+
+% ======================================================================
+% Game registration (per-source)
+% ======================================================================
+
+% \tfgames{source}{G0, G1, Red1, G2, G3}
+\NewDocumentCommand{\tfgames}{ m m }
+  {
+    \seq_gclear_new:c { g__tf_source_ #1 _games_seq }
+    \prop_gclear_new:c { g__tf_source_ #1 _gamename_prop }
+    \prop_gclear_new:c { g__tf_source_ #1 _reduction_prop }
+    \prop_gclear_new:c { g__tf_source_ #1 _related_prop }
+    \clist_map_inline:nn { #2 }
       {
-        \seq_gput_right:Nn \g__tf_games_seq { ##1 }
+        \seq_gput_right:cn { g__tf_source_ #1 _games_seq } { ##1 }
       }
   }
 
-% \tfgamename{G0}{G_0}
-\NewDocumentCommand{\tfgamename}{ m m }
+% \tfgamename{source}{label}{name} (define) or \tfgamename{label} (lookup, active source)
+% or \tfgamename{source}{label} (lookup, explicit source)
+\NewDocumentCommand{\tfgamename}{ m g g }
   {
-    \prop_gput:Nnn \g__tf_gamename_prop { #1 } { #2 }
+    \IfNoValueTF { #2 }
+      { \__tf_gamename_use:n { #1 } } % 1 arg: lookup from active source
+      {
+        \IfNoValueTF { #3 }
+          { \__tf_gamename_source_use:nn { #1 } { #2 } } % 2 args: lookup with explicit source
+          { \prop_gput:cnn { g__tf_source_ #1 _gamename_prop } { #2 } { #3 } } % 3 args: define
+      }
   }
 
-% \tfreduction{Red1}
-\NewDocumentCommand{\tfreduction}{ m }
+% \tfreduction{source}{label}
+\NewDocumentCommand{\tfreduction}{ m m }
   {
-    \prop_gput:Nnn \g__tf_reduction_prop { #1 } { 1 }
+    \prop_gput:cnn { g__tf_source_ #1 _reduction_prop } { #2 } { 1 }
   }
 
-% \tfrelatedgames{Red1}{G0, G1}
-\NewDocumentCommand{\tfrelatedgames}{ m m }
+% \tfrelatedgames{source}{label}{games}
+\NewDocumentCommand{\tfrelatedgames}{ m m m }
   {
-    \prop_gput:Nnn \g__tf_related_prop { #1 } { #2 }
+    \prop_gput:cnn { g__tf_source_ #1 _related_prop } { #2 } { #3 }
   }
 
 % ======================================================================
-% Game name dispatch macro
+% Game name dispatch macros
 % ======================================================================
 
-% \tfgamename lookup: \tfgn{label} -> \ensuremath{latex_name}
-% We use \@nameuse-style dispatch via the prop, but for compatibility
-% with the existing pattern, define a user-level command.
+% Internal lookup using active source (1-arg form, used inside tfsource body)
 \cs_new_protected:Nn \__tf_gamename_use:n
   {
     \prop_get:NnNTF \g__tf_gamename_prop { #1 } \l_tmpa_tl
@@ -139,21 +176,12 @@
       { \textbf{??#1??} }
   }
 
-% Redefine \tfgamename for use in document body (dispatch mode).
-% In the preamble it sets names; in the body it looks them up.
-% We handle this by checking arguments: 1 arg = lookup, 2 args = define.
-% Actually, let's use separate commands to keep it clean:
-% \tfgamename{label}{name} for defining (preamble)
-% \tfgn{label} for using in text
-% But the plan says \tfgamename is used both ways. Let's make it work:
-% If called with 1 arg, look up. If called with 2 args, define.
-
-% Override the earlier definition:
-\RenewDocumentCommand{\tfgamename}{ m g }
+% Lookup with explicit source (2-arg form)
+\cs_new_protected:Nn \__tf_gamename_source_use:nn
   {
-    \IfNoValueTF { #2 }
-      { \__tf_gamename_use:n { #1 } }
-      { \prop_gput:Nnn \g__tf_gamename_prop { #1 } { #2 } }
+    \prop_get:cnNTF { g__tf_source_ #1 _gamename_prop } { #2 } \l_tmpa_tl
+      { \ensuremath{ \tl_use:N \l_tmpa_tl } }
+      { \textbf{??#1:#2??} }
   }
 
 % ======================================================================
@@ -162,9 +190,9 @@
 
 \NewDocumentCommand{\tfmacrofile}{ m }{ }
 \NewDocumentCommand{\tfpreamble}{ m }{ }
-\NewDocumentCommand{\tfcommentary}{ m m }{ }
-\NewDocumentCommand{\tfdescription}{ m m }{ }
-\NewDocumentCommand{\tffigure}{ o m m }{ }
+\NewDocumentCommand{\tfcommentary}{ m m m }{ }
+\NewDocumentCommand{\tfdescription}{ m m m }{ }
+\NewDocumentCommand{\tffigure}{ m o m m }{ }
 
 % ======================================================================
 % Tag parsing and range resolution
@@ -548,6 +576,7 @@
 % Clean rendering (no highlighting)
 \cs_new_protected:Nn \__tf_render_game_clean:nn
   {
+    \__tf_activate_source:n { #1 }
     \tl_gset:Nn \g__tf_current_game_tl { #2 }
     \int_gset:Nn \g__tf_pos_int { 0 }
     \int_gset:Nn \g__tf_mode_int { 3 } % clean mode
@@ -559,6 +588,7 @@
 % #1 = source name, #2 = current game label, #3 = diff target game label
 \cs_new_protected:Nn \__tf_render_game_highlighted:nnn
   {
+    \__tf_activate_source:n { #1 }
     % Recording pass: expand source for diff target game, record positions
     \prop_gclear:N \g__tf_recorded_prop
     \int_gset:Nn \g__tf_pos_int { 0 }
@@ -583,6 +613,7 @@
 \NewDocumentCommand{\tfrenderfigure}{ o m m }
   {
     \group_begin:
+    \__tf_activate_source:n { #2 }
     \clist_gset:Nn \g__tf_figure_games_clist { #3 }
     \int_gset:Nn \g__tf_pos_int { 0 }
     \int_gset:Nn \g__tf_mode_int { 4 } % figure mode

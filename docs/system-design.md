@@ -109,16 +109,16 @@ rendering and is parsed by `texfrog/tex_parser.py` for HTML export.
 \usepackage[package=cryptocode]{texfrog}
 
 % Game registration (order determines range resolution)
-\tfgames{G0, G1, Red1, G2}
-\tfgamename{G0}{G_0}
-\tfgamename{Red1}{\Bdversary_1}
-\tfdescription{G0}{The starting game.}
-\tfreduction{Red1}
-\tfrelatedgames{Red1}{G0, G1}
+\tfgames{myproof}{G0, G1, Red1, G2}
+\tfgamename{myproof}{G0}{G_0}
+\tfgamename{myproof}{Red1}{\Bdversary_1}
+\tfdescription{myproof}{G0}{The starting game.}
+\tfreduction{myproof}{Red1}
+\tfrelatedgames{myproof}{Red1}{G0, G1}
 
 % Metadata for Python HTML export (no-ops in LaTeX)
 \tfmacrofile{macros.tex}
-\tfcommentary{G0}{commentary/G0.tex}
+\tfcommentary{myproof}{G0}{commentary/G0.tex}
 
 % Proof source with \tfonly{tags}{content} filtering
 \begin{tfsource}{myproof}
@@ -140,6 +140,10 @@ rendering and is parsed by `texfrog/tex_parser.py` for HTML export.
 \tfrendergame{myproof}{G1}                    % clean, no highlighting
 \tfrenderfigure{myproof}{G0,G1,G2}            % consolidated figure
 ```
+
+> **Multiple proofs per document:** A single `.tex` file can define multiple independent
+> proofs by using different source names. Each proof has its own `\tfgames`, `\tfgamename`,
+> etc., all sharing the same source name, and its own `\begin{tfsource}{name}` block.
 
 **`\tfonly{tags}{content}`** — content appears only in the listed games:
 - `\tfonly{G1}{...}` — only in G1

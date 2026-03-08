@@ -6,21 +6,21 @@
 \input{macros.tex}
 
 %%% Game registration
-\tfgames{G0, G1, Red1, G2, G3}
-\tfgamename{G0}{G_0}
-\tfgamename{G1}{G_1}
-\tfgamename{Red1}{\Bdversary_1}
-\tfgamename{G2}{G_2}
-\tfgamename{G3}{G_3}
+\tfgames{indcpa}{G0, G1, Red1, G2, G3}
+\tfgamename{indcpa}{G0}{G_0}
+\tfgamename{indcpa}{G1}{G_1}
+\tfgamename{indcpa}{Red1}{\Bdversary_1}
+\tfgamename{indcpa}{G2}{G_2}
+\tfgamename{indcpa}{G3}{G_3}
 
-\tfdescription{G0}{Starting game (real IND-CPA).}
-\tfdescription{G1}{Replace PRF with truly random function.}
-\tfdescription{Red1}{Reduction to PRF security.}
-\tfdescription{G2}{Replace random function output with uniform randomness.}
-\tfdescription{G3}{Ciphertext independent of message.}
+\tfdescription{indcpa}{G0}{Starting game (real IND-CPA).}
+\tfdescription{indcpa}{G1}{Replace PRF with truly random function.}
+\tfdescription{indcpa}{Red1}{Reduction to PRF security.}
+\tfdescription{indcpa}{G2}{Replace random function output with uniform randomness.}
+\tfdescription{indcpa}{G3}{Ciphertext independent of message.}
 
-\tfreduction{Red1}
-\tfrelatedgames{Red1}{G0, G1}
+\tfreduction{indcpa}{Red1}
+\tfrelatedgames{indcpa}{Red1}{G0, G1}
 
 \tfmacrofile{macros.tex}
 
@@ -58,22 +58,22 @@
 
 \section*{IND-CPA Proof (Pure \LaTeX{} TeXFrog)}
 
-\subsection*{Game $\tfgamename{G0}$ (no highlighting --- first game)}
+\subsection*{Game $\tfgamename{indcpa}{G0}$ (no highlighting --- first game)}
 \tfrendergame{indcpa}{G0}
 
-\subsection*{Game $\tfgamename{G1}$ (with highlighting, diff against G0)}
+\subsection*{Game $\tfgamename{indcpa}{G1}$ (with highlighting, diff against G0)}
 \tfrendergame[diff=G0]{indcpa}{G1}
 
-\subsection*{Game $\tfgamename{G1}$ (clean, no highlighting)}
+\subsection*{Game $\tfgamename{indcpa}{G1}$ (clean, no highlighting)}
 \tfrendergame{indcpa}{G1}
 
-\subsection*{Game $\tfgamename{G2}$ (with highlighting, diff against G1)}
+\subsection*{Game $\tfgamename{indcpa}{G2}$ (with highlighting, diff against G1)}
 \tfrendergame[diff=G1]{indcpa}{G2}
 
-\subsection*{Reduction $\tfgamename{Red1}$ (with highlighting, diff against G1)}
+\subsection*{Reduction $\tfgamename{indcpa}{Red1}$ (with highlighting, diff against G1)}
 \tfrendergame[diff=G1]{indcpa}{Red1}
 
-\subsection*{Game $\tfgamename{G3}$ (with highlighting, diff against G2)}
+\subsection*{Game $\tfgamename{indcpa}{G3}$ (with highlighting, diff against G2)}
 \tfrendergame[diff=G2]{indcpa}{G3}
 
 \subsection*{Consolidated figure}
