@@ -178,6 +178,7 @@ All examples compile directly with `pdflatex` — no Python needed. Just place `
 | [`examples/tutorial-cryptocode-quickstart/`](https://github.com/TeXFrog/TeXFrog/tree/main/examples/tutorial-cryptocode-quickstart) | Minimal IND-CPA proof (recommended starting point) | `cryptocode` | |
 | [`examples/tutorial-cryptocode/`](https://github.com/TeXFrog/TeXFrog/tree/main/examples/tutorial-cryptocode) | Same proof with detailed walkthrough and commentary | `cryptocode` | [View demo](https://texfrog.github.io/demos/tutorial-cryptocode/) |
 | [`examples/tutorial-nicodemus/`](https://github.com/TeXFrog/TeXFrog/tree/main/examples/tutorial-nicodemus) | Same proof using `nicodemus` syntax | `nicodemus` | [View demo](https://texfrog.github.io/demos/tutorial-nicodemus/) |
+| [`examples/example-multiproof/`](https://github.com/TeXFrog/TeXFrog/tree/main/examples/example-multiproof) | Multiple proofs in one document | `cryptocode` | |
 
 Comparing the cryptocode and nicodemus tutorials shows the syntax differences between pseudocode packages.
 

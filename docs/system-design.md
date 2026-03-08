@@ -50,16 +50,26 @@ TeXFrog/
 │       └── html.py             # build_html_site() + serve_html(): per-game .tex, pdflatex → SVG → HTML site
 ├── tests/
 │   ├── test_tex_parser.py      # Tests for .tex format parsing
-│   ├── test_filter.py
-│   └── test_latex_output.py
+│   ├── test_filter.py          # Line filtering, diff, \tfchanged wrapping
+│   ├── test_latex_output.py    # LaTeX output generation
+│   ├── test_packages.py        # Package profile tests
+│   ├── test_validate.py        # Proof validation checks
+│   ├── test_html_internals.py  # HTML generation internals
+│   ├── test_html_viewer.py     # HTML viewer integration tests
+│   ├── test_check_cli.py       # texfrog check CLI tests
+│   ├── test_cli_helpers.py     # CLI helper function tests
+│   ├── test_init.py            # texfrog init scaffolding tests
+│   ├── test_integration.py     # End-to-end integration tests
+│   ├── test_watcher.py         # File watcher tests
+│   ├── test_sty_compilation.py # texfrog.sty LaTeX compilation tests
+│   └── test_deps.py            # Dependency detection tests
 ├── examples/
 │   ├── tutorial-cryptocode-quickstart/    # IND-CPA tutorial using pure LaTeX format
 │   │   ├── main.tex            # Complete document with TeXFrog commands
 │   │   └── macros.tex          # Custom macros
 │   ├── tutorial-cryptocode/    # IND-CPA tutorial (pure LaTeX format, cryptocode)
 │   ├── tutorial-nicodemus/     # IND-CPA tutorial (pure LaTeX format, nicodemus)
-│   └── example-compositekems/  # QSH IND-CCA proof (pure LaTeX format, cryptocode)
-└── CompositeKEMs/              # Reference only — NOT part of the Python package
+│   └── example-multiproof/     # Multiple proofs in a single document
 ```
 
 **Important**: `pyproject.toml` must have `[tool.setuptools.packages.find]` with
@@ -86,14 +96,15 @@ class Figure:
 
 @dataclass
 class Proof:
+    source_name: str               # Name from \begin{tfsource}{name}
     macros: list[str]              # Paths relative to the input file
     games: list[Game]              # All games/reductions in declared order
+    source_text: str               # Raw tfsource body (\tfonly format)
     commentary: dict[str, str]     # label → LaTeX text (loaded from files)
     figures: list[Figure]          # Consolidated figure specs
     package: str = "cryptocode"    # Package profile name (see packages.py)
     preamble: Optional[str] = None # Path to extra preamble .tex (relative to input dir)
     commentary_files: dict[str, str] = field(default_factory=dict)  # label → relative file path
-    source_text: str = ""          # Raw tfsource body
 ```
 
 ---
@@ -202,7 +213,7 @@ Wraps a changed line in `\tfchanged{content}`, with special handling:
 
 ---
 
-## LaTeX Output (`output/latex.py`)
+## LaTeX Output (in `output/html.py`)
 
 ### Per-game files: `{label}.tex`
 
@@ -367,7 +378,7 @@ python3 -m venv .venv
 source .venv/bin/activate   # or: .venv/bin/activate.fish for fish shell
 pip install -e ".[dev]"     # installs texfrog + pytest
 texfrog --help
-pytest tests/ -q            # 204 tests
+pytest tests/ -q            # 312 tests
 ```
 
 System requirements (not pip-installable):
@@ -391,9 +402,10 @@ Pure LaTeX format tutorials implementing the same small IND-CPA proof (4 entries
 G1, Red1, G2). `tutorial-cryptocode/` uses `package=cryptocode` (default);
 `tutorial-nicodemus/` uses `package=nicodemus`.
 
-### `examples/example-compositekems/` — QSH IND-CCA (pure LaTeX format, cryptocode)
+### `examples/example-multiproof/` — Multiple proofs in one document (pure LaTeX format, cryptocode)
 
-A larger pure LaTeX format example with 12 entries: G0–G9, Red2, Red5.
+Demonstrates defining multiple independent proofs in a single `.tex` file, each with
+its own source name, games, and `tfsource` block.
 
 ---
 

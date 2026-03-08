@@ -303,5 +303,4 @@ The repository includes worked examples you can study and run. All examples comp
 - [tutorial-cryptocode-quickstart/](../examples/tutorial-cryptocode-quickstart/) --- IND-CPA proof using the pure LaTeX format with `texfrog.sty` (recommended starting point, especially if you are not using the Python CLI)
 - [tutorial-cryptocode/](../examples/tutorial-cryptocode/) --- IND-CPA proof using `cryptocode` with a detailed walkthrough and commentary files
 - [tutorial-nicodemus/](../examples/tutorial-nicodemus/) --- same proof using `nicodemus`, showing the syntax differences
-- [example-compositekems/](../examples/example-compositekems/) --- larger QSH IND-CCA proof with 12 games/reductions
-- [example-ntor/](../examples/example-ntor/) --- ntor key exchange proof
+- [example-multiproof/](../examples/example-multiproof/) --- multiple proofs in a single document

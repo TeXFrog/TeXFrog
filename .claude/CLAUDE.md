@@ -12,7 +12,7 @@ pip install -e ".[dev]"          # if reinstall needed
 
 **Run tests:**
 ```bash
-.venv/bin/pytest tests/ -q                          # Python tests (226 tests)
+.venv/bin/pytest tests/ -q                          # Python tests (312 tests)
 cd vscode-texfrog && npm test                       # VS Code extension tests (35 tests)
 ```
 
