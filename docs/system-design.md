@@ -53,7 +53,7 @@ TeXFrog/
 │   ├── test_filter.py
 │   └── test_latex_output.py
 ├── examples/
-│   ├── tutorial-pure-latex/    # IND-CPA tutorial using pure LaTeX format
+│   ├── tutorial-cryptocode-quickstart/    # IND-CPA tutorial using pure LaTeX format
 │   │   ├── main.tex            # Complete document with TeXFrog commands
 │   │   └── macros.tex          # Custom macros
 │   ├── tutorial-cryptocode/    # IND-CPA tutorial (pure LaTeX format, cryptocode)
@@ -375,7 +375,7 @@ System requirements (not pip-installable):
 
 ## Tutorials and Example Proofs
 
-### `examples/tutorial-pure-latex/` — IND-CPA (pure LaTeX format, preferred)
+### `examples/tutorial-cryptocode-quickstart/` — IND-CPA (pure LaTeX format, preferred)
 
 Implements a small IND-CPA proof (5 entries: G0, G1, Red1, G2, G3) using the pure LaTeX
 format with `texfrog.sty`. The `.tex` file is the single source of truth — it compiles

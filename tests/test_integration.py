@@ -29,7 +29,7 @@ TEXFROG = str(Path(sys.executable).parent / "texfrog")
 
 # Tutorial directories to test (pure LaTeX .tex-based, main.tex entry point).
 _TEX_TUTORIAL_NAMES = [
-    "tutorial-pure-latex",
+    "tutorial-cryptocode-quickstart",
     "tutorial-cryptocode",
     "tutorial-nicodemus",
 ]

@@ -351,8 +351,8 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 class TestParseTexProof:
-    def test_tutorial_pure_latex(self):
-        tex_path = _PROJECT_ROOT / "examples" / "tutorial-pure-latex" / "main.tex"
+    def test_tutorial_cryptocode_quickstart(self):
+        tex_path = _PROJECT_ROOT / "examples" / "tutorial-cryptocode-quickstart" / "main.tex"
         proof = parse_tex_proof(tex_path)
         assert proof.package == "cryptocode"
         assert len(proof.games) == 5

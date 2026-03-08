@@ -19,7 +19,7 @@ import pytest
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _STY_PATH = _PROJECT_ROOT / "latex" / "texfrog.sty"
-_TUTORIAL_DIR = _PROJECT_ROOT / "examples" / "tutorial-pure-latex"
+_TUTORIAL_DIR = _PROJECT_ROOT / "examples" / "tutorial-cryptocode-quickstart"
 
 needs_pdflatex = pytest.mark.skipif(
     shutil.which("pdflatex") is None,
@@ -92,8 +92,8 @@ _CRYPTO_PREAMBLE = r"""\documentclass{article}
 
 
 @needs_pdflatex
-def test_tutorial_pure_latex_compiles(tmp_path):
-    """The tutorial-pure-latex/main.tex compiles with pdflatex."""
+def test_tutorial_cryptocode_quickstart_compiles(tmp_path):
+    """The tutorial-cryptocode-quickstart/main.tex compiles with pdflatex."""
     # Copy the entire tutorial directory so macros.tex is found.
     tutorial_copy = tmp_path / "tutorial"
     shutil.copytree(_TUTORIAL_DIR, tutorial_copy)

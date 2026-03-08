@@ -1,6 +1,6 @@
 # Writing a Proof
 
-This is the reference guide for TeXFrog's `.tex` input format. For a hands-on introduction, start with the [pure LaTeX tutorial](../examples/tutorial-pure-latex/), the [cryptocode tutorial](../examples/tutorial-cryptocode/), or the [nicodemus tutorial](../examples/tutorial-nicodemus/) instead.
+This is the reference guide for TeXFrog's `.tex` input format. For a hands-on introduction, start with the [cryptocode quickstart](../examples/tutorial-cryptocode-quickstart/), the [cryptocode tutorial](../examples/tutorial-cryptocode/), or the [nicodemus tutorial](../examples/tutorial-nicodemus/) instead.
 
 > [!TIP]
 > Run `texfrog init` to scaffold a starter proof with commented templates, then modify the generated files. Use `texfrog init --package nicodemus` for nicodemus-flavored templates.
@@ -297,7 +297,7 @@ When generating the LaTeX output, TeXFrog wraps changed lines in `\tfchanged{}` 
 
 The repository includes worked examples you can study and run. All examples compile directly with `pdflatex` (no Python needed) — just place `texfrog.sty` in the same directory.
 
-- [tutorial-pure-latex/](../examples/tutorial-pure-latex/) --- IND-CPA proof using the pure LaTeX format with `texfrog.sty` (recommended starting point, especially if you are not using the Python CLI)
+- [tutorial-cryptocode-quickstart/](../examples/tutorial-cryptocode-quickstart/) --- IND-CPA proof using the pure LaTeX format with `texfrog.sty` (recommended starting point, especially if you are not using the Python CLI)
 - [tutorial-cryptocode/](../examples/tutorial-cryptocode/) --- IND-CPA proof using `cryptocode` with a detailed walkthrough and commentary files
 - [tutorial-nicodemus/](../examples/tutorial-nicodemus/) --- same proof using `nicodemus`, showing the syntax differences
 - [example-compositekems/](../examples/example-compositekems/) --- larger QSH IND-CCA proof with 12 games/reductions

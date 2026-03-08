@@ -1,4 +1,4 @@
-# TeXFrog Tutorial (Pure LaTeX)
+# TeXFrog Tutorial (Cryptocode Quickstart)
 
 > [!NOTE]
 > **No Python required.** This tutorial uses only `texfrog.sty` and compiles directly with `pdflatex`. It is the recommended starting point for anyone who wants to try TeXFrog without installing the Python CLI.

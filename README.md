@@ -56,7 +56,7 @@ If you just want to write game-hopping proofs in LaTeX with automatic diff highl
 
 **On Overleaf:** Upload `texfrog.sty` to your project and use it like any other local package.
 
-This gives you everything needed to render individual games (`\tfrendergame`), consolidated comparison figures (`\tfrenderfigure`), and automatic change highlighting — all at compile time. See the [tutorial-pure-latex](https://github.com/TeXFrog/TeXFrog/tree/main/examples/tutorial-pure-latex) example for a complete working document.
+This gives you everything needed to render individual games (`\tfrendergame`), consolidated comparison figures (`\tfrenderfigure`), and automatic change highlighting — all at compile time. See the [tutorial-cryptocode-quickstart](https://github.com/TeXFrog/TeXFrog/tree/main/examples/tutorial-cryptocode-quickstart) example for a complete working document.
 
 ### Option 2: Full installation (Python CLI + LaTeX package)
 
@@ -98,7 +98,7 @@ After activating the virtual environment, you can `cd` to any directory on your 
 
 ### Starting from the LaTeX package only
 
-The fastest way to get started without Python is to copy the [tutorial-pure-latex](https://github.com/TeXFrog/TeXFrog/tree/main/examples/tutorial-pure-latex) example and modify it. Download `texfrog.sty`, `main.tex`, and `macros.tex`, then compile with `pdflatex`. On Overleaf, upload all three files to a new project.
+The fastest way to get started without Python is to copy the [tutorial-cryptocode-quickstart](https://github.com/TeXFrog/TeXFrog/tree/main/examples/tutorial-cryptocode-quickstart) example and modify it. Download `texfrog.sty`, `main.tex`, and `macros.tex`, then compile with `pdflatex`. On Overleaf, upload all three files to a new project.
 
 ### Starting with the Python CLI
 
@@ -175,7 +175,7 @@ All examples compile directly with `pdflatex` — no Python needed. Just place `
 
 | Directory | Description | Package | Live Demo |
 |-----------|-------------|---------|-----------|
-| [`examples/tutorial-pure-latex/`](https://github.com/TeXFrog/TeXFrog/tree/main/examples/tutorial-pure-latex) | Minimal IND-CPA proof (recommended starting point) | `cryptocode` | |
+| [`examples/tutorial-cryptocode-quickstart/`](https://github.com/TeXFrog/TeXFrog/tree/main/examples/tutorial-cryptocode-quickstart) | Minimal IND-CPA proof (recommended starting point) | `cryptocode` | |
 | [`examples/tutorial-cryptocode/`](https://github.com/TeXFrog/TeXFrog/tree/main/examples/tutorial-cryptocode) | Same proof with detailed walkthrough and commentary | `cryptocode` | [View demo](https://texfrog.github.io/demos/tutorial-cryptocode/) |
 | [`examples/tutorial-nicodemus/`](https://github.com/TeXFrog/TeXFrog/tree/main/examples/tutorial-nicodemus) | Same proof using `nicodemus` syntax | `nicodemus` | [View demo](https://texfrog.github.io/demos/tutorial-nicodemus/) |
 
