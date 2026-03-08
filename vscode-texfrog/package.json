@@ -4,6 +4,20 @@
   "description": "Highlight game-based cryptographic proofs in LaTeX",
   "version": "0.1.0",
   "publisher": "texfrog",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TeXFrog/TeXFrog"
+  },
+  "license": "Apache-2.0",
+  "homepage": "https://texfrog.github.io/",
+  "bugs": {
+    "url": "https://github.com/TeXFrog/TeXFrog/issues"
+  },
+  "keywords": [
+    "latex",
+    "cryptography",
+    "game-based proofs"
+  ],
   "engines": {
     "vscode": "^1.80.0"
   },
