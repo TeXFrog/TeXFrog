@@ -223,7 +223,7 @@ def html_build_cmd(input_file: str, output_dir: str | None, keep_tmp: bool) -> N
     default=None,
     help="Output directory (default: texfrog_html/ next to INPUT).",
 )
-@click.option("--port", default=8080, show_default=True, help="Port to listen on.")
+@click.option("--port", default=8080, show_default=True, type=click.IntRange(1024, 65535), help="Port to listen on.")
 @click.option("--no-browser", is_flag=True, default=False, help="Don't open a browser.")
 @click.option(
     "--keep-tmp",
