@@ -46,7 +46,7 @@ A minimal `.tex` file looks like this:
 
 \begin{document}
 \tfrendergame{myproof}{G0}
-\tfrendergame{myproof}{G1}
+\tfrendergame[diff=G0]{myproof}{G1}
 \tfrenderfigure{myproof}{G0,G1,G2}
 \end{document}
 ```
@@ -235,16 +235,16 @@ If you placed these in different parts of the source, they would all appear toge
 
 Use these commands in the document body to render games and figures.
 
-**`\tfrendergame{source}{label}`** renders a single game. The first game in the sequence has no diff highlighting; subsequent games automatically highlight changes relative to the previous game.
+**`\tfrendergame{source}{label}`** renders a single game without diff highlighting.
 
-**`\tfrendergame[highlight=false]{source}{label}`** renders a game without diff highlighting ("clean" version).
+**`\tfrendergame[diff=target]{source}{label}`** renders a game with changes highlighted relative to the specified target game.
 
 **`\tfrenderfigure{source}{games}`** renders a consolidated figure showing multiple games side by side.
 
 ```latex
-\tfrendergame{indcpa}{G0}                     % no highlighting (first game)
-\tfrendergame{indcpa}{G1}                     % auto-highlighted changes
-\tfrendergame[highlight=false]{indcpa}{G1}    % clean, no highlighting
+\tfrendergame{indcpa}{G0}                     % no highlighting
+\tfrendergame[diff=G0]{indcpa}{G1}            % changes from G0 highlighted
+\tfrendergame{indcpa}{G1}                     % clean, no highlighting
 \tfrenderfigure{indcpa}{G0,G1,G2,G3}          % consolidated figure
 ```
 

@@ -142,8 +142,8 @@ Procedure headers use `\tfonly*` (starred) so they appear in individual games bu
 ### Rendering
 
 ```latex
-\tfrendergame{indcpa}{G0}                    % no highlighting (first game)
-\tfrendergame{indcpa}{G1}                    % auto-highlighted changes
+\tfrendergame{indcpa}{G0}                    % no highlighting
+\tfrendergame[diff=G0]{indcpa}{G1}           % changes from G0 highlighted
 \tfrenderfigure{indcpa}{G0,G1,G2,G3,Red1}   % consolidated figure
 ```
 

@@ -65,13 +65,13 @@ CRYPTOCODE_TEX = r"""\documentclass{article}
 \tfrendergame{myproof}{G0}
 
 \subsection*{Game $\tfgamename{G1}$}
-\tfrendergame{myproof}{G1}
+\tfrendergame[diff=G0]{myproof}{G1}
 
 \subsection*{Reduction $\tfgamename{Red1}$}
-\tfrendergame{myproof}{Red1}
+\tfrendergame[diff=G1]{myproof}{Red1}
 
 \subsection*{Game $\tfgamename{G2}$}
-\tfrendergame{myproof}{G2}
+\tfrendergame[diff=G1]{myproof}{G2}
 
 \subsection*{Consolidated figure}
 \tfrenderfigure{myproof}{G0,G1,G2}
@@ -152,13 +152,13 @@ NICODEMUS_TEX = r"""\documentclass{article}
 \tfrendergame{myproof}{G0}
 
 \subsection*{Game $\tfgamename{G1}$}
-\tfrendergame{myproof}{G1}
+\tfrendergame[diff=G0]{myproof}{G1}
 
 \subsection*{Reduction $\tfgamename{Red1}$}
-\tfrendergame{myproof}{Red1}
+\tfrendergame[diff=G1]{myproof}{Red1}
 
 \subsection*{Game $\tfgamename{G2}$}
-\tfrendergame{myproof}{G2}
+\tfrendergame[diff=G1]{myproof}{G2}
 
 \subsection*{Consolidated figure}
 \tfrenderfigure{myproof}{G0,G1,G2}

@@ -61,20 +61,20 @@
 \subsection*{Game $\tfgamename{G0}$ (no highlighting --- first game)}
 \tfrendergame{indcpa}{G0}
 
-\subsection*{Game $\tfgamename{G1}$ (with highlighting)}
-\tfrendergame{indcpa}{G1}
+\subsection*{Game $\tfgamename{G1}$ (with highlighting, diff against G0)}
+\tfrendergame[diff=G0]{indcpa}{G1}
 
 \subsection*{Game $\tfgamename{G1}$ (clean, no highlighting)}
-\tfrendergame[highlight=false]{indcpa}{G1}
+\tfrendergame{indcpa}{G1}
 
-\subsection*{Game $\tfgamename{G2}$ (with highlighting)}
-\tfrendergame{indcpa}{G2}
+\subsection*{Game $\tfgamename{G2}$ (with highlighting, diff against G1)}
+\tfrendergame[diff=G1]{indcpa}{G2}
 
-\subsection*{Reduction $\tfgamename{Red1}$ (with highlighting)}
-\tfrendergame{indcpa}{Red1}
+\subsection*{Reduction $\tfgamename{Red1}$ (with highlighting, diff against G1)}
+\tfrendergame[diff=G1]{indcpa}{Red1}
 
-\subsection*{Game $\tfgamename{G3}$ (with highlighting)}
-\tfrendergame{indcpa}{G3}
+\subsection*{Game $\tfgamename{G3}$ (with highlighting, diff against G2)}
+\tfrendergame[diff=G2]{indcpa}{G3}
 
 \subsection*{Consolidated figure}
 \tfrenderfigure{indcpa}{G0,G1,G2,G3}

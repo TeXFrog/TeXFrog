@@ -134,7 +134,7 @@ We proceed via a sequence of games. Figure~\ref{fig:all-games} shows all the gam
 
 \begin{figure}[ht]
 \centering
-\tfrendergame{indcpa}{G1}
+\tfrendergame[diff=G0]{indcpa}{G1}
 \caption{Game~$\tfgamename{G1}$: Replace $\mathrm{PRF}(k, r)$ with a truly random function $\RF(r)$.}
 \label{fig:G1}
 \end{figure}
@@ -144,7 +144,7 @@ We proceed via a sequence of games. Figure~\ref{fig:all-games} shows all the gam
 
 \begin{figure}[ht]
 \centering
-\tfrendergame{indcpa}{Red1}
+\tfrendergame[diff=G1]{indcpa}{Red1}
 \caption{Reduction~$\tfgamename{Red1}$: Reduction against PRF security, simulating Games~\tfgamename{G0} and~\tfgamename{G1} via an external PRF challenger.}
 \label{fig:Red1}
 \end{figure}
@@ -154,7 +154,7 @@ We proceed via a sequence of games. Figure~\ref{fig:all-games} shows all the gam
 
 \begin{figure}[ht]
 \centering
-\tfrendergame{indcpa}{G2}
+\tfrendergame[diff=G1]{indcpa}{G2}
 \caption{Game~$\tfgamename{G2}$: Replace $\RF(r)$ with independently sampled randomness.}
 \label{fig:G2}
 \end{figure}
@@ -164,7 +164,7 @@ We proceed via a sequence of games. Figure~\ref{fig:all-games} shows all the gam
 
 \begin{figure}[ht]
 \centering
-\tfrendergame{indcpa}{G3}
+\tfrendergame[diff=G2]{indcpa}{G3}
 \caption{Game~$\tfgamename{G3}$: Ciphertext is uniformly random, independent of~$m_b$.}
 \label{fig:G3}
 \end{figure}

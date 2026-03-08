@@ -135,9 +135,9 @@ rendering and is parsed by `texfrog/tex_parser.py` for HTML export.
 \end{tfsource}
 
 % Rendering
-\tfrendergame{myproof}{G0}                    % no highlighting (first game)
-\tfrendergame{myproof}{G1}                    % auto-highlighted changes
-\tfrendergame[highlight=false]{myproof}{G1}   % clean, no highlighting
+\tfrendergame{myproof}{G0}                    % no highlighting
+\tfrendergame[diff=G0]{myproof}{G1}           % changes from G0 highlighted
+\tfrendergame{myproof}{G1}                    % clean, no highlighting
 \tfrenderfigure{myproof}{G0,G1,G2}            % consolidated figure
 ```
 

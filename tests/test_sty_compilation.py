@@ -139,7 +139,7 @@ def test_basic_two_game_proof(tmp_path):
 
 \begin{document}
 \tfrendergame{test}{G0}
-\tfrendergame{test}{G1}
+\tfrendergame[diff=G0]{test}{G1}
 \end{document}
 """
     result = _compile_tex(tmp_path, tex)
@@ -286,13 +286,13 @@ def test_renderfigure_multi_game(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# \tfrendergame[highlight=false] — clean mode
+# \tfrendergame default (no highlighting) and \tfrendergame[diff=...] (with highlighting)
 # ---------------------------------------------------------------------------
 
 
 @needs_pdflatex
-def test_rendergame_no_highlight(tmp_path):
-    r"""\tfrendergame[highlight=false] compiles without highlighting."""
+def test_rendergame_no_highlight_by_default(tmp_path):
+    r"""\tfrendergame without options compiles without highlighting."""
     tex = _CRYPTO_PREAMBLE + r"""
 \tfgames{G0, G1}
 \tfgamename{G0}{G_0}
@@ -309,7 +309,33 @@ def test_rendergame_no_highlight(tmp_path):
 \end{tfsource}
 
 \begin{document}
-\tfrendergame[highlight=false]{test}{G1}
+\tfrendergame{test}{G1}
+\end{document}
+"""
+    result = _compile_tex(tmp_path, tex)
+    _assert_compiled(tmp_path, result)
+
+
+@needs_pdflatex
+def test_rendergame_diff_explicit_target(tmp_path):
+    r"""\tfrendergame[diff=G0] compiles with highlighting against G0."""
+    tex = _CRYPTO_PREAMBLE + r"""
+\tfgames{G0, G1}
+\tfgamename{G0}{G_0}
+\tfgamename{G1}{G_1}
+
+\begin{tfsource}{test}
+\begin{pchstack}[boxed]
+  \procedure{Game}{
+    \tfonly{G0}{x \gets 0 \\}
+    \tfonly{G1}{x \gets 1 \\}
+    \pcreturn x
+  }
+\end{pchstack}
+\end{tfsource}
+
+\begin{document}
+\tfrendergame[diff=G0]{test}{G1}
 \end{document}
 """
     result = _compile_tex(tmp_path, tex)
@@ -345,8 +371,8 @@ def test_reduction_rendering(tmp_path):
 
 \begin{document}
 \tfrendergame{test}{G0}
-\tfrendergame{test}{Red}
-\tfrendergame{test}{G1}
+\tfrendergame[diff=G0]{test}{Red}
+\tfrendergame[diff=G0]{test}{G1}
 \end{document}
 """
     result = _compile_tex(tmp_path, tex)

@@ -528,20 +528,20 @@
 % \tfrendergame — render a specific game
 % ======================================================================
 
+\tl_new:N \l__tf_diff_tl
 \keys_define:nn { texfrog / rendergame }
   {
-    highlight .bool_set:N = \l__tf_highlight_bool,
-    highlight .default:n = true,
-    highlight .initial:n = true,
+    diff .tl_set:N = \l__tf_diff_tl,
+    diff .initial:n = {},
   }
 
 \NewDocumentCommand{\tfrendergame}{ O{} m m }
   {
     \group_begin:
     \keys_set:nn { texfrog / rendergame } { #1 }
-    \bool_if:NTF \l__tf_highlight_bool
-      { \__tf_render_game_highlighted:nn { #2 } { #3 } }
+    \tl_if_empty:NTF \l__tf_diff_tl
       { \__tf_render_game_clean:nn { #2 } { #3 } }
+      { \__tf_render_game_highlighted:nnn { #2 } { #3 } { \l__tf_diff_tl } }
     \group_end:
   }
 
@@ -555,76 +555,25 @@
     \int_gset:Nn \g__tf_mode_int { 0 } % back to inactive
   }
 
-% Highlighted rendering (with diff)
-\cs_new_protected:Nn \__tf_render_game_highlighted:nn
+% Highlighted rendering (with diff against explicit target)
+% #1 = source name, #2 = current game label, #3 = diff target game label
+\cs_new_protected:Nn \__tf_render_game_highlighted:nnn
   {
-    % Determine previous game
-    \tl_clear:N \l_tmpa_tl % will hold previous game label
-    \__tf_find_prev_game:nN { #2 } \l_tmpa_tl
+    % Recording pass: expand source for diff target game, record positions
+    \prop_gclear:N \g__tf_recorded_prop
+    \int_gset:Nn \g__tf_pos_int { 0 }
+    \int_gset:Nn \g__tf_mode_int { 1 } % record mode
+    \tl_gset:Nn \g__tf_current_game_tl { #3 }
+    \vbox_set:Nn \g__tf_scratch_box
+      { \tl_use:c { g__tf_source_ #1 _tl } }
+    \box_gclear:N \g__tf_scratch_box
 
-    \tl_if_empty:NTF \l_tmpa_tl
-      {
-        % No previous game — render clean (first game)
-        \__tf_render_game_clean:nn { #1 } { #2 }
-      }
-      {
-        % Recording pass: expand source for previous game, record positions
-        \prop_gclear:N \g__tf_recorded_prop
-        \int_gset:Nn \g__tf_pos_int { 0 }
-        \int_gset:Nn \g__tf_mode_int { 1 } % record mode
-        \tl_gset_eq:NN \g__tf_current_game_tl \l_tmpa_tl
-        \vbox_set:Nn \g__tf_scratch_box
-          { \tl_use:c { g__tf_source_ #1 _tl } }
-        \box_gclear:N \g__tf_scratch_box
-
-        % Render pass: expand source for current game with highlighting
-        \int_gset:Nn \g__tf_pos_int { 0 }
-        \int_gset:Nn \g__tf_mode_int { 2 } % render mode
-        \tl_gset:Nn \g__tf_current_game_tl { #2 }
-        \tl_use:c { g__tf_source_ #1 _tl }
-        \int_gset:Nn \g__tf_mode_int { 0 } % back to inactive
-      }
-  }
-
-% Find previous game for diffing.
-% For non-reductions: previous non-reduction game.
-% For reductions: immediately preceding game.
-% For first game: empty.
-\cs_new_protected:Nn \__tf_find_prev_game:nN
-  {
-    \tl_clear:N #2
-    % Find index of current game
-    \int_set:Nn \l__tf_range_start_int { -1 }
-    \__tf_find_index:nN { #1 } \l__tf_range_start_int
-    \int_compare:nNnT \l__tf_range_start_int > { 0 }
-      {
-        % Check if current game is a reduction
-        \prop_if_in:NnTF \g__tf_reduction_prop { #1 }
-          {
-            % Reduction: previous is immediately preceding game
-            \tl_set:Ne #2
-              { \seq_item:Nn \g__tf_games_seq { \l__tf_range_start_int } }
-          }
-          {
-            % Non-reduction: find previous non-reduction
-            \int_set:Nn \l__tf_range_i_int { \l__tf_range_start_int }
-            \bool_until_do:nn
-              {
-                \int_compare_p:nNn \l__tf_range_i_int < { 1 }
-              }
-              {
-                \int_decr:N \l__tf_range_i_int
-                \tl_set:Ne \l_tmpb_tl
-                  { \seq_item:Nn \g__tf_games_seq
-                    { \int_eval:n { \l__tf_range_i_int + 1 } } }
-                \prop_if_in:NnF \g__tf_reduction_prop { \l_tmpb_tl }
-                  {
-                    \tl_set_eq:NN #2 \l_tmpb_tl
-                    \int_set:Nn \l__tf_range_i_int { 0 } % break
-                  }
-              }
-          }
-      }
+    % Render pass: expand source for current game with highlighting
+    \int_gset:Nn \g__tf_pos_int { 0 }
+    \int_gset:Nn \g__tf_mode_int { 2 } % render mode
+    \tl_gset:Nn \g__tf_current_game_tl { #2 }
+    \tl_use:c { g__tf_source_ #1 _tl }
+    \int_gset:Nn \g__tf_mode_int { 0 } % back to inactive
   }
 
 % ======================================================================

@@ -198,7 +198,9 @@ Reductions are included in tag ranges — `G1-G2` in this example includes `Red2
 
 ### How do I suppress diff highlighting in the final paper?
 
-Override `\tfchanged` to be a no-op in your preamble:
+By default, `\tfrendergame{source}{label}` renders without highlighting. Highlighting only appears when you explicitly request it with `\tfrendergame[diff=target]{source}{label}`. To remove highlighting, simply omit the `diff` option.
+
+If you want to globally suppress highlighting from all `\tfrendergame[diff=...]` calls without editing each one, override `\tfchanged` to be a no-op in your preamble:
 
 ```latex
 \renewcommand{\tfchanged}[1]{#1}
