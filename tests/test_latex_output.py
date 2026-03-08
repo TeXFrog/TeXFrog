@@ -6,9 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from texfrog.filter import compute_changed_lines, filter_for_game
-from texfrog.model import Game, Proof, SourceLine
+from texfrog.filter import compute_changed_lines
+from texfrog.model import Game, Proof
 from texfrog.output.html import _expand_tfgamename, _write_game_file
+from texfrog.tex_parser import filter_for_game_from_text
 
 
 def make_proof() -> Proof:
@@ -18,14 +19,14 @@ def make_proof() -> Proof:
         Game(label="G1", latex_name="G_1", description="Modified game."),
         Game(label="G2", latex_name="G_2", description="Final game."),
     ]
-    source_lines = [
-        SourceLine(r"\begin{procedure}", None, r"\begin{procedure}"),
-        SourceLine(r"    common \\", None, r"    common \\"),
-        SourceLine(r"    only_g0 \\", frozenset({"G0"}), r"    only_g0 \\ %:tags: G0"),
-        SourceLine(r"    only_g1 \\", frozenset({"G1", "G2"}), r"    only_g1 \\ %:tags: G1,G2"),
-        SourceLine(r"    \pcreturn \adv", None, r"    \pcreturn \adv"),
-        SourceLine(r"\end{procedure}", None, r"\end{procedure}"),
-    ]
+    source_text = (
+        r"\begin{procedure}" "\n"
+        r"    common \\" "\n"
+        r"\tfonly{G0}{    only_g0 \\}" "\n"
+        r"\tfonly{G1,G2}{    only_g1 \\}" "\n"
+        r"    \pcreturn \adv" "\n"
+        r"\end{procedure}"
+    )
     commentary = {
         "G0": "This is the G0 commentary.\n",
         "G1": r"\begin{claim}G0 and G1 are equiv.\end{claim}" + "\n",
@@ -33,10 +34,16 @@ def make_proof() -> Proof:
     return Proof(
         macros=["macros.tex"],
         games=games,
-        source_lines=source_lines,
+        source_text=source_text,
         commentary=commentary,
         figures=[],
     )
+
+
+def _filter_game(proof: Proof, label: str) -> list[str]:
+    """Filter source text for a game label."""
+    ordered_labels = [g.label for g in proof.games]
+    return filter_for_game_from_text(proof.source_text, label, ordered_labels)
 
 
 def _write_all_game_files(proof: Proof, output_dir: Path) -> None:
@@ -49,7 +56,9 @@ def _write_all_game_files(proof: Proof, output_dir: Path) -> None:
 
     for i, game in enumerate(proof.games):
         label = game.label
-        current = filter_for_game(proof.source_lines, label)
+        current = filter_for_game_from_text(
+            proof.source_text, label, ordered_labels,
+        )
 
         if i == 0:
             changed: set[int] = set()
@@ -66,8 +75,12 @@ def _write_all_game_files(proof: Proof, output_dir: Path) -> None:
                 changed = set()
             else:
                 changed = compute_changed_lines(
-                    filter_for_game(proof.source_lines, prev_label),
-                    filter_for_game(proof.source_lines, label),
+                    filter_for_game_from_text(
+                        proof.source_text, prev_label, ordered_labels,
+                    ),
+                    filter_for_game_from_text(
+                        proof.source_text, label, ordered_labels,
+                    ),
                 )
 
         _write_game_file(
@@ -151,14 +164,13 @@ def test_game_after_reduction_diffs_against_previous_game(tmp_path):
         Game(label="Red", latex_name="Red", description="", reduction=True),
         Game(label="G1", latex_name="G_1", description=""),
     ]
-    source_lines = [
-        SourceLine(r"    common \\", None, ""),
-        # same_line appears identically in G0 and G1 but NOT in Red
-        SourceLine(r"    same_line \\", frozenset({"G0", "G1"}), ""),
-        SourceLine(r"    red_line \\", frozenset({"Red"}), ""),
-    ]
+    source_text = (
+        r"    common \\" "\n"
+        r"\tfonly{G0,G1}{    same_line \\}" "\n"
+        r"\tfonly{Red}{    red_line \\}"
+    )
     proof = Proof(
-        macros=[], games=games, source_lines=source_lines,
+        macros=[], games=games, source_text=source_text,
         commentary={}, figures=[],
     )
     _write_all_game_files(proof, tmp_path)
@@ -178,13 +190,13 @@ def test_reduction_diffs_against_immediately_preceding(tmp_path):
         Game(label="G0", latex_name="G_0", description=""),
         Game(label="Red", latex_name="Red", description="", reduction=True),
     ]
-    source_lines = [
-        SourceLine(r"    common \\", None, ""),
-        SourceLine(r"    g0_only \\", frozenset({"G0"}), ""),
-        SourceLine(r"    red_only \\", frozenset({"Red"}), ""),
-    ]
+    source_text = (
+        r"    common \\" "\n"
+        r"\tfonly{G0}{    g0_only \\}" "\n"
+        r"\tfonly{Red}{    red_only \\}"
+    )
     proof = Proof(
-        macros=[], games=games, source_lines=source_lines,
+        macros=[], games=games, source_text=source_text,
         commentary={}, figures=[],
     )
     _write_all_game_files(proof, tmp_path)
@@ -206,16 +218,16 @@ def test_nicodemus_game_item_prefix_outside_tfchanged(tmp_path):
         Game(label="G0", latex_name="G_0", description=""),
         Game(label="G1", latex_name="G_1", description=""),
     ]
-    source_lines = [
-        SourceLine(r"		\begin{nicodemus}", None, ""),
-        SourceLine(r"			\item common line", None, ""),
-        SourceLine(r"			\item $x\getsr\Zp$", frozenset({"G0"}), ""),
-        SourceLine(r"			\item $x\gets\Ogen$", frozenset({"G1"}), ""),
-        SourceLine(r"			\item Return $x$", None, ""),
-        SourceLine(r"		\end{nicodemus}%", None, ""),
-    ]
+    source_text = (
+        "\t\t\\begin{nicodemus}\n"
+        "\t\t\t\\item common line\n"
+        r"\tfonly{G0}{			\item $x\getsr\Zp$}" "\n"
+        r"\tfonly{G1}{			\item $x\gets\Ogen$}" "\n"
+        "\t\t\t\\item Return $x$\n"
+        "\t\t\\end{nicodemus}%"
+    )
     proof = Proof(
-        macros=[], games=games, source_lines=source_lines,
+        macros=[], games=games, source_text=source_text,
         commentary={}, figures=[], package="nicodemus",
     )
     _write_all_game_files(proof, tmp_path)

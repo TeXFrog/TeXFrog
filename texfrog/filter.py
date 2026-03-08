@@ -5,8 +5,6 @@ from __future__ import annotations
 import difflib
 import re
 
-from .model import SourceLine
-
 # Matches a trailing \\ possibly followed by whitespace at end of a line.
 _TRAILING_BACKSLASH_BS = re.compile(r"\\\\(\s*)$")
 
@@ -45,32 +43,6 @@ def _strip_trailing_newline_sep(lines: list[str]) -> list[str]:
                 result[i] = stripped[: m.start()]
             break
     return result
-
-
-def filter_for_game(source_lines: list[SourceLine], label: str) -> list[str]:
-    """Return the filtered list of content lines for the given game label.
-
-    A line is included if:
-    * Its ``tags`` field is ``None`` (untagged — appears in all games), OR
-    * The given ``label`` is in its ``tags`` set.
-
-    The ``%:tags:`` comment has already been stripped from ``SourceLine.content``
-    by the parser.  This function returns those content strings, with the
-    trailing ``\\`` removed from the last non-empty included line (see
-    :func:`_strip_trailing_newline_sep`).
-
-    Args:
-        source_lines: All lines from the combined source file.
-        label: The game/reduction label to filter for.
-
-    Returns:
-        List of content strings for the game, ready to be written to a file.
-    """
-    included: list[str] = []
-    for sl in source_lines:
-        if sl.tags is None or label in sl.tags:
-            included.append(sl.content)
-    return _strip_trailing_newline_sep(included)
 
 
 def compute_removed_lines(prev_lines: list[str], curr_lines: list[str]) -> set[int]:

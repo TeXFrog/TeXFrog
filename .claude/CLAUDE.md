@@ -12,19 +12,14 @@ pip install -e ".[dev]"          # if reinstall needed
 
 **Run tests:**
 ```bash
-.venv/bin/pytest tests/ -q       # 269 tests, should all pass
+.venv/bin/pytest tests/ -q       # 204 tests, should all pass
 ```
 
 **Try the tool:**
 ```bash
-# Pure LaTeX input (.tex with TeXFrog commands — preferred)
 .venv/bin/texfrog check examples/tutorial-pure-latex/main.tex
 .venv/bin/texfrog html build examples/tutorial-pure-latex/main.tex -o /tmp/tfhtml
 .venv/bin/texfrog html serve --live-reload examples/tutorial-pure-latex/main.tex -o /tmp/tfhtml
-
-# YAML input (backward compatible)
-.venv/bin/texfrog check examples/tutorial-cryptocode/proof.yaml
-.venv/bin/texfrog html build examples/tutorial-cryptocode/proof.yaml -o /tmp/tfhtml
 
 # Scaffold a new proof
 .venv/bin/texfrog init /tmp/tfinit                        # cryptocode (default)
@@ -33,9 +28,8 @@ pip install -e ".[dev]"          # if reinstall needed
 
 System requirements (not pip): `pdflatex`, `pdftocairo` (or `pdf2svg`), `pdfcrop`.
 
-## Input Formats
+## Input Format
 
-### Pure LaTeX (.tex) — Preferred
 The `.tex` file is the single source of truth. It uses the `texfrog.sty` LaTeX package
 for compilation and is parsed by `texfrog/tex_parser.py` for HTML export.
 
@@ -47,16 +41,11 @@ Key commands: `\tfgames`, `\tfgamename`, `\tfdescription`, `\tfreduction`,
 
 Package option: `\usepackage[package=cryptocode]{texfrog}` or `package=nicodemus`.
 
-### YAML (.yaml) — Legacy
-Still supported for backward compatibility. Uses `%:tags:` comment syntax in
-separate source files. Parsed by `texfrog/parser.py`.
-
 ## Key Conventions
 
 - **Package profiles**: `\usepackage[package=cryptocode]{texfrog}` (default) or `nicodemus`.
   Profiles are defined in `texfrog/packages.py`.
-- **Tag syntax**: `\tfonly{G1,G3-G5}{content}` in .tex format;
-  `%:tags: G1,G3-G5` at end of line in YAML format. Ranges resolved by position
+- **Tag syntax**: `\tfonly{G1,G3-G5}{content}`. Ranges resolved by position
   in the games list, not alphabetically.
 - **`\tfchanged` wrapping skips**: lines ending with `{` (procedure headers) and
   pure comment lines (starting with `%`). For nicodemus, `\item` prefix is kept

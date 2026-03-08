@@ -36,88 +36,63 @@ G0 to G1 is by PRF security (via Red1). G1 to G2 is by a birthday bound on nonce
 
 | File | Purpose |
 |------|---------|
-| `proof.yaml` | Declares the games, commentary, and figure specs |
-| `games_source.tex` | Combined LaTeX source with `%:tags:` annotations |
+| `main.tex` | Single source file: declares games, contains pseudocode with `\tfonly` tags, and renders output |
 | `macros.tex` | Short macro definitions (no external dependencies) |
 | `commentary/*.tex` | Per-game commentary files (LaTeX) |
 
 ---
 
-## Step 1 — The YAML Configuration (`proof.yaml`)
+## Step 1 — The Source File (`main.tex`)
 
-### `macros` and `source`
+The `.tex` file is the single source of truth. It compiles directly with `pdflatex` (using `texfrog.sty`) and is also parsed by the Python CLI tool for HTML export.
 
-```yaml
-macros:
-  - macros.tex
+### Package and game registration
 
-source: games_source.tex
+```latex
+\usepackage[package=cryptocode]{texfrog}
+
+\tfgames{G0, G1, Red1, G2, G3}
+\tfgamename{G0}{G_0}
+\tfgamename{Red1}{\Bdversary_1}
+\tfdescription{G0}{The IND-CPA game. The LR oracle encrypts using the actual PRF.}
+\tfreduction{Red1}
+\tfrelatedgames{Red1}{G0, G1}
 ```
 
-`macros` lists LaTeX files that define your proof-specific commands; `source` points to the combined pseudocode file. Both paths are relative to the YAML file.
+`\tfgames` declares the ordered list of all games and reductions. The order matters for diffing and range resolution. `\tfgamename` sets the display name (math-mode content without `$` delimiters). `\tfreduction` marks an entry as a reduction.
 
-### `games`
+### Metadata for HTML export
 
-```yaml
-games:
-  - label: G0
-    latex_name: 'G_0'
-    description: '...'
-
-  - label: Red1
-    latex_name: '\Bdversary_1'
-    description: '...'
-    reduction: true
-
-  - label: G1
-    latex_name: 'G_1'
-    description: '...'
-
-  - label: G2
-    latex_name: 'G_2'
-    description: '...'
-
-  - label: G3
-    latex_name: 'G_3'
-    description: '...'
+```latex
+\tfmacrofile{macros.tex}
+\tfcommentary{G0}{commentary/G0.tex}
 ```
 
-Each game has a `label` (used in `%:tags:` and as the output filename), a `latex_name` (math-mode content without `$` delimiters), and a `description`. The optional `reduction: true` flag marks an entry as a reduction, which affects how it is displayed in the HTML viewer.
+`\tfmacrofile` declares files needed in the HTML build. `\tfcommentary` associates per-game commentary.
 
-The order of the game list matters:
+### The proof source
 
-1. **Diffing.** TeXFrog highlights lines that differ between each game and the one before it. Red1 is diffed against G0, G1 against Red1, G2 against G1, G3 against G2.
-2. **Range resolution.** Tags like `G0-G2` mean "from G0 to G2 by position in this list" — so `G0-G2` covers G0, Red1, G1, G2 (positions 0–3).
-
-### `commentary`
-
-```yaml
-commentary:
-  G0: commentary/G0.tex
-  G1: commentary/G1.tex
-  Red1: commentary/Red1.tex
-  G2: commentary/G2.tex
-  G3: commentary/G3.tex
+```latex
+\begin{tfsource}{indcpa}
+\begin{pcvstack}[boxed]
+  \procedure[linenumbering]{%
+    \tfonly*{G0}{Game $\tfgamename{G0}$}%
+    \tfonly*{G1}{Game $\tfgamename{G1}$}%
+    ...
+  }{
+    \tfonly{G0,G1-G3}{k \getsr \{0,1\}^\lambda \\}
+    ...
+    \tfonly{G0}{y \gets \mathrm{PRF}(k, r) \\}
+    \tfonly{G1}{y \gets \RF(r) \\}
+    \tfonly{G2}{y \getsr \{0,1\}^\lambda \\}
+    \tfonly{Red1}{y \gets \OPRF(r) \\}
+    ...
+  }
+\end{pcvstack}
+\end{tfsource}
 ```
 
-Each entry maps a game label to a `.tex` file containing raw LaTeX commentary. These are written to `{label}_commentary.tex` in the output and included by the harness after the game pseudocode.
-
-### `figures`
-
-```yaml
-figures:
-  - label: all_games
-    games: "G0,G1,G2,G3,Red1"
-    procedure_name: "Games $\\tfgamename{G0}$--$\\tfgamename{G3}$, Reduction $\\tfgamename{Red1}$"
-```
-
-This produces `fig_all_games.tex`: a consolidated block showing all five games, with game-specific lines annotated by `\tfgamelabel`. The optional `procedure_name` overrides the title of the first procedure header.
-
----
-
-## Step 2 — The Combined Source (`games_source.tex`)
-
-All pseudocode for all games lives in this one file. TeXFrog filters it per game.
+All pseudocode lives in a single `tfsource` environment. Lines not wrapped in `\tfonly` appear in every game. Lines inside `\tfonly{tags}{content}` appear only in the listed games.
 
 ### Lines with no tag appear in every game
 
@@ -132,7 +107,7 @@ These lines are identical across G0, G1, G2, G3, and Red1.
 ### Lines with a tag appear only in named games
 
 ```latex
-k \getsr \{0,1\}^\lambda \\ %:tags: G0,G1-G3
+\tfonly{G0,G1-G3}{k \getsr \{0,1\}^\lambda \\}
 ```
 
 The tag `G0,G1-G3` includes G0 (position 0) plus positions from G1 to G3 (positions 2–4): G1, G2, G3. Red1 (position 1) does not get this line.
@@ -144,38 +119,46 @@ The tag `G0,G1-G3` includes G0 (position 0) plus positions from G1 to G3 (positi
 The `y` computation is a four-way slot:
 
 ```latex
-y \gets \mathrm{PRF}(k, r) \\ %:tags: G0
-y \gets \RF(r) \\              %:tags: G1
-y \getsr \{0,1\}^\lambda \\    %:tags: G2
-y \gets \OPRF(r) \\            %:tags: Red1
+\tfonly{G0}{y \gets \mathrm{PRF}(k, r) \\}
+\tfonly{G1}{y \gets \RF(r) \\}
+\tfonly{G2}{y \getsr \{0,1\}^\lambda \\}
+\tfonly{Red1}{y \gets \OPRF(r) \\}
 ```
 
 For each game, at most one of these lines survives filtering. They are consecutive, so the chosen line always appears at the right position.
 
 ### Procedure headers
 
-Here is how TeXFrog expects procedure headers to be typeset when using cryptocode:
+Procedure headers use `\tfonly*` (starred) so they appear in individual games but are suppressed in consolidated figures:
 
 ```latex
-\procedure[linenumbering]{\tfgamename{G0}}{ %:tags: G0
-\procedure[linenumbering]{\tfgamename{G1}}{ %:tags: G1
-\procedure[linenumbering]{\tfgamename{G2}}{ %:tags: G2
-\procedure[linenumbering]{\tfgamename{G3}}{ %:tags: G3
-\procedure[linenumbering]{\tfgamename{Red1}}{ %:tags: Red1
+\procedure[linenumbering]{%
+  \tfonly*{G0}{Game $\tfgamename{G0}$}%
+  \tfonly*{G1}{Game $\tfgamename{G1}$}%
+  \tffigonly{Games $\tfgamename{G0}$--$\tfgamename{G3}$}%
+}{...}
+```
+
+### Rendering
+
+```latex
+\tfrendergame{indcpa}{G0}                    % no highlighting (first game)
+\tfrendergame{indcpa}{G1}                    % auto-highlighted changes
+\tfrenderfigure{indcpa}{G0,G1,G2,G3,Red1}   % consolidated figure
 ```
 
 ---
 
-## Step 3 — Running the Tutorial
+## Step 2 — Running the Tutorial
 
 From the repo root:
 
 ```bash
 # Build an interactive HTML viewer
-texfrog html build examples/tutorial-cryptocode/proof.yaml -o /tmp/tf_tutorial_html
+texfrog html build examples/tutorial-cryptocode/main.tex -o /tmp/tf_tutorial_html
 
 # Or build and open in your browser with live reload
-texfrog html serve examples/tutorial-cryptocode/proof.yaml --live-reload
+texfrog html serve examples/tutorial-cryptocode/main.tex --live-reload
 ```
 
 ---
@@ -185,17 +168,17 @@ texfrog html serve examples/tutorial-cryptocode/proof.yaml --live-reload
 | Concept | Where demonstrated |
 |---------|-------------------|
 | Untagged lines appear in every game | `b`, `b'`, `\pcreturn` lines |
-| Single-game tag | `%:tags: G0`, `%:tags: G3` |
-| Comma-separated tag list | `%:tags: G0,G1-G3` |
-| Range tag | `%:tags: G0-G2` (positions 0–3, covers G0, Red1, G1, G2) |
+| Single-game tag | `\tfonly{G0}{...}`, `\tfonly{G3}{...}` |
+| Comma-separated tag list | `\tfonly{G0,G1-G3}{...}` |
+| Range tag | `G0-G2` (positions 0–3, covers G0, Red1, G1, G2) |
 | Consecutive variant slot | The four `y` lines; the two `c` lines |
 | Changed-line highlighting | `y` highlighted in G1; `c` highlighted in G3 |
-| Consolidated figure | `fig_all_games.tex` annotates game-specific lines |
+| Consolidated figure | `\tfrenderfigure` annotates game-specific lines |
 | `\tfgamename` | Commentary uses `\tfgamename{G0}` to reference game names |
 
 ---
 
 ## Next Steps
 
-- [Writing a proof](../../docs/writing-proofs.md) — full reference for `proof.yaml` and source file syntax
+- [Writing a proof](../../docs/writing-proofs.md) — full reference for the `.tex` input format
 - [tutorial-nicodemus/](../tutorial-nicodemus/) — the same proof using the `nicodemus` package

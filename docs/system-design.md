@@ -20,7 +20,7 @@ It has two components:
    MathJax rendering, and live-reload.
 
 The `.tex` file is the **single source of truth** for both LaTeX compilation and HTML
-export. A legacy YAML input format is also supported for backward compatibility.
+export.
 
 The tool supports multiple LaTeX pseudocode packages via a **package profile** system.
 Currently supported: `cryptocode` (default) and `nicodemus`. Each profile captures
@@ -37,9 +37,8 @@ TeXFrog/
 │   └── texfrog.sty             # Pure LaTeX3 package for compile-time game rendering
 ├── texfrog/
 │   ├── __init__.py
-│   ├── model.py                # Dataclasses: Proof, Game, SourceLine, Figure
-│   ├── tex_parser.py           # Parse .tex files with TeXFrog commands (preferred)
-│   ├── parser.py               # YAML + tagged .tex parsing (legacy), range resolution
+│   ├── model.py                # Dataclasses: Proof, Game, Figure
+│   ├── tex_parser.py           # Parse .tex files with TeXFrog commands
 │   ├── filter.py               # Line filtering, diff, \tfchanged wrapping
 │   ├── packages.py             # PackageProfile dataclass + built-in profiles
 │   ├── validate.py             # Proof validation checks
@@ -50,19 +49,16 @@ TeXFrog/
 │       ├── __init__.py
 │       └── html.py             # build_html_site() + serve_html(): per-game .tex, pdflatex → SVG → HTML site
 ├── tests/
-│   ├── fixtures/simple/        # Minimal cryptocode YAML + source.tex for fast unit tests
-│   ├── fixtures/nicodemus/     # Minimal nicodemus YAML + source.tex for package tests
 │   ├── test_tex_parser.py      # Tests for .tex format parsing
-│   ├── test_parser.py          # Tests for YAML format parsing
 │   ├── test_filter.py
 │   └── test_latex_output.py
 ├── examples/
-│   ├── tutorial-pure-latex/    # IND-CPA tutorial using pure LaTeX format (preferred)
+│   ├── tutorial-pure-latex/    # IND-CPA tutorial using pure LaTeX format
 │   │   ├── main.tex            # Complete document with TeXFrog commands
 │   │   └── macros.tex          # Custom macros
-│   ├── tutorial-cryptocode/    # IND-CPA tutorial (YAML format, cryptocode)
-│   ├── tutorial-nicodemus/     # IND-CPA tutorial (YAML format, nicodemus)
-│   └── example-compositekems/  # QSH IND-CCA proof (YAML format, cryptocode)
+│   ├── tutorial-cryptocode/    # IND-CPA tutorial (pure LaTeX format, cryptocode)
+│   ├── tutorial-nicodemus/     # IND-CPA tutorial (pure LaTeX format, nicodemus)
+│   └── example-compositekems/  # QSH IND-CCA proof (pure LaTeX format, cryptocode)
 └── CompositeKEMs/              # Reference only — NOT part of the Python package
 ```
 
@@ -83,12 +79,6 @@ class Game:
     related_games: list[str] = field(default_factory=list)  # 0–2 game labels shown alongside this reduction
 
 @dataclass
-class SourceLine:
-    content: str                   # Line with %:tags: comment stripped
-    tags: Optional[frozenset[str]] # None = all games; set = only these labels
-    original: str                  # Raw original line (for debugging)
-
-@dataclass
 class Figure:
     label: str        # e.g. "start_end" → output file fig_start_end.tex
     games: list[str]  # Ordered game labels to include (ordered per proof.games)
@@ -98,13 +88,12 @@ class Figure:
 class Proof:
     macros: list[str]              # Paths relative to the input file
     games: list[Game]              # All games/reductions in declared order
-    source_lines: list[SourceLine] # All lines from combined source (YAML format)
     commentary: dict[str, str]     # label → LaTeX text (loaded from files)
     figures: list[Figure]          # Consolidated figure specs
     package: str = "cryptocode"    # Package profile name (see packages.py)
     preamble: Optional[str] = None # Path to extra preamble .tex (relative to input dir)
     commentary_files: dict[str, str] = field(default_factory=dict)  # label → relative file path
-    source_text: Optional[str] = None  # Raw tfsource body (.tex format; None for YAML)
+    source_text: str = ""          # Raw tfsource body
 ```
 
 ---
@@ -173,79 +162,11 @@ Typical pattern for procedure headers:
 }{...}
 ```
 
-### YAML Format (Legacy)
-
-### `proof.yaml`
-
-```yaml
-package: cryptocode            # or "nicodemus" (default: "cryptocode")
-
-macros:
-  - macros.tex                 # relative to this yaml file
-  - nicodemus.sty              # .sty files are copied but not \input'd
-
-preamble: preamble.tex         # optional: extra \usepackage lines for HTML build
-
-source: games_source.tex       # relative to this yaml file
-
-games:
-  - label: G0
-    latex_name: '\indcca_\QSH^\adv.\REAL()'
-    description: 'The starting game (real IND-CCA game).'
-  - label: G1
-    latex_name: 'G_1'
-    description: 'Replace $\key_2$ with a fresh $\key_2^*$.'
-  - label: Red2
-    latex_name: '\bdv_2'
-    description: 'Reduction against $\indcca$ security of $\KEM_2$.'
-    reduction: true
-    related_games: [G0, G1]      # show clean G0 and G1 alongside in HTML viewer
-  # ... more games ...
-
-commentary:                    # optional; values are file paths relative to this yaml file
-  G0: commentary/G0.tex
-  G1: commentary/G1.tex
-
-figures:                       # optional
-  - label: start_end
-    games: "G0,G9"
-    procedure_name: "Games $G_0$--$G_9$"   # custom title for first procedure header
-  - label: game2_reduction
-    games: "G1-Red2"           # range: all games from G1 to Red2 inclusive
-```
-
-### `games_source.tex` — Tag Syntax
-
-```latex
-% Lines with no %:tags: comment appear in EVERY game/reduction:
-(\pk_1, \sk_1) \getsr \KEM_1.\keygen() \\
-
-% Lines tagged for specific games only:
-(\ct_1^*, \key_1) \getsr \KEM_1.\encaps(\pk_1) \\   %:tags: G0-G3,Red2
-(\ct_1^*, \key_1^*) \getsr \KEM_1.\encaps(\pk_1) \\ %:tags: G4,G5,Red5
-(\ct_1^*, \_\_) \getsr \KEM_1.\encaps(\pk_1) \\      %:tags: G6-G9
-```
-
-**Tag semantics:**
-- `%:tags: G1` — only in G1
-- `%:tags: G0,G3-G5` — in G0, G3, G4, G5
-- `%:tags: G0-G9` — in every label from G0 to G9 *by position in the games list*
-- No `%:tags:` → in all games
-
-**Range resolution** is **positional**, not alphabetical or numerical. The game list
-order in the YAML determines what "G0-G5" means. This allows labels like "Red2" to sit
-between G1 and G3 in the sequence without breaking range syntax.
-
-**CRITICAL source ordering constraint**: Variant lines for the same "slot" (e.g.,
-alternative encaps lines for different games) MUST be consecutive in the source file.
-The tool filters but does NOT reorder. Put all G0-only, then G1-only, then shared
-versions of the same logical line in sequence.
-
 ---
 
 ## Core Algorithms
 
-### 1. Tag Range Resolution (`parser.py: resolve_tag_ranges`)
+### 1. Tag Range Resolution (`tex_parser.py: resolve_tag_ranges`)
 
 Given `ordered_labels = ["G0","G1","G2","Red2","G3",...]` and `"G0,G3-G5"`:
 - Split on `,`
@@ -253,21 +174,7 @@ Given `ordered_labels = ["G0","G1","G2","Red2","G3",...]` and `"G0,G3-G5"`:
 - Resolve range to all labels between start and end (inclusive) by position
 - Unknown single labels are kept verbatim (silently ignored at filter time)
 
-### 2. Line Filtering (`filter.py: filter_for_game`)
-
-```python
-def filter_for_game(source_lines, label):
-    included = [sl.content for sl in source_lines
-                if sl.tags is None or label in sl.tags]
-    return _strip_trailing_newline_sep(included)
-```
-
-After filtering, the last non-empty line may end with `\\` (cryptocode line separator
-that's only needed between lines, not after the last one). `_strip_trailing_newline_sep`
-removes trailing `\\` from the last non-empty line. This is a no-op for packages that
-don't use `\\` (algorithmicx etc.).
-
-### 3. Diff Computation (`filter.py: compute_changed_lines`)
+### 2. Diff Computation (`filter.py: compute_changed_lines`)
 
 Uses `difflib.SequenceMatcher` to align the previous game's filtered lines with the
 current game's filtered lines. Returns a `set[int]` of 0-based indices into the
@@ -275,7 +182,7 @@ current lines that are insertions or replacements (not in the previous game).
 
 The first game (index 0) always gets an empty changed set.
 
-### 4. Change Highlighting (`filter.py: wrap_changed_line`)
+### 3. Change Highlighting (`filter.py: wrap_changed_line`)
 
 Wraps a changed line in `\tfchanged{content}`, with special handling:
 
@@ -303,7 +210,7 @@ environments like cryptocode's `pcvstack`.
 ### Commentary files: `{label}_commentary.tex`
 
 Generated only if commentary text is non-empty. Contains the content loaded from the
-corresponding commentary file (e.g., `commentary/G0.tex` as specified in proof.yaml).
+corresponding commentary file (e.g., `commentary/G0.tex` as specified in the proof `.tex` file).
 
 ---
 
@@ -392,13 +299,12 @@ Reductions support a `related_games` field listing zero, one, or two game labels
 ### Live Reload (`watcher.py` + `output/html.py`)
 
 When `--live-reload` is passed to `html serve`, the tool watches the proof's source
-files (input .tex or YAML, macros, preamble, commentary files) using `watchdog`
+files (input `.tex`, macros, preamble, commentary files) using `watchdog`
 and automatically rebuilds + reloads the browser on changes.
 
 **File watching** (`watcher.py`):
 - `collect_watched_files(input_path)` discovers files to watch. For `.tex` input, it
   scans for `\tfmacrofile`, `\tfpreamble`, `\tfcommentary`, and `\input` commands.
-  For YAML input, it reads the YAML with `yaml.safe_load`.
 - `_DebouncedHandler` ignores events for files not in the watched set and debounces
   rapid changes (0.5 s quiet period) before triggering a rebuild.
 - `safe_rebuild()` builds into a staging temp dir (created in `output_dir.parent` to
@@ -433,8 +339,7 @@ texfrog html build INPUT [-o DIR] [--keep-tmp]
 texfrog html serve INPUT [-o DIR] [--port 8080] [--no-browser] [--live-reload]
 ```
 
-INPUT can be a `.tex` file with TeXFrog commands (preferred), a `.yaml` file (legacy),
-or a directory containing `proof.tex` (or `proof.yaml` as fallback).
+INPUT can be a `.tex` file with TeXFrog commands or a directory containing `proof.tex`.
 
 ### `texfrog init`
 
@@ -458,7 +363,7 @@ python3 -m venv .venv
 source .venv/bin/activate   # or: .venv/bin/activate.fish for fish shell
 pip install -e ".[dev]"     # installs texfrog + pytest
 texfrog --help
-pytest tests/ -q            # 269 tests
+pytest tests/ -q            # 204 tests
 ```
 
 System requirements (not pip-installable):
@@ -476,15 +381,15 @@ Implements a small IND-CPA proof (5 entries: G0, G1, Red1, G2, G3) using the pur
 format with `texfrog.sty`. The `.tex` file is the single source of truth — it compiles
 directly with `pdflatex` and can also be used with `texfrog html build` for the HTML viewer.
 
-### `examples/tutorial-cryptocode/` and `examples/tutorial-nicodemus/` — IND-CPA (YAML format)
+### `examples/tutorial-cryptocode/` and `examples/tutorial-nicodemus/` — IND-CPA (pure LaTeX format)
 
-Legacy YAML-format tutorials implementing the same small IND-CPA proof (4 entries: G0,
-G1, Red1, G2). `tutorial-cryptocode/` uses `package: cryptocode` (default);
-`tutorial-nicodemus/` uses `package: nicodemus`.
+Pure LaTeX format tutorials implementing the same small IND-CPA proof (4 entries: G0,
+G1, Red1, G2). `tutorial-cryptocode/` uses `package=cryptocode` (default);
+`tutorial-nicodemus/` uses `package=nicodemus`.
 
-### `examples/example-compositekems/` — QSH IND-CCA (YAML format, cryptocode)
+### `examples/example-compositekems/` — QSH IND-CCA (pure LaTeX format, cryptocode)
 
-A larger YAML-format example with 12 entries: G0–G9, Red2, Red5.
+A larger pure LaTeX format example with 12 entries: G0–G9, Red2, Red5.
 
 ---
 
@@ -508,6 +413,3 @@ the build directory without renaming (so `\usepackage` can find them) and are NO
 ---
 
 ## Known Limitations / Future Work
-
-- No validation that game labels in `%:tags:` comments actually exist in the YAML
-  (unknown labels are silently ignored)

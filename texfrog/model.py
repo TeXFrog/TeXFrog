@@ -17,14 +17,6 @@ class Game:
 
 
 @dataclass
-class SourceLine:
-    """A single physical line from the combined source file."""
-    content: str                    # Line content with tag comment stripped
-    tags: Optional[frozenset[str]]  # None means "all games"; set means specific labels
-    original: str                   # Original raw line (for debugging)
-
-
-@dataclass
 class Figure:
     """A consolidated figure showing several games side by side."""
     label: str         # Internal label, e.g. "fig_start_end"
@@ -34,13 +26,12 @@ class Figure:
 
 @dataclass
 class Proof:
-    """The top-level proof object, parsed from the YAML or .tex input."""
+    """The top-level proof object, parsed from a .tex input file."""
     macros: list[str]               # Paths to macro .tex files (relative to input dir)
     games: list[Game]               # All games/reductions in order
-    source_lines: list[SourceLine]  # Combined source lines (from YAML %:tags: format)
+    source_text: str                # Raw tfsource body (\tfonly format)
     commentary: dict[str, str]      # game_label -> LaTeX commentary text (loaded from files)
     figures: list[Figure]           # Consolidated figure specs
     package: str = "cryptocode"     # Package profile name (see packages.py)
     preamble: Optional[str] = None  # Path to extra preamble .tex file (relative to input dir)
     commentary_files: dict[str, str] = field(default_factory=dict)  # game_label -> relative file path
-    source_text: Optional[str] = None  # Raw tfsource body (from .tex \tfonly format)

@@ -36,8 +36,7 @@ G0 to G1 is by PRF security (via Red1). G1 to G2 is by a birthday bound on nonce
 
 | File | Purpose |
 |------|---------|
-| `proof.yaml` | Declares the games, commentary, and figure specs (`package: nicodemus`) |
-| `games_source.tex` | Combined LaTeX source with `%:tags:` annotations |
+| `main.tex` | Single source file: declares games, contains pseudocode with `\tfonly` tags, and renders output |
 | `macros.tex` | Short macro definitions (no external dependencies) |
 | `nicodemus.sty` | The nicodemus pseudocode package |
 | `commentary/*.tex` | Per-game commentary files (LaTeX) |
@@ -46,12 +45,12 @@ G0 to G1 is by PRF security (via Red1). G1 to G2 is by a birthday bound on nonce
 
 ## Key Differences from the cryptocode Tutorial
 
-The YAML configuration is almost identical. The main differences:
+The `.tex` file structure is the same (game registration, `tfsource` environment, rendering commands). The main differences are in the pseudocode syntax:
 
-1. **`package: nicodemus`** is set at the top of the YAML.
-2. **`nicodemus.sty`** is listed under `macros:` (`.sty` files are copied to the build directory for `\usepackage` but are not `\input`-ed).
+1. **`\usepackage[package=nicodemus]{texfrog}`** selects the nicodemus package profile.
+2. **`nicodemus.sty`** is listed via `\tfmacrofile{nicodemus.sty}` (`.sty` files are copied to the build directory for `\usepackage` but are not `\input`-ed).
 
-The source file syntax differs substantially:
+The source syntax differs substantially:
 
 | cryptocode | nicodemus |
 |-----------|-----------|
@@ -69,7 +68,7 @@ The source file syntax differs substantially:
 
 ---
 
-## The Combined Source (`games_source.tex`)
+## The Proof Source (`main.tex`)
 
 ### Lines with no tag appear in every game
 
@@ -82,7 +81,7 @@ The source file syntax differs substantially:
 ### Lines with a tag appear only in named games
 
 ```latex
-\item $k \getsr \{0,1\}^\lambda$ %:tags: G0
+\tfonly{G0,G1-G3}{\item $k \getsr \{0,1\}^\lambda$}
 ```
 
 ### Consecutive variant lines encode "slots"
@@ -90,10 +89,10 @@ The source file syntax differs substantially:
 The `y` computation is a four-way slot:
 
 ```latex
-\item $y \gets \mathrm{PRF}(k, r)$ %:tags: G0
-\item $y \gets \RF(r)$             %:tags: G1
-\item $y \getsr \{0,1\}^\lambda$   %:tags: G2
-\item $y \gets \OPRF(r)$           %:tags: Red1
+\tfonly{G0}{\item $y \gets \mathrm{PRF}(k, r)$}
+\tfonly{G1}{\item $y \gets \RF(r)$}
+\tfonly{G2}{\item $y \getsr \{0,1\}^\lambda$}
+\tfonly{Red1}{\item $y \gets \OPRF(r)$}
 ```
 
 For each game, at most one of these lines survives filtering. They are consecutive, so the chosen line always appears at the right position.
@@ -103,11 +102,8 @@ For each game, at most one of these lines survives filtering. They are consecuti
 In nicodemus, procedure headers use `\nicodemusheader{...}` above `\begin{nicodemus}` environments:
 
 ```latex
-\nicodemusheader{$\INDCPA_\Enc^\Adversary()$} %:tags: G0
-\nicodemusheader{Game~$\tfgamename{G1}$} %:tags: G1
-\nicodemusheader{Game~$\tfgamename{G2}$} %:tags: G2
-\nicodemusheader{Game~$\tfgamename{G3}$} %:tags: G3
-\nicodemusheader{Reduction $\Bdversary_1^{\OPRF}$} %:tags: Red1
+\tfonly*{G0}{\nicodemusheader{$\INDCPA_\Enc^\Adversary()$}}
+\tfonly*{G1}{\nicodemusheader{Game~$\tfgamename{G1}$}}
 ```
 
 ---
@@ -118,10 +114,10 @@ From the repo root:
 
 ```bash
 # Build an interactive HTML viewer
-texfrog html build examples/tutorial-nicodemus/proof.yaml -o /tmp/tf_tutorial_nic_html
+texfrog html build examples/tutorial-nicodemus/main.tex -o /tmp/tf_tutorial_nic_html
 
 # Or build and open in your browser with live reload
-texfrog html serve examples/tutorial-nicodemus/proof.yaml --live-reload
+texfrog html serve examples/tutorial-nicodemus/main.tex --live-reload
 ```
 
 ---
@@ -144,5 +140,5 @@ No `$...$` wrapping — unlike cryptocode, nicodemus content is text-mode. The `
 
 ## Next Steps
 
-- [Writing a proof](../../docs/writing-proofs.md) — full reference for `proof.yaml` and source file syntax
+- [Writing a proof](../../docs/writing-proofs.md) — full reference for the `.tex` input format
 - [tutorial-cryptocode/](../tutorial-cryptocode/) — the same proof using `cryptocode` (with a more detailed walkthrough)

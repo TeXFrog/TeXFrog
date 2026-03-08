@@ -1,8 +1,7 @@
 """Parse TeXFrog commands from .tex files.
 
 Extracts game definitions, source content, and metadata from a LaTeX file
-that uses the texfrog.sty package.  This replaces the YAML parser for the
-Python HTML export pipeline.
+that uses the texfrog.sty package.
 """
 
 from __future__ import annotations
@@ -11,9 +10,65 @@ import re
 from pathlib import Path
 from typing import Optional
 
-from .model import Figure, Game, Proof, SourceLine
+from .model import Figure, Game, Proof
 from .packages import get_profile
-from .parser import resolve_tag_ranges
+
+
+# -----------------------------------------------------------------------
+# Tag range resolution
+# -----------------------------------------------------------------------
+
+def resolve_tag_ranges(tag_string: str, ordered_labels: list[str]) -> frozenset[str]:
+    """Convert a tag string like "G0,G3-G5" to a frozenset of labels.
+
+    Ranges are resolved by position in ``ordered_labels``.  A range
+    "A-B" includes every label from A to B inclusive (in list order).
+    Single labels outside the ordered list are still accepted verbatim
+    (they simply never match any game and are therefore silently ignored
+    at filtering time).
+
+    Args:
+        tag_string: Comma-separated tokens, each either a single label
+            or a "start-end" range.
+        ordered_labels: The full ordered list of game/reduction labels
+            from the proof config.
+
+    Returns:
+        A frozenset of resolved label strings.
+
+    Raises:
+        ValueError: If a range endpoint is not found in ordered_labels.
+    """
+    label_index = {label: i for i, label in enumerate(ordered_labels)}
+    result: set[str] = set()
+
+    for token in tag_string.split(","):
+        token = token.strip()
+        if not token:
+            continue
+        if "-" in token:
+            parts = token.split("-")
+            resolved = False
+            for split_at in range(1, len(parts)):
+                start = "-".join(parts[:split_at])
+                end = "-".join(parts[split_at:])
+                if start in label_index and end in label_index:
+                    i_start = label_index[start]
+                    i_end = label_index[end]
+                    if i_start > i_end:
+                        raise ValueError(
+                            f"Range '{token}' is reversed: '{start}' comes after '{end}' "
+                            f"in the game order."
+                        )
+                    result.update(ordered_labels[i_start : i_end + 1])
+                    resolved = True
+                    break
+            if not resolved:
+                result.add(token)
+        else:
+            result.add(token)
+
+    return frozenset(result)
 
 
 # -----------------------------------------------------------------------
@@ -299,54 +354,6 @@ def _strip_tffigonly(source_text: str) -> str:
 
 
 # -----------------------------------------------------------------------
-# SourceLine conversion (for compatibility with filter.py pipeline)
-# -----------------------------------------------------------------------
-
-def _source_text_to_lines(
-    source_text: str,
-    ordered_labels: list[str],
-) -> list[SourceLine]:
-    r"""Convert tfsource body into SourceLine objects.
-
-    Each ``\tfonly{tags}{content}`` becomes one or more SourceLines with
-    the appropriate tag set.  Bare text (between ``\tfonly`` calls) becomes
-    SourceLines with ``tags=None``.
-
-    This is used by the HTML pipeline which still relies on SourceLine-based
-    filtering for the removed-lines view.
-    """
-    lines: list[SourceLine] = []
-    # Strip \tffigonly calls first
-    source_text = _strip_tffigonly(source_text)
-    pos = 0
-    for m in _TFONLY_RE.finditer(source_text):
-        # Bare text before this \tfonly
-        bare = source_text[pos : m.start()]
-        for raw_line in bare.split("\n"):
-            lines.append(SourceLine(content=raw_line, tags=None, original=raw_line))
-
-        # Parse \tfonly{tags}{content}
-        i = m.end()
-        i = _skip_whitespace(source_text, i)
-        tag_str, i = find_brace_group(source_text, i)
-        i = _skip_whitespace(source_text, i)
-        content, i = find_brace_group(source_text, i)
-        resolved = resolve_tag_ranges(tag_str, ordered_labels)
-        for raw_line in content.split("\n"):
-            lines.append(
-                SourceLine(content=raw_line, tags=resolved, original=raw_line)
-            )
-        pos = i
-
-    # Remaining bare text
-    bare = source_text[pos:]
-    for raw_line in bare.split("\n"):
-        lines.append(SourceLine(content=raw_line, tags=None, original=raw_line))
-
-    return lines
-
-
-# -----------------------------------------------------------------------
 # Main parser
 # -----------------------------------------------------------------------
 
@@ -539,13 +546,12 @@ def parse_tex_proof(tex_path: Path) -> Proof:
     return Proof(
         macros=[m.strip() for m in macros],
         games=games,
-        source_lines=[],  # Not used for .tex format; use source_text instead
+        source_text=source_text,
         commentary=commentary,
         figures=figures,
         package=package_name,
         preamble=preamble_rel,
         commentary_files=commentary_files,
-        source_text=source_text,
     )
 
 
@@ -558,10 +564,8 @@ def filter_for_game_from_text(
 ) -> list[str]:
     r"""Resolve ``\tfonly`` calls and return filtered lines for a game.
 
-    This is the ``\tfonly``-format equivalent of
-    :func:`~texfrog.filter.filter_for_game`.  It resolves all ``\tfonly``
-    calls for the given game, splits into lines, and strips trailing ``\\``
-    from the last non-empty line.
+    Resolves all ``\tfonly`` calls for the given game, splits into lines,
+    and strips trailing ``\\`` from the last non-empty line.
 
     Args:
         source_text: Raw body of a ``tfsource`` environment.

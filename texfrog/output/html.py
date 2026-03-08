@@ -34,11 +34,11 @@ from jinja2 import Environment, PackageLoader
 from ..filter import (
     compute_changed_lines,
     compute_removed_lines,
-    filter_for_game,
     wrap_changed_line,
 )
 from ..model import Proof
 from ..packages import get_profile
+from ..tex_parser import filter_for_game_from_text
 
 # Macro used to highlight changed lines.
 _CHANGED_MACRO = r"\tfchanged"
@@ -494,24 +494,17 @@ def generate_html(
 
         ordered_labels = [g.label for g in proof.games]
 
-        # Helper to filter lines for a game (supports both .tex and YAML input).
         def _filter_game(label: str) -> list[str]:
-            if proof.source_text is not None:
-                from ..tex_parser import filter_for_game_from_text
-                return filter_for_game_from_text(
-                    proof.source_text, label, ordered_labels,
-                )
-            return filter_for_game(proof.source_lines, label)
+            return filter_for_game_from_text(
+                proof.source_text, label, ordered_labels,
+            )
 
         def _filter_game_for_diff(label: str) -> list[str]:
             """Like _filter_game but strips \\tfonly* content for diff."""
-            if proof.source_text is not None:
-                from ..tex_parser import filter_for_game_from_text
-                return filter_for_game_from_text(
-                    proof.source_text, label, ordered_labels,
-                    strip_star=True,
-                )
-            return filter_for_game(proof.source_lines, label)
+            return filter_for_game_from_text(
+                proof.source_text, label, ordered_labels,
+                strip_star=True,
+            )
 
         # Build filtered lines per game, compute diffs, and write .tex files.
         for i, game in enumerate(proof.games):

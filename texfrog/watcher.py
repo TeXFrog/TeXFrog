@@ -33,42 +33,6 @@ def _snapshot_mtimes(files: set[Path]) -> dict[Path, float]:
     return result
 
 
-def _collect_watched_files_yaml(yaml_path: Path) -> set[Path]:
-    """Collect watched files from a YAML proof config."""
-    import yaml
-
-    paths: set[Path] = {yaml_path}
-    base_dir = yaml_path.parent
-
-    try:
-        with yaml_path.open("r", encoding="utf-8") as fh:
-            data = yaml.safe_load(fh)
-    except Exception:
-        return paths
-
-    if not isinstance(data, dict):
-        return paths
-
-    source_rel = data.get("source")
-    if source_rel:
-        paths.add((base_dir / source_rel).resolve())
-
-    for macro_rel in data.get("macros", []):
-        paths.add((base_dir / macro_rel).resolve())
-
-    preamble_rel = data.get("preamble")
-    if preamble_rel:
-        paths.add((base_dir / preamble_rel).resolve())
-
-    raw_commentary = data.get("commentary") or {}
-    if isinstance(raw_commentary, dict):
-        for file_rel in raw_commentary.values():
-            if isinstance(file_rel, str) and file_rel.strip():
-                paths.add((base_dir / file_rel).resolve())
-
-    return paths
-
-
 def _collect_watched_files_tex(tex_path: Path) -> set[Path]:
     """Collect watched files from a .tex proof file."""
     paths: set[Path] = {tex_path}
@@ -97,17 +61,13 @@ def _collect_watched_files_tex(tex_path: Path) -> set[Path]:
 def collect_watched_files(input_path: Path) -> set[Path]:
     """Return the set of absolute paths that should be monitored.
 
-    Supports both YAML and .tex input files.
-
     Args:
-        input_path: Absolute path to the proof config file (.tex or .yaml).
+        input_path: Absolute path to the proof .tex file.
 
     Returns:
         A set of resolved absolute paths including the input file itself
         and all referenced source/macro/commentary files.
     """
-    if input_path.suffix in (".yaml", ".yml"):
-        return _collect_watched_files_yaml(input_path)
     return _collect_watched_files_tex(input_path)
 
 
@@ -178,28 +138,20 @@ def safe_rebuild(
     On success the *output_dir* is updated with new content.  On failure
     the existing *output_dir* is left untouched and the error is logged.
 
-    Supports both YAML and .tex input files.
-
     Returns:
         ``True`` if the rebuild succeeded, ``False`` otherwise.
     """
     from .output.html import generate_html
+    from .tex_parser import parse_tex_proof
+    from .validate import validate_proof
 
     logger.info("Rebuilding …")
     start = time.monotonic()
 
     try:
-        if input_path.suffix in (".yaml", ".yml"):
-            from .parser import parse_proof, validate_tags
-            proof = parse_proof(input_path)
-            for msg in validate_tags(proof):
-                logger.warning(msg)
-        else:
-            from .tex_parser import parse_tex_proof
-            from .validate import validate_proof
-            proof = parse_tex_proof(input_path)
-            for msg in validate_proof(proof, input_path.parent):
-                logger.warning(msg)
+        proof = parse_tex_proof(input_path)
+        for msg in validate_proof(proof, input_path.parent):
+            logger.warning(msg)
     except Exception as exc:
         logger.error("Parse error (keeping existing site): %s", exc)
         return False
@@ -245,7 +197,7 @@ def start_watcher(
     """Start watching proof source files for changes.
 
     Args:
-        input_path: Absolute path to the proof config (.tex or .yaml).
+        input_path: Absolute path to the proof .tex file.
         output_dir: Destination directory for the HTML site.
         keep_tmp: Whether to preserve intermediate files.
         version: A mutable ``[int]`` list.  ``version[0]`` is incremented

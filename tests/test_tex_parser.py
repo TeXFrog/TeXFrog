@@ -9,6 +9,7 @@ import pytest
 from texfrog.tex_parser import (
     find_brace_group,
     find_bracket_group,
+    resolve_tag_ranges,
     resolve_tfonly,
     filter_for_game_from_text,
     parse_tex_proof,
@@ -18,6 +19,57 @@ from texfrog.tex_parser import (
     _extract_tfsource,
     _extract_texfrog_package_option,
 )
+
+
+# ---------------------------------------------------------------------------
+# resolve_tag_ranges
+# ---------------------------------------------------------------------------
+
+TAG_LABELS = ["G0", "G1", "Red1", "G2", "G3", "G4", "G5"]
+
+
+def test_single_label():
+    assert resolve_tag_ranges("G1", TAG_LABELS) == frozenset({"G1"})
+
+
+def test_multiple_labels():
+    assert resolve_tag_ranges("G0,G2", TAG_LABELS) == frozenset({"G0", "G2"})
+
+
+def test_simple_range():
+    assert resolve_tag_ranges("G1-G3", TAG_LABELS) == frozenset({"G1", "Red1", "G2", "G3"})
+
+
+def test_range_spanning_reduction():
+    assert resolve_tag_ranges("G0-Red1", TAG_LABELS) == frozenset({"G0", "G1", "Red1"})
+
+
+def test_range_start_equals_end():
+    assert resolve_tag_ranges("G2-G2", TAG_LABELS) == frozenset({"G2"})
+
+
+def test_range_full_list():
+    assert resolve_tag_ranges("G0-G5", TAG_LABELS) == frozenset(TAG_LABELS)
+
+
+def test_mixed_single_and_range():
+    assert resolve_tag_ranges("G0,G3-G5", TAG_LABELS) == frozenset({"G0", "G3", "G4", "G5"})
+
+
+def test_reversed_range_raises():
+    with pytest.raises(ValueError, match="reversed"):
+        resolve_tag_ranges("G3-G1", TAG_LABELS)
+
+
+def test_whitespace_around_tokens():
+    assert resolve_tag_ranges(" G0 , G2 ", TAG_LABELS) == frozenset({"G0", "G2"})
+
+
+def test_unknown_label_accepted_verbatim():
+    # Unknown labels are passed through without error (user responsibility)
+    result = resolve_tag_ranges("G0,UNKNOWN", TAG_LABELS)
+    assert "G0" in result
+    assert "UNKNOWN" in result
 
 
 # ---------------------------------------------------------------------------

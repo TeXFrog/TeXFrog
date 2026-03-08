@@ -26,39 +26,17 @@ def _resolve_input_path(input_path: str) -> Path:
     """Resolve *input_path* to a .tex file.
 
     If *input_path* is a directory, look for ``proof.tex`` inside it.
-    Falls back to ``proof.yaml`` for backward compatibility, but warns.
     """
     p = Path(input_path).resolve()
     if p.is_dir():
         candidate = p / "proof.tex"
         if candidate.exists():
             return candidate
-        # Backward compatibility: try proof.yaml
-        yaml_candidate = p / "proof.yaml"
-        if yaml_candidate.exists():
-            click.echo(
-                "Warning: proof.yaml detected. TeXFrog now uses .tex input files. "
-                "See docs/pure-latex.md for migration instructions.",
-                err=True,
-            )
-            return yaml_candidate
         raise click.BadParameter(
             f"Directory '{p}' does not contain a proof.tex file.",
             param_hint="'INPUT'",
         )
     return p
-
-
-def _parse_input(input_path: Path):
-    """Parse a .tex or .yaml input file into a Proof object."""
-    if input_path.suffix == ".yaml" or input_path.suffix == ".yml":
-        # Backward compatibility
-        from .parser import parse_proof, validate_tags
-        proof = parse_proof(input_path)
-        for msg in validate_tags(proof):
-            click.echo(f"Warning: {msg}", err=True)
-        return proof
-    return parse_tex_proof(input_path)
 
 
 @click.group()
@@ -139,7 +117,7 @@ def check_cmd(input_file: str, strict: bool) -> None:
 
     click.echo(f"Parsing {file_path} …")
     try:
-        proof = _parse_input(file_path)
+        proof = parse_tex_proof(file_path)
     except (ValueError, FileNotFoundError) as exc:
         click.echo(f"Error: {exc}", err=True)
         sys.exit(1)
@@ -211,7 +189,7 @@ def html_build_cmd(input_file: str, output_dir: str | None, keep_tmp: bool) -> N
 
     click.echo(f"Parsing {file_path} …")
     try:
-        proof = _parse_input(file_path)
+        proof = parse_tex_proof(file_path)
     except (ValueError, FileNotFoundError) as exc:
         click.echo(f"Error: {exc}", err=True)
         sys.exit(1)
@@ -281,7 +259,7 @@ def html_serve_cmd(
 
     click.echo(f"Parsing {file_path} …")
     try:
-        proof = _parse_input(file_path)
+        proof = parse_tex_proof(file_path)
     except (ValueError, FileNotFoundError) as exc:
         click.echo(f"Error: {exc}", err=True)
         sys.exit(1)
