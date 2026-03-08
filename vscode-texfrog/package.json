@@ -2,7 +2,7 @@
   "name": "texfrog",
   "displayName": "TeXFrog",
   "description": "Highlight game-based cryptographic proofs in LaTeX",
-  "version": "0.1.0",
+  "version": "0.0.1",
   "publisher": "texfrog",
   "repository": {
     "type": "git",

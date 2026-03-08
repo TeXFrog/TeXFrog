@@ -34,7 +34,7 @@ The extension re-parses your document as you type (with a 300ms debounce) and up
 If you received a `.vsix` file:
 
 - **VS Code UI:** Extensions view → `···` menu → *Install from VSIX...*
-- **Command line:** `code --install-extension texfrog-0.1.0.vsix`
+- **Command line:** `code --install-extension texfrog-0.0.1.vsix`
 
 ### From source
 
