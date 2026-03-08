@@ -12,7 +12,8 @@ pip install -e ".[dev]"          # if reinstall needed
 
 **Run tests:**
 ```bash
-.venv/bin/pytest tests/ -q       # 204 tests, should all pass
+.venv/bin/pytest tests/ -q                          # Python tests (226 tests)
+cd vscode-texfrog && npm test                       # VS Code extension tests (35 tests)
 ```
 
 **Try the tool:**

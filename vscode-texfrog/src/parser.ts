@@ -42,23 +42,44 @@ function offsetToLine(text: string, offset: number): number {
 }
 
 /**
- * Extract the ordered game labels from \tfgames{...}.
+ * Extract the ordered game labels from \tfgames{source}{games}.
+ * Skips the first brace group (source name) and parses the second (game labels).
+ * Collects labels from all \tfgames calls in the document.
  */
 function extractGameLabels(text: string): string[] {
-  const match = text.match(/\\tfgames\s*\{/);
-  if (!match || match.index === undefined) {
-    return [];
+  const labels: string[] = [];
+  const re = /\\tfgames\s*\{/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text)) !== null) {
+    // First brace group: source name — skip it
+    const firstOpen = match.index + match[0].length - 1;
+    const firstClose = findClosingBrace(text, firstOpen);
+    if (firstClose === -1) {
+      continue;
+    }
+    // Skip whitespace between brace groups
+    let j = firstClose + 1;
+    while (j < text.length && (text[j] === " " || text[j] === "\t" || text[j] === "\n")) {
+      j++;
+    }
+    // Second brace group: game labels
+    if (j >= text.length || text[j] !== "{") {
+      continue;
+    }
+    const secondClose = findClosingBrace(text, j);
+    if (secondClose === -1) {
+      continue;
+    }
+    const content = text.substring(j + 1, secondClose);
+    for (const s of content.split(",")) {
+      const trimmed = s.trim();
+      if (trimmed.length > 0) {
+        labels.push(trimmed);
+      }
+    }
+    re.lastIndex = secondClose + 1;
   }
-  const openBrace = match.index + match[0].length - 1;
-  const closeBrace = findClosingBrace(text, openBrace);
-  if (closeBrace === -1) {
-    return [];
-  }
-  const content = text.substring(openBrace + 1, closeBrace);
-  return content
-    .split(",")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+  return labels;
 }
 
 /**
