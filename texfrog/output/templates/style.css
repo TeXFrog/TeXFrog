@@ -143,8 +143,8 @@ body { display: flex; height: 100vh; font-family: sans-serif; }
   #game-title { font-size: 1rem; }
   #game-subtitle { font-size: 0.8rem; }
   #game-display { padding: 0.75rem; gap: 1rem; }
-  #game-svg-container { flex-direction: column; align-items: center; }
-  .game-panel { width: 100%; }
+  #game-svg-container { flex-wrap: wrap; justify-content: center; }
+  .game-panel { max-width: 100%; }
   .game-panel:first-child { margin-left: 0; }
   .game-panel:last-child { margin-right: 0; }
   .game-panel img { max-width: 100%; height: auto; }
