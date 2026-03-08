@@ -117,9 +117,6 @@ In nicodemus, procedure headers use `\nicodemusheader{...}` above `\begin{nicode
 From the repo root:
 
 ```bash
-# Generate per-game LaTeX files
-texfrog latex examples/tutorial-nicodemus/proof.yaml -o /tmp/tf_tutorial_nic_latex
-
 # Build an interactive HTML viewer
 texfrog html build examples/tutorial-nicodemus/proof.yaml -o /tmp/tf_tutorial_nic_html
 
@@ -149,4 +146,3 @@ No `$...$` wrapping — unlike cryptocode, nicodemus content is text-mode. The `
 
 - [Writing a proof](../../docs/writing-proofs.md) — full reference for `proof.yaml` and source file syntax
 - [tutorial-cryptocode/](../tutorial-cryptocode/) — the same proof using `cryptocode` (with a more detailed walkthrough)
-- [LaTeX integration](../../docs/latex-integration.md) — customizing `\tfchanged` and `\tfgamelabel`

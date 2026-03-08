@@ -171,35 +171,12 @@ Here is how TeXFrog expects procedure headers to be typeset when using cryptocod
 From the repo root:
 
 ```bash
-# Generate per-game LaTeX files
-texfrog latex examples/tutorial-cryptocode/proof.yaml -o /tmp/tf_tutorial_latex
-
 # Build an interactive HTML viewer
 texfrog html build examples/tutorial-cryptocode/proof.yaml -o /tmp/tf_tutorial_html
 
 # Or build and open in your browser with live reload
 texfrog html serve examples/tutorial-cryptocode/proof.yaml --live-reload
 ```
-
----
-
-## Step 4 — Reading the Output
-
-After running `texfrog latex`, the output directory contains:
-
-```
-G0.tex              — pseudocode for G0 (no highlighting; first game)
-Red1.tex            — pseudocode for Red1; changed lines wrapped in \tfchanged{}
-G1.tex              — pseudocode for G1; changed lines wrapped in \tfchanged{}
-G2.tex              — pseudocode for G2; changed lines wrapped in \tfchanged{}
-G3.tex              — pseudocode for G3; changed lines wrapped in \tfchanged{}
-G0_commentary.tex   — LaTeX commentary for G0
-...
-proof_harness.tex   — \inputs macros, then each game + commentary in order
-fig_all_games.tex   — consolidated figure with all five games annotated
-```
-
-Include the harness in your paper with `\input{proof_harness.tex}`, or include individual game files and figures as needed. See [LaTeX integration](../../docs/latex-integration.md) for details.
 
 ---
 
@@ -222,4 +199,3 @@ Include the harness in your paper with `\input{proof_harness.tex}`, or include i
 
 - [Writing a proof](../../docs/writing-proofs.md) — full reference for `proof.yaml` and source file syntax
 - [tutorial-nicodemus/](../tutorial-nicodemus/) — the same proof using the `nicodemus` package
-- [LaTeX integration](../../docs/latex-integration.md) — customizing `\tfchanged` and `\tfgamelabel`

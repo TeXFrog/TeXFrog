@@ -110,7 +110,7 @@ Each `.tex` file contains raw LaTeX — environments, math, and display equation
 This follows by inlining the decapsulation result.
 ```
 
-You can use `\tfgamename{G1}` to reference a game's `latex_name` — see [latex-integration.md](latex-integration.md).
+You can use `\tfgamename{G1}` to reference a game's `latex_name`.
 
 **HTML viewer:** Commentary is compiled through the same LaTeX → PDF → SVG pipeline as game pseudocode, so any LaTeX commands or environments used in commentary (e.g., `\newtheorem{claim}{Claim}`) must be defined in your macros file. The packages available in the HTML compilation wrapper include your selected pseudocode package (e.g., `cryptocode` or `nicodemus`), plus `amsfonts`, `amsmath`, `amsthm`, `adjustbox`, and `xcolor`. Additional packages can be added via the `preamble` field.
 
@@ -133,7 +133,7 @@ Each figure has:
 - `games` — comma-separated list or range of game labels (same syntax as `%:tags:`)
 - `procedure_name` (optional) — custom title for the first procedure header in the consolidated output. Without this, the first game's header is used verbatim. Useful for showing a collective name like `Games $G_0$--$G_9$` instead of a single game's title.
 
-In the generated figure, lines that appear in all selected games are output verbatim. Lines that appear in only some games are annotated with `\tfgamelabel{G1,G3}{line content}`. See [latex-integration.md](latex-integration.md) for customizing the annotation macro.
+In the generated figure, lines that appear in all selected games are output verbatim. Lines that appear in only some games are annotated with `\tfgamelabel{G1,G3}{line content}`.
 
 ## The Combined LaTeX Source File
 

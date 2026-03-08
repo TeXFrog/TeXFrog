@@ -242,16 +242,15 @@ Reductions are included in tag ranges — `G1-G2` in this example includes `Red2
 
 ### How do I suppress diff highlighting in the final paper?
 
-Override `\tfchanged` to be a no-op before including the harness:
+Override `\tfchanged` to be a no-op in your preamble:
 
 ```latex
-\newcommand{\tfchanged}[1]{#1}
-\input{output/proof_harness.tex}
+\renewcommand{\tfchanged}[1]{#1}
 ```
 
 ### Can I use custom `\tfchanged` / `\tfgamelabel` definitions?
 
-Yes. TeXFrog defines them with `\providecommand`, so your `\newcommand` takes precedence if it comes first. See [Customizing the Highlight Macro](latex-integration.md#customizing-the-highlight-macro) for details.
+Yes. The `texfrog.sty` package defines them with `\providecommand`, so you can override them with `\renewcommand` in your preamble.
 
 ### Why does `latex_name` not include `$` delimiters?
 

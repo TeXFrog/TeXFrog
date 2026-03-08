@@ -31,10 +31,69 @@ from typing import Optional
 
 from jinja2 import Environment, PackageLoader
 
-from ..filter import compute_removed_lines, filter_for_game
+from ..filter import (
+    compute_changed_lines,
+    compute_removed_lines,
+    filter_for_game,
+    wrap_changed_line,
+)
 from ..model import Proof
 from ..packages import get_profile
-from .latex import _write_game_file, generate_latex
+
+# Macro used to highlight changed lines.
+_CHANGED_MACRO = r"\tfchanged"
+
+# ---------------------------------------------------------------------------
+# Per-game LaTeX file writers
+# ---------------------------------------------------------------------------
+
+
+def _write_game_file(
+    game_label: str,
+    current_lines: list[str],
+    changed_indices: set[int],
+    out_path: Path,
+    macro: str = _CHANGED_MACRO,
+    procedure_header_cmd: str | None = None,
+) -> None:
+    """Write per-game LaTeX file with changed lines highlighted.
+
+    Args:
+        game_label: The game/reduction label (used only in a leading comment).
+        current_lines: Filtered content lines for this game.
+        changed_indices: 0-based indices of lines to wrap with a highlighting macro.
+        out_path: Destination file path.
+        macro: LaTeX macro name to use for wrapping (default ``\\tfchanged``).
+        procedure_header_cmd: Package-specific command name (without backslash)
+            for procedure headers that should never be wrapped.
+    """
+    parts: list[str] = [f"% TeXFrog output for game: {game_label}\n"]
+    for i, line in enumerate(current_lines):
+        # Skip blank lines — they arise from excluded tagged content and can
+        # cause LaTeX dimension errors inside pseudocode environments
+        # (e.g. varwidth used internally by cryptocode's pcvstack).
+        if not line.strip():
+            continue
+        if i in changed_indices:
+            parts.append(
+                wrap_changed_line(line, macro, procedure_header_cmd) + "\n"
+            )
+        else:
+            parts.append(line + "\n")
+    out_path.write_text("".join(parts), encoding="utf-8")
+
+
+def _write_commentary_file(game_label: str, text: str, out_path: Path) -> None:
+    """Write a per-game commentary LaTeX file.
+
+    Args:
+        game_label: The game/reduction label (used only in a leading comment).
+        text: Raw LaTeX commentary text.
+        out_path: Destination file path.
+    """
+    content = f"% TeXFrog commentary for game: {game_label}\n{text}"
+    out_path.write_text(content, encoding="utf-8")
+
 
 # ---------------------------------------------------------------------------
 # LaTeX wrapper template used to compile individual game files to PDF
@@ -425,18 +484,17 @@ def generate_html(
         proof.package, user_preamble, commentary=True,
     )
 
-    # Step 1: generate LaTeX files in a temp directory.
+    # Step 1: generate per-game LaTeX files in a temp directory.
     with contextlib.ExitStack() as stack:
         if keep_tmp:
             latex_dir = Path(tempfile.mkdtemp(prefix="texfrog_"))
             print(f"  Keeping intermediate files in {latex_dir}", file=sys.stderr)
         else:
             latex_dir = Path(stack.enter_context(tempfile.TemporaryDirectory()))
-        generate_latex(proof, latex_dir)
 
-        # Helper to filter lines for a game (supports both .tex and YAML input).
         ordered_labels = [g.label for g in proof.games]
 
+        # Helper to filter lines for a game (supports both .tex and YAML input).
         def _filter_game(label: str) -> list[str]:
             if proof.source_text is not None:
                 from ..tex_parser import filter_for_game_from_text
@@ -454,6 +512,48 @@ def generate_html(
                     strip_star=True,
                 )
             return filter_for_game(proof.source_lines, label)
+
+        # Build filtered lines per game, compute diffs, and write .tex files.
+        for i, game in enumerate(proof.games):
+            label = game.label
+            game_lines = _filter_game(label)
+
+            # Compute changed lines relative to previous game.
+            # Use diff lines (with \tfonly* stripped) so that per-game headers
+            # (which change between every game) are not highlighted.
+            # Non-reduction games diff against the previous non-reduction game
+            # (skipping intervening reductions); reductions diff against the
+            # immediately preceding entry.
+            if i == 0:
+                changed: set[int] = set()
+            else:
+                if game.reduction:
+                    prev_label = ordered_labels[i - 1]
+                else:
+                    prev_label = None
+                    for j in range(i - 1, -1, -1):
+                        if not proof.games[j].reduction:
+                            prev_label = ordered_labels[j]
+                            break
+                if prev_label is None:
+                    changed = set()
+                else:
+                    changed = compute_changed_lines(
+                        _filter_game_for_diff(prev_label),
+                        _filter_game_for_diff(label),
+                    )
+
+            _write_game_file(
+                label, game_lines, changed, latex_dir / f"{label}.tex",
+                procedure_header_cmd=proc_hdr_cmd,
+            )
+
+            # Write commentary file if commentary exists.
+            commentary = proof.commentary.get(label, "")
+            if commentary.strip():
+                _write_commentary_file(
+                    label, commentary, latex_dir / f"{label}_commentary.tex"
+                )
 
         # Generate removed-highlight .tex files for the side-by-side view.
         # Each non-reduction game (except the last one) may appear as the

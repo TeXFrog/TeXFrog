@@ -45,7 +45,7 @@ Lines with no `%:tags:` comment appear in every game. Lines with tags appear onl
 - **LaTeX** — [TeX Live](https://tug.org/texlive/) or [MacTeX](https://tug.org/mactex/) (for `pdflatex` and `pdfcrop`)
 - **Poppler** or **pdf2svg** — for `pdftocairo` (`brew install poppler` on macOS), or `pdf2svg` as an alternative
 
-LaTeX and Poppler are only needed for the HTML viewer (`texfrog html`). The LaTeX output mode (`texfrog latex`) works with Python alone.
+LaTeX and Poppler are needed for the HTML viewer (`texfrog html`).
 
 ## Installation and Running
 
@@ -88,25 +88,13 @@ texfrog init mydirectory
 texfrog init myproof --package nicodemus
 ```
 
-Build it immediately:
-
-```bash
-texfrog latex proof.yaml -o /tmp/tf_output
-```
-
 The [TeXFrog repository contains tutorials](https://github.com/TeXFrog/TeXFrog/tree/main/examples) you can study:
 
 ```bash
-# Download them from https://github.com/TeXFrog/TeXFrog/tree/main/examples 
+# Download them from https://github.com/TeXFrog/TeXFrog/tree/main/examples
 # or clone the repository using the following two lines:
 git clone https://github.com/TeXFrog/TeXFrog
 cd TeXFrog/examples
-
-# Tutorial: IND-CPA proof (4 games/reductions)
-texfrog latex tutorial-cryptocode/proof.yaml
-
-# Same tutorial using the nicodemus package
-texfrog latex tutorial-nicodemus/proof.yaml
 
 # Interactive HTML viewer with live reload
 texfrog html serve tutorial-cryptocode/proof.yaml --live-reload
@@ -129,14 +117,6 @@ texfrog check proof.yaml [--strict]
 ```
 
 Parses the proof and runs validation checks (YAML structure, file existence, tag consistency, empty games, commentary references) without generating any output. Prints a summary and exits with code 0 if valid. With `--strict`, exits with code 1 if there are any warnings.
-
-### Generate LaTeX output
-
-```bash
-texfrog latex proof.yaml [-o OUTPUT_DIR]
-```
-
-Produces per-game `.tex` files, commentary files, a harness file, and consolidated figures. Output goes to `texfrog_latex/` next to the input file by default. See [LaTeX integration](https://github.com/TeXFrog/TeXFrog/blob/main/docs/latex-integration.md) for how to incorporate the output into your paper.
 
 ### Generate HTML output
 
@@ -175,7 +155,6 @@ Comparing the two tutorials side by side shows the syntax differences between ps
 ## Documentation
 
 - [Writing a proof](https://github.com/TeXFrog/TeXFrog/blob/main/docs/writing-proofs.md) — reference for `proof.yaml` and `games_source.tex`
-- [Using TeXFrog Output in Your LaTeX Paper](https://github.com/TeXFrog/TeXFrog/blob/main/docs/latex-integration.md) — how to incorporate LaTeX output into your paper, including customizing highlight macros
 - [Troubleshooting & FAQ](https://github.com/TeXFrog/TeXFrog/blob/main/docs/troubleshooting.md) — common problems proof authors may encounter
 
 ## Contributing

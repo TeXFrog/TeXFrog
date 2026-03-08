@@ -48,8 +48,7 @@ TeXFrog/
 │   ├── watcher.py              # File watching + safe rebuild for live-reload
 │   └── output/
 │       ├── __init__.py
-│       ├── latex.py            # generate_latex(): per-game .tex, commentary, harness, figures
-│       └── html.py             # generate_html() + serve_html(): pdflatex → SVG → HTML site
+│       └── html.py             # build_html_site() + serve_html(): per-game .tex, pdflatex → SVG → HTML site
 ├── tests/
 │   ├── fixtures/simple/        # Minimal cryptocode YAML + source.tex for fast unit tests
 │   ├── fixtures/nicodemus/     # Minimal nicodemus YAML + source.tex for package tests
@@ -307,29 +306,6 @@ environments like cryptocode's `pcvstack`.
 Generated only if commentary text is non-empty. Contains the content loaded from the
 corresponding commentary file (e.g., `commentary/G0.tex` as specified in proof.yaml).
 
-### Harness: `proof_harness.tex`
-
-- Defines `\tfchanged` (via `\providecommand`), `\tfgamelabel`, and `\tfgamename`
-- `\tfgamename{label}` expands to `\ensuremath{latex_name}` via `\@namedef`/`\@nameuse`
-- `\input`s each macro file (`.sty`/`.cls` files are skipped — they are loaded via `\usepackage`)
-- `\input`s each game file, then its commentary file, in order
-
-The `\providecommand` means authors can override macros in their paper preamble.
-Default `\tfchanged` varies by package: `\colorbox{blue!15}{$#1$}` for cryptocode (math mode),
-`\colorbox{blue!15}{#1}` for nicodemus (text mode).
-
-### Consolidated figures: `fig_{label}.tex`
-
-For each source line:
-- In ALL selected games → output verbatim
-- In SUBSET of selected games → `\tfgamelabel{\tfgamename{G1},\tfgamename{G3}}{line content}`
-- In NO selected games → skip
-
-If `procedure_name` is set on the figure, the title of the first procedure header
-in the output is replaced with the given text. This lets consolidated figures show
-e.g. "Games $G_0$--$G_9$" instead of the first game's specific header. Subsequent
-procedure headers (e.g. oracle definitions) are unaffected.
-
 ---
 
 ## HTML Output (`output/html.py`)
@@ -337,7 +313,7 @@ procedure headers (e.g. oracle definitions) are unaffected.
 ### Pipeline
 
 For each game:
-1. Generate per-game `.tex` via `generate_latex` (in a temp dir)
+1. Generate per-game `.tex` files (in a temp dir)
 2. Copy game `.tex` and all macro files to a **flat temp directory with no spaces in path**
    (LaTeX's `\input{}` cannot handle paths with spaces — the project lives in
    "Formal methods/" which has a space)
