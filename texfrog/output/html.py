@@ -445,6 +445,16 @@ def generate_html(
                 )
             return filter_for_game(proof.source_lines, label)
 
+        def _filter_game_for_diff(label: str) -> list[str]:
+            """Like _filter_game but strips \\tfonly* content for diff."""
+            if proof.source_text is not None:
+                from ..tex_parser import filter_for_game_from_text
+                return filter_for_game_from_text(
+                    proof.source_text, label, ordered_labels,
+                    strip_star=True,
+                )
+            return filter_for_game(proof.source_lines, label)
+
         # Generate removed-highlight .tex files for the side-by-side view.
         # Each non-reduction game (except the last one) may appear as the
         # "previous" panel, with red strikethrough on lines removed/changed
@@ -455,7 +465,10 @@ def generate_html(
             prev_lines = _filter_game(game.label)
             next_game = non_red_games[i + 1]
             next_lines = _filter_game(next_game.label)
-            removed_indices = compute_removed_lines(prev_lines, next_lines)
+            # Use diff lines (with \tfonly* stripped) for change detection
+            prev_diff = _filter_game_for_diff(game.label)
+            next_diff = _filter_game_for_diff(next_game.label)
+            removed_indices = compute_removed_lines(prev_diff, next_diff)
             _write_game_file(
                 game.label, prev_lines, removed_indices,
                 latex_dir / f"{game.label}-removed.tex",

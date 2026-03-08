@@ -318,7 +318,11 @@
       {
         { 0 } { } % inactive: do nothing (captured in tfsource)
         { 1 } { \__tf_only_record:nn { #2 } { #3 } }
-        { 2 } { \__tf_only_render:nn { #2 } { #3 } }
+        { 2 } {
+                 \IfBooleanTF { #1 }
+                   { \__tf_only_clean:nn { #2 } { #3 } } % star: no highlighting
+                   { \__tf_only_render:nn { #2 } { #3 } }
+               }
         { 3 } { \__tf_only_clean:nn { #2 } { #3 } }
         { 4 } {
                  \IfBooleanTF { #1 }

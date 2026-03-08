@@ -186,6 +186,7 @@ def _extract_tfsource(text: str) -> dict[str, str]:
 # -----------------------------------------------------------------------
 
 _TFONLY_RE = re.compile(r"\\tfonly\*?(?![a-zA-Z])")
+_TFONLY_STAR_RE = re.compile(r"\\tfonly\*(?![a-zA-Z])")
 _TFFIGONLY_RE = re.compile(r"\\tffigonly(?![a-zA-Z])")
 
 
@@ -193,15 +194,14 @@ def resolve_tfonly(
     source_text: str,
     game_label: str,
     ordered_labels: list[str],
+    *,
+    strip_star: bool = False,
 ) -> str:
     r"""Resolve ``\tfonly``, ``\tfonly*``, and ``\tffigonly`` for a game.
 
     Walks through *source_text* and for each ``\tfonly`` or ``\tfonly*``:
     * If *game_label* is in the resolved tag set → replaces with *content*.
     * Otherwise → replaces with empty string.
-
-    ``\tfonly*`` is treated identically to ``\tfonly`` in the Python pipeline
-    (the star variant only differs in LaTeX figure mode).
 
     ``\tffigonly{content}`` is always stripped (it only appears in LaTeX
     consolidated figures, not in per-game rendering).
@@ -212,12 +212,19 @@ def resolve_tfonly(
         source_text: Raw body of a ``tfsource`` environment.
         game_label: The game to resolve for.
         ordered_labels: Ordered list of all game labels (for range resolution).
+        strip_star: If ``True``, ``\tfonly*`` blocks are stripped entirely
+            (replaced with empty string regardless of tags).  This is used
+            for diff computation so that per-game header content does not
+            participate in change detection.
 
     Returns:
         The resolved LaTeX string for the given game.
     """
     # First, strip all \tffigonly{...} calls (figure-only content)
     source_text = _strip_tffigonly(source_text)
+    # Optionally strip \tfonly* blocks (for diff computation)
+    if strip_star:
+        source_text = _strip_tfonly_star(source_text)
 
     result: list[str] = []
     pos = 0
@@ -244,6 +251,24 @@ def resolve_tfonly(
             result.append(content)
         pos = i
     # Append remaining text after last \tfonly
+    result.append(source_text[pos:])
+    return "".join(result)
+
+
+def _strip_tfonly_star(source_text: str) -> str:
+    r"""Remove all ``\tfonly*{tags}{content}`` calls from source text."""
+    result: list[str] = []
+    pos = 0
+    for m in _TFONLY_STAR_RE.finditer(source_text):
+        result.append(source_text[pos : m.start()])
+        i = m.end()
+        i = _skip_whitespace(source_text, i)
+        if i < len(source_text) and source_text[i] == "{":
+            _, i = find_brace_group(source_text, i)  # skip tags
+        i = _skip_whitespace(source_text, i)
+        if i < len(source_text) and source_text[i] == "{":
+            _, i = find_brace_group(source_text, i)  # skip content
+        pos = i
     result.append(source_text[pos:])
     return "".join(result)
 
@@ -519,6 +544,8 @@ def filter_for_game_from_text(
     source_text: str,
     game_label: str,
     ordered_labels: list[str],
+    *,
+    strip_star: bool = False,
 ) -> list[str]:
     r"""Resolve ``\tfonly`` calls and return filtered lines for a game.
 
@@ -531,12 +558,17 @@ def filter_for_game_from_text(
         source_text: Raw body of a ``tfsource`` environment.
         game_label: The game to resolve for.
         ordered_labels: Ordered list of all game labels.
+        strip_star: If ``True``, ``\tfonly*`` blocks are stripped entirely
+            so their content does not appear in the output.  Used for diff
+            computation (game headers should not be highlighted).
 
     Returns:
         List of content strings for the game.
     """
     from .filter import _strip_trailing_newline_sep
 
-    resolved = resolve_tfonly(source_text, game_label, ordered_labels)
+    resolved = resolve_tfonly(
+        source_text, game_label, ordered_labels, strip_star=strip_star,
+    )
     lines = resolved.split("\n")
     return _strip_trailing_newline_sep(lines)

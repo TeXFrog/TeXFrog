@@ -355,6 +355,9 @@ def generate_latex(proof: Proof, output_dir: Path) -> None:
 
     # Build filtered lines per game, then compute diffs.
     game_lines: dict[str, list[str]] = {}
+    # For .tex format, also build diff-only lines with \tfonly* stripped,
+    # so that per-game headers don't participate in change detection.
+    diff_lines: dict[str, list[str]] = {}
     if proof.source_text is not None:
         # .tex format: resolve \tfonly calls per game
         from ..tex_parser import filter_for_game_from_text
@@ -362,16 +365,23 @@ def generate_latex(proof: Proof, output_dir: Path) -> None:
             game_lines[game.label] = filter_for_game_from_text(
                 proof.source_text, game.label, ordered_labels,
             )
+            diff_lines[game.label] = filter_for_game_from_text(
+                proof.source_text, game.label, ordered_labels,
+                strip_star=True,
+            )
     else:
         # YAML format: filter by SourceLine tags
         for game in proof.games:
             game_lines[game.label] = filter_for_game(proof.source_lines, game.label)
+            diff_lines[game.label] = game_lines[game.label]
 
     for i, game in enumerate(proof.games):
         label = game.label
         current = game_lines[label]
 
         # Compute changed lines relative to previous game.
+        # Use diff_lines (with \tfonly* stripped) so that per-game headers
+        # (which change between every game) are not highlighted.
         # Non-reduction games diff against the previous non-reduction game
         # (skipping intervening reductions); reductions diff against the
         # immediately preceding entry.
@@ -390,7 +400,7 @@ def generate_latex(proof: Proof, output_dir: Path) -> None:
                 changed = set()
             else:
                 changed = compute_changed_lines(
-                    game_lines[prev_label], current
+                    diff_lines[prev_label], diff_lines[label]
                 )
 
         # Write per-game file.
