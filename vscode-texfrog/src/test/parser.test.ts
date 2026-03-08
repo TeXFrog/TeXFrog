@@ -13,6 +13,9 @@ describe("extractGameLabels", () => {
       "G2",
       "G3",
     ]);
+    assert.deepStrictEqual(result.labelsBySource, [
+      { source: "indcpa", labels: ["G0", "G1", "Red1", "G2", "G3"] },
+    ]);
   });
 
   it("skips source name and parses second brace group", () => {
@@ -21,6 +24,7 @@ describe("extractGameLabels", () => {
     assert.deepStrictEqual(result.orderedLabels, ["A", "B"]);
     // Should NOT include "mysource"
     assert.ok(!result.orderedLabels.includes("mysource"));
+    assert.strictEqual(result.labelsBySource[0].source, "mysource");
   });
 
   it("handles whitespace between brace groups", () => {
@@ -40,24 +44,31 @@ describe("extractGameLabels", () => {
       "A1",
       "A2",
     ]);
+    assert.deepStrictEqual(result.labelsBySource, [
+      { source: "proof1", labels: ["G0", "G1"] },
+      { source: "proof2", labels: ["A0", "A1", "A2"] },
+    ]);
   });
 
   it("returns empty array when no \\tfgames present", () => {
     const text = "\\documentclass{article}\n\\begin{document}Hello\\end{document}";
     const result = parseDocument(text);
     assert.deepStrictEqual(result.orderedLabels, []);
+    assert.deepStrictEqual(result.labelsBySource, []);
   });
 
   it("handles nested braces in source name", () => {
     const text = "\\tfgames{my{nested}source}{G0, G1}";
     const result = parseDocument(text);
     assert.deepStrictEqual(result.orderedLabels, ["G0", "G1"]);
+    assert.strictEqual(result.labelsBySource[0].source, "my{nested}source");
   });
 
   it("skips \\tfgames with missing second brace group", () => {
     const text = "\\tfgames{onlyonegroup}";
     const result = parseDocument(text);
     assert.deepStrictEqual(result.orderedLabels, []);
+    assert.deepStrictEqual(result.labelsBySource, []);
   });
 });
 

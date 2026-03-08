@@ -18,10 +18,20 @@ export interface TfSourceBlock {
   endLine: number;
 }
 
+/** Game labels grouped by their source name. */
+export interface SourceGroup {
+  /** The source name from \tfgames{source}{...}. */
+  source: string;
+  /** Ordered game labels within this source. */
+  labels: string[];
+}
+
 /** Result of parsing a .tex document for TeXFrog content. */
 export interface ParseResult {
   /** Ordered game/reduction labels from \tfgames{...}. */
   orderedLabels: string[];
+  /** Game labels grouped by source, in document order. */
+  labelsBySource: SourceGroup[];
   /** tfsource block ranges. */
   sourceBlocks: TfSourceBlock[];
   /** All \tfonly / \tfonly* / \tffigonly spans within tfsource blocks. */

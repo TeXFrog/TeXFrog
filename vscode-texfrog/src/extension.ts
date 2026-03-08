@@ -25,7 +25,7 @@ function getState(uri: string): { selectedGame: string | null; parseResult: Pars
   if (!state) {
     state = {
       selectedGame: null,
-      parseResult: { orderedLabels: [], sourceBlocks: [], spans: [] },
+      parseResult: { orderedLabels: [], labelsBySource: [], sourceBlocks: [], spans: [] },
     };
     documentState.set(uri, state);
   }
@@ -74,8 +74,18 @@ function updateStatusBar(editor: vscode.TextEditor): void {
   }
 
   if (state.selectedGame) {
-    statusBarItem.text = `$(telescope) ${state.selectedGame}`;
-    statusBarItem.tooltip = `TeXFrog: viewing game ${state.selectedGame}. Click to change.`;
+    // Find which source this game belongs to
+    let displayName = state.selectedGame;
+    if (state.parseResult.labelsBySource.length > 1) {
+      const group = state.parseResult.labelsBySource.find((g) =>
+        g.labels.includes(state.selectedGame!)
+      );
+      if (group) {
+        displayName = `${group.source}: ${state.selectedGame}`;
+      }
+    }
+    statusBarItem.text = `$(telescope) ${displayName}`;
+    statusBarItem.tooltip = `TeXFrog: viewing game ${displayName}. Click to change.`;
   } else {
     statusBarItem.text = "$(telescope) TeXFrog";
     statusBarItem.tooltip = "TeXFrog: no game selected. Click to select.";
@@ -103,12 +113,24 @@ async function selectGame(): Promise<void> {
     return;
   }
 
-  const items: vscode.QuickPickItem[] = state.parseResult.orderedLabels.map(
-    (label) => ({
-      label,
-      description: state.selectedGame === label ? "(current)" : undefined,
-    })
-  );
+  const items: vscode.QuickPickItem[] = [];
+  const groups = state.parseResult.labelsBySource;
+  const multiSource = groups.length > 1;
+
+  for (const group of groups) {
+    if (multiSource) {
+      items.push({
+        label: group.source,
+        kind: vscode.QuickPickItemKind.Separator,
+      });
+    }
+    for (const label of group.labels) {
+      items.push({
+        label,
+        description: state.selectedGame === label ? "(current)" : undefined,
+      });
+    }
+  }
 
   items.push({ label: "", kind: vscode.QuickPickItemKind.Separator });
   items.push({
