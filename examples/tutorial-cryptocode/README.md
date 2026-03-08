@@ -151,7 +151,20 @@ Procedure headers use `\tfonly*` (starred) so they appear in individual games bu
 
 ## Step 2 — Running the Tutorial
 
-From the repo root:
+### Compiling with pdflatex (no Python needed)
+
+The `.tex` file compiles directly with `pdflatex`. You just need `texfrog.sty` in the same directory (or installed where TeX can find it):
+
+```bash
+cd examples/tutorial-cryptocode
+pdflatex main.tex
+```
+
+This also works on Overleaf — upload `texfrog.sty`, `main.tex`, `macros.tex`, and the `commentary/` files to a project and compile.
+
+### Building the HTML viewer (requires Python CLI)
+
+If you have the Python CLI installed, you can also build an interactive HTML viewer:
 
 ```bash
 # Build an interactive HTML viewer

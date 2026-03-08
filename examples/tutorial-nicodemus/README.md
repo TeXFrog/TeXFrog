@@ -110,7 +110,20 @@ In nicodemus, procedure headers use `\nicodemusheader{...}` above `\begin{nicode
 
 ## Running the Tutorial
 
-From the repo root:
+### Compiling with pdflatex (no Python needed)
+
+The `.tex` file compiles directly with `pdflatex`. You just need `texfrog.sty` and `nicodemus.sty` in the same directory:
+
+```bash
+cd examples/tutorial-nicodemus
+pdflatex main.tex
+```
+
+This also works on Overleaf — upload `texfrog.sty`, `nicodemus.sty`, `main.tex`, `macros.tex`, and the `commentary/` files to a project and compile.
+
+### Building the HTML viewer (requires Python CLI)
+
+If you have the Python CLI installed, you can also build an interactive HTML viewer:
 
 ```bash
 # Build an interactive HTML viewer

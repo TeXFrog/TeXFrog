@@ -13,8 +13,8 @@ A game-hopping proof consists of a sequence of games (and reductions) where adja
 
 The `.tex` file is the **single source of truth**. It serves two purposes:
 
-1. **Direct LaTeX compilation** via `pdflatex` using the `texfrog.sty` package, which handles game filtering, automatic diff highlighting, and consolidated figures entirely at compile time.
-2. **HTML export** via the Python CLI tool (`texfrog html build`), which parses the same `.tex` file and builds an interactive HTML site with side-by-side game comparison, commentary, and MathJax rendering.
+1. **Direct LaTeX compilation** via `pdflatex` using the `texfrog.sty` package, which handles game filtering, automatic diff highlighting, and consolidated figures entirely at compile time. This works standalone — you only need `texfrog.sty` in your project directory (or on Overleaf), with no Python installation required.
+2. **HTML export** (optional) via the Python CLI tool (`texfrog html build`), which parses the same `.tex` file and builds an interactive HTML site with side-by-side game comparison, commentary, and MathJax rendering.
 
 A minimal `.tex` file looks like this:
 
@@ -94,6 +94,9 @@ Register the games and reductions in your proof using the following commands. Th
 Labels can be anything: `G0`, `Red2`, `Hybrid3`, `BadEvent` --- TeXFrog treats them as arbitrary strings.
 
 ### Macros and Preamble
+
+> [!NOTE]
+> The `\tfmacrofile`, `\tfpreamble`, `\tfcommentary`, and `\tffigure` commands are metadata for the Python CLI's HTML export. They are silently ignored during normal `pdflatex` compilation, so they are harmless to include even if you only use the LaTeX package.
 
 **`\tfmacrofile{macros.tex}`** declares a macro file (relative to the `.tex` file's location) that should be included in the HTML build. You can use multiple `\tfmacrofile` commands. `.tex` files are `\input`-ed into the HTML compilation. `.sty` and `.cls` files are copied to the build directory (so `\usepackage` can find them) but are NOT `\input`-ed.
 
@@ -292,10 +295,10 @@ When generating the LaTeX output, TeXFrog wraps changed lines in `\tfchanged{}` 
 
 ## Examples
 
-The repository includes worked examples you can study and run:
+The repository includes worked examples you can study and run. All examples compile directly with `pdflatex` (no Python needed) — just place `texfrog.sty` in the same directory.
 
-- [tutorial-pure-latex/](../examples/tutorial-pure-latex/) --- IND-CPA proof using the pure LaTeX format with `texfrog.sty` (preferred starting point)
-- [tutorial-cryptocode/](../examples/tutorial-cryptocode/) --- IND-CPA proof using `cryptocode`
+- [tutorial-pure-latex/](../examples/tutorial-pure-latex/) --- IND-CPA proof using the pure LaTeX format with `texfrog.sty` (recommended starting point, especially if you are not using the Python CLI)
+- [tutorial-cryptocode/](../examples/tutorial-cryptocode/) --- IND-CPA proof using `cryptocode` with a detailed walkthrough and commentary files
 - [tutorial-nicodemus/](../examples/tutorial-nicodemus/) --- same proof using `nicodemus`, showing the syntax differences
 - [example-compositekems/](../examples/example-compositekems/) --- larger QSH IND-CCA proof with 12 games/reductions
 - [example-ntor/](../examples/example-ntor/) --- ntor key exchange proof

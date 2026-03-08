@@ -1,6 +1,9 @@
 # Troubleshooting & FAQ
 
-Common problems proof authors encounter, organized by symptom. If your issue isn't listed here, run `texfrog check --strict proof.tex` first — it catches many problems with clear error messages.
+Common problems proof authors encounter, organized by symptom. If you have the Python CLI installed and your issue isn't listed here, run `texfrog check --strict proof.tex` first — it catches many problems with clear error messages.
+
+> [!TIP]
+> If you are using only the LaTeX package (`texfrog.sty`) without the Python CLI, the sections on [Tag and Filtering Issues](#tag-and-filtering-issues), [LaTeX Build Errors](#latex-build-errors), and the [FAQ](#faq) are relevant to you. The [HTML Build Issues](#html-build-issues) and [`texfrog check`](#texfrog-check-and-validation) sections apply only to the Python CLI.
 
 ## Tag and Filtering Issues
 
@@ -216,3 +219,11 @@ Blank lines inside `varwidth` environments (used by cryptocode's `pcvstack`) can
 ### My live-reload isn't picking up changes to a new file
 
 The file watcher monitors paths referenced in your .tex file (macro files, preamble, commentary files). After adding a new file via `\tfmacrofile` or `\tfcommentary`, save the .tex file — the watcher refreshes its file set after each rebuild.
+
+### Can I use TeXFrog on Overleaf?
+
+Yes. Upload `texfrog.sty` to your Overleaf project and use it like any other local package — add `\usepackage[package=cryptocode]{texfrog}` to your preamble. Everything that happens at compile time (game filtering, diff highlighting, consolidated figures) works on Overleaf. The Python CLI features (HTML viewer, `texfrog check`, `texfrog init`) are not available on Overleaf, but you don't need them to write and compile proofs.
+
+### Do I need Python to use TeXFrog?
+
+No. The `texfrog.sty` LaTeX package works standalone — just place it in your project directory and compile with `pdflatex`. Python is only needed if you want the interactive HTML proof viewer (`texfrog html`) or the validation/scaffolding commands (`texfrog check`, `texfrog init`).
