@@ -434,6 +434,17 @@ def generate_html(
             latex_dir = Path(stack.enter_context(tempfile.TemporaryDirectory()))
         generate_latex(proof, latex_dir)
 
+        # Helper to filter lines for a game (supports both .tex and YAML input).
+        ordered_labels = [g.label for g in proof.games]
+
+        def _filter_game(label: str) -> list[str]:
+            if proof.source_text is not None:
+                from ..tex_parser import filter_for_game_from_text
+                return filter_for_game_from_text(
+                    proof.source_text, label, ordered_labels,
+                )
+            return filter_for_game(proof.source_lines, label)
+
         # Generate removed-highlight .tex files for the side-by-side view.
         # Each non-reduction game (except the last one) may appear as the
         # "previous" panel, with red strikethrough on lines removed/changed
@@ -441,9 +452,9 @@ def generate_html(
         # use the related_games display instead.
         non_red_games = [g for g in proof.games if not g.reduction]
         for i, game in enumerate(non_red_games[:-1]):
-            prev_lines = filter_for_game(proof.source_lines, game.label)
+            prev_lines = _filter_game(game.label)
             next_game = non_red_games[i + 1]
-            next_lines = filter_for_game(proof.source_lines, next_game.label)
+            next_lines = _filter_game(next_game.label)
             removed_indices = compute_removed_lines(prev_lines, next_lines)
             _write_game_file(
                 game.label, prev_lines, removed_indices,
@@ -458,7 +469,7 @@ def generate_html(
             if game.related_games:
                 clean_labels.update(game.related_games)
         for label in clean_labels:
-            clean_lines = filter_for_game(proof.source_lines, label)
+            clean_lines = _filter_game(label)
             _write_game_file(
                 label, clean_lines, set(),
                 latex_dir / f"{label}-clean.tex",

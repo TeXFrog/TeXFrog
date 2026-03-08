@@ -351,12 +351,21 @@ def generate_latex(proof: Proof, output_dir: Path) -> None:
     profile = get_profile(proof.package)
     proc_hdr_cmd = profile.procedure_header_cmd
 
+    ordered_labels = [g.label for g in proof.games]
+
     # Build filtered lines per game, then compute diffs.
     game_lines: dict[str, list[str]] = {}
-    for game in proof.games:
-        game_lines[game.label] = filter_for_game(proof.source_lines, game.label)
-
-    ordered_labels = [g.label for g in proof.games]
+    if proof.source_text is not None:
+        # .tex format: resolve \tfonly calls per game
+        from ..tex_parser import filter_for_game_from_text
+        for game in proof.games:
+            game_lines[game.label] = filter_for_game_from_text(
+                proof.source_text, game.label, ordered_labels,
+            )
+    else:
+        # YAML format: filter by SourceLine tags
+        for game in proof.games:
+            game_lines[game.label] = filter_for_game(proof.source_lines, game.label)
 
     for i, game in enumerate(proof.games):
         label = game.label

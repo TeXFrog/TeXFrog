@@ -7,15 +7,20 @@ implementation gotchas for contributors and maintainers.
 
 ## Purpose
 
-TeXFrog is a Python tool for cryptographers who write game-hopping proofs in LaTeX.
-The core innovation is a **single combined LaTeX source file** where each line is
-optionally tagged with `%:tags:` comments indicating which games/reductions it belongs
-to. The tool then:
+TeXFrog is a tool for cryptographers who write game-hopping proofs in LaTeX.
+It has two components:
 
-1. Filters lines per game to produce individual per-game `.tex` files
-2. Diffs adjacent games and highlights changed lines with `\tfchanged{}`
-3. Produces consolidated figures showing multiple games annotated side-by-side
-4. Builds an interactive HTML site (via pdflatex → pdftocairo → SVG)
+1. **`texfrog.sty`** — a standalone LaTeX3 (expl3) package that handles game filtering,
+   automatic diff highlighting, and consolidated figures entirely at compile time.
+   Authors use `\tfonly{tags}{content}` macros inside a `\begin{tfsource}` environment,
+   then render individual games with `\tfrendergame` and figures with `\tfrenderfigure`.
+
+2. **Python CLI tool** — reads the same `.tex` file and builds an interactive HTML site
+   (via pdflatex → pdftocairo → SVG) with side-by-side game comparison, commentary,
+   MathJax rendering, and live-reload.
+
+The `.tex` file is the **single source of truth** for both LaTeX compilation and HTML
+export. A legacy YAML input format is also supported for backward compatibility.
 
 The tool supports multiple LaTeX pseudocode packages via a **package profile** system.
 Currently supported: `cryptocode` (default) and `nicodemus`. Each profile captures
@@ -28,13 +33,17 @@ differences in line separators, content mode, and macro definitions.
 ```
 TeXFrog/
 ├── pyproject.toml              # setuptools.build_meta; include = ["texfrog*"] only
+├── latex/
+│   └── texfrog.sty             # Pure LaTeX3 package for compile-time game rendering
 ├── texfrog/
 │   ├── __init__.py
 │   ├── model.py                # Dataclasses: Proof, Game, SourceLine, Figure
-│   ├── parser.py               # YAML + tagged .tex parsing, range resolution
+│   ├── tex_parser.py           # Parse .tex files with TeXFrog commands (preferred)
+│   ├── parser.py               # YAML + tagged .tex parsing (legacy), range resolution
 │   ├── filter.py               # Line filtering, diff, \tfchanged wrapping
 │   ├── packages.py             # PackageProfile dataclass + built-in profiles
-│   ├── cli.py                  # Click CLI: texfrog init / latex / html build / html serve
+│   ├── validate.py             # Proof validation checks
+│   ├── cli.py                  # Click CLI: texfrog init / check / html build / html serve
 │   ├── templates.py            # Inline template strings for texfrog init
 │   ├── watcher.py              # File watching + safe rebuild for live-reload
 │   └── output/
@@ -44,26 +53,18 @@ TeXFrog/
 ├── tests/
 │   ├── fixtures/simple/        # Minimal cryptocode YAML + source.tex for fast unit tests
 │   ├── fixtures/nicodemus/     # Minimal nicodemus YAML + source.tex for package tests
-│   ├── test_parser.py
+│   ├── test_tex_parser.py      # Tests for .tex format parsing
+│   ├── test_parser.py          # Tests for YAML format parsing
 │   ├── test_filter.py
 │   └── test_latex_output.py
 ├── examples/
-│   ├── tutorial-cryptocode/
-│   │   ├── proof.yaml          # IND-CPA tutorial proof (4 games/reductions, cryptocode)
-│   │   ├── games_source.tex    # Combined tagged source for the tutorial
-│   │   └── commentary/         # Per-game commentary .tex files (G0.tex, G1.tex, …)
-│   ├── tutorial-nicodemus/
-│   │   ├── proof.yaml          # Same IND-CPA tutorial proof using nicodemus
-│   │   ├── games_source.tex    # Combined tagged source (nicodemus syntax)
-│   │   ├── nicodemus.sty       # The nicodemus package
-│   │   └── commentary/         # Per-game commentary .tex files
-│   └── example-compositekems/
-│       ├── proof.yaml          # QSH IND-CCA proof config (12 games/reductions, cryptocode)
-│       ├── games_source.tex    # Combined tagged source for the example
-│       └── commentary/         # Per-game commentary .tex files
+│   ├── tutorial-pure-latex/    # IND-CPA tutorial using pure LaTeX format (preferred)
+│   │   ├── main.tex            # Complete document with TeXFrog commands
+│   │   └── macros.tex          # Custom macros
+│   ├── tutorial-cryptocode/    # IND-CPA tutorial (YAML format, cryptocode)
+│   ├── tutorial-nicodemus/     # IND-CPA tutorial (YAML format, nicodemus)
+│   └── example-compositekems/  # QSH IND-CCA proof (YAML format, cryptocode)
 └── CompositeKEMs/              # Reference only — NOT part of the Python package
-    ├── simple_extract.tex      # Original 562-line proof (reference/inspiration)
-    └── macros.tex              # Crypto macros used by the example
 ```
 
 **Important**: `pyproject.toml` must have `[tool.setuptools.packages.find]` with
@@ -96,19 +97,85 @@ class Figure:
 
 @dataclass
 class Proof:
-    macros: list[str]              # Paths relative to the yaml file
+    macros: list[str]              # Paths relative to the input file
     games: list[Game]              # All games/reductions in declared order
-    source_lines: list[SourceLine] # All lines from combined source
+    source_lines: list[SourceLine] # All lines from combined source (YAML format)
     commentary: dict[str, str]     # label → LaTeX text (loaded from files)
     figures: list[Figure]          # Consolidated figure specs
     package: str = "cryptocode"    # Package profile name (see packages.py)
-    preamble: Optional[str] = None # Path to extra preamble .tex (relative to YAML dir)
+    preamble: Optional[str] = None # Path to extra preamble .tex (relative to input dir)
     commentary_files: dict[str, str] = field(default_factory=dict)  # label → relative file path
+    source_text: Optional[str] = None  # Raw tfsource body (.tex format; None for YAML)
 ```
 
 ---
 
 ## Input Format
+
+### Pure LaTeX Format (Preferred)
+
+The `.tex` file is the single source of truth. It uses `texfrog.sty` for compile-time
+rendering and is parsed by `texfrog/tex_parser.py` for HTML export.
+
+```latex
+\usepackage{texfrog}
+
+% Game registration (order determines range resolution)
+\tfgames{G0, G1, Red1, G2}
+\tfgamename{G0}{G_0}
+\tfgamename{Red1}{\Bdversary_1}
+\tfdescription{G0}{The starting game.}
+\tfreduction{Red1}
+\tfrelatedgames{Red1}{G0, G1}
+
+% Metadata for Python HTML export (no-ops in LaTeX)
+\tfsetpackage{cryptocode}
+\tfmacrofile{macros.tex}
+\tfcommentary{G0}{commentary/G0.tex}
+
+% Proof source with \tfonly{tags}{content} filtering
+\begin{tfsource}{myproof}
+\begin{pcvstack}[boxed]
+  \procedure[linenumbering]{%
+    \tfonly{G0}{Game $\tfgamename{G0}$}%
+    \tfonly{G1}{Game $\tfgamename{G1}$}%
+  }{
+    \tfonly{G0}{k \sample \{0,1\}^\lambda \\}
+    b' \gets \Adversary(y) \\
+    \pcreturn b'
+  }
+\end{pcvstack}
+\end{tfsource}
+
+% Rendering
+\tfrendergame{myproof}{G0}                    % no highlighting (first game)
+\tfrendergame{myproof}{G1}                    % auto-highlighted changes
+\tfrendergame[highlight=false]{myproof}{G1}   % clean, no highlighting
+\tfrenderfigure{myproof}{G0,G1,G2}            % consolidated figure
+```
+
+**`\tfonly{tags}{content}`** — content appears only in the listed games:
+- `\tfonly{G1}{...}` — only in G1
+- `\tfonly{G0,G2}{...}` — in G0 and G2
+- `\tfonly{G0-G2}{...}` — in all games from G0 to G2 by position
+
+**`\tfonly*{tags}{content}`** — like `\tfonly` but suppressed in consolidated
+figures (`\tfrenderfigure`). Use for per-game procedure headers that should not
+appear in the combined view.
+
+**`\tffigonly{content}`** — shown only in consolidated figures, hidden in
+single-game rendering. Use for a combined header in `\tfrenderfigure` output.
+
+Typical pattern for procedure headers:
+```latex
+\procedure[linenumbering]{%
+  \tfonly*{G0}{Game $\tfgamename{G0}$}%
+  \tfonly*{G1}{Game $\tfgamename{G1}$}%
+  \tffigonly{Games $\tfgamename{G0}$--$\tfgamename{G1}$}%
+}{...}
+```
+
+### YAML Format (Legacy)
 
 ### `proof.yaml`
 
@@ -288,12 +355,11 @@ Uses `\documentclass{article}` with `[letterpaper,margin=1in]{geometry}`.
 (used internally by cryptocode's `pcvstack`), causing "Dimension too large" errors.
 
 The `\tfchanged` macro in the HTML wrapper varies by package profile:
-- **cryptocode** (math-mode content): `\newcommand{\tfchanged}[1]{\highlightbox{\ensuremath{#1}}}`
+- **cryptocode** (math-mode content): Uses `\ifmmode` to detect context — wraps with
+  `\ensuremath` inside `\highlightbox` when in math mode, plain `\highlightbox` in text mode.
+  This is necessary because procedure titles are text-mode while procedure bodies are
+  math-mode in cryptocode's `\procedure` environment.
 - **nicodemus** (text-mode content): `\newcommand{\tfchanged}[1]{\highlightbox{#1}}`
-
-For cryptocode, `\ensuremath` is required because `\adjustbox` (used by `\highlightbox`)
-processes content in text mode, but pseudocode content contains math-mode macros.
-For nicodemus, content is already in text mode, so no `\ensuremath` is needed.
 
 ### pdftocairo Behavior
 
@@ -351,20 +417,20 @@ Reductions support a `related_games` field listing zero, one, or two game labels
 ### Live Reload (`watcher.py` + `output/html.py`)
 
 When `--live-reload` is passed to `html serve`, the tool watches the proof's source
-files (YAML config, `.tex` source, macros, preamble, commentary files) using `watchdog`
+files (input .tex or YAML, macros, preamble, commentary files) using `watchdog`
 and automatically rebuilds + reloads the browser on changes.
 
 **File watching** (`watcher.py`):
-- `collect_watched_files(yaml_path)` reads the YAML with `yaml.safe_load` (lightweight,
-  does not run full `parse_proof` validation) and returns the set of absolute paths,
-  including any commentary files listed under `commentary:`.
+- `collect_watched_files(input_path)` discovers files to watch. For `.tex` input, it
+  scans for `\tfmacrofile`, `\tfpreamble`, `\tfcommentary`, and `\input` commands.
+  For YAML input, it reads the YAML with `yaml.safe_load`.
 - `_DebouncedHandler` ignores events for files not in the watched set and debounces
   rapid changes (0.5 s quiet period) before triggering a rebuild.
 - `safe_rebuild()` builds into a staging temp dir (created in `output_dir.parent` to
   guarantee same-filesystem). On success, the old output dir is atomically swapped via
   rename. On failure, the existing site is left untouched and the error is logged.
-- After each successful rebuild, the watched file set is refreshed from the YAML in case
-  it changed (e.g. a new macro file was added).
+- After each successful rebuild, the watched file set is refreshed from the input file
+  in case it changed (e.g. a new macro file was added).
 
 **Browser reload** (`output/html.py`):
 - `serve_html_live()` uses a custom `LiveReloadHandler` subclass that adds a
@@ -387,23 +453,25 @@ Built with Click. Entry point: `texfrog` → `texfrog.cli:main`.
 
 ```
 texfrog init [DIRECTORY] [--package cryptocode|nicodemus]
-texfrog latex INPUT.yaml [-o DIR]
-texfrog html build INPUT.yaml [-o DIR]
-texfrog html serve INPUT.yaml [-o DIR] [--port 8080] [--no-browser] [--live-reload]
+texfrog check INPUT [--strict]
+texfrog html build INPUT [-o DIR] [--keep-tmp]
+texfrog html serve INPUT [-o DIR] [--port 8080] [--no-browser] [--live-reload]
 ```
+
+INPUT can be a `.tex` file with TeXFrog commands (preferred), a `.yaml` file (legacy),
+or a directory containing `proof.tex` (or `proof.yaml` as fallback).
 
 ### `texfrog init`
 
-Scaffolds a new proof directory with starter files (`proof.yaml`, `games_source.tex`,
-`macros.tex`) and a `commentary/` subdirectory containing starter `.tex` files for each
-game. The `--package` option selects the template flavour (default: `cryptocode`).
+Scaffolds a new proof directory with a `proof.tex` file containing TeXFrog commands,
+a `macros.tex` file, and a `commentary/` subdirectory with starter commentary files.
+The `--package` option selects the template flavour (default: `cryptocode`).
 Existing files are never overwritten — skipped with a warning instead.
 
 Templates are stored as inline strings in `texfrog/templates.py`. Each template set
-produces a minimal 3-game proof that is immediately buildable with `texfrog latex`.
+produces a minimal 4-game proof that is immediately compilable with `pdflatex`.
 
-Default output dirs: `texfrog_latex/` (latex) and `texfrog_html/` (html), both
-created next to the input YAML file.
+Default output dir: `texfrog_html/` next to the input file.
 
 ---
 
@@ -415,7 +483,7 @@ python3 -m venv .venv
 source .venv/bin/activate   # or: .venv/bin/activate.fish for fish shell
 pip install -e ".[dev]"     # installs texfrog + pytest
 texfrog --help
-pytest tests/ -q            # 100 tests
+pytest tests/ -q            # 269 tests
 ```
 
 System requirements (not pip-installable):
@@ -427,20 +495,21 @@ System requirements (not pip-installable):
 
 ## Tutorials and Example Proofs
 
-### `examples/tutorial-cryptocode/` and `examples/tutorial-nicodemus/` — IND-CPA (cryptocode & nicodemus)
+### `examples/tutorial-pure-latex/` — IND-CPA (pure LaTeX format, preferred)
 
-Both tutorials implement the same small IND-CPA proof (4 entries: G0, G1, Red1, G2)
-for PRF-based symmetric encryption. `examples/tutorial-cryptocode/` uses `package: cryptocode` (default);
-`examples/tutorial-nicodemus/` uses `package: nicodemus`. Comparing the two shows the syntax
-differences between packages: `\procedure` vs `\begin{nicodemus}`, `\\` vs `\item`,
-`\pcreturn` vs plain `Return`, math-mode content vs text-mode content.
+Implements a small IND-CPA proof (5 entries: G0, G1, Red1, G2, G3) using the pure LaTeX
+format with `texfrog.sty`. The `.tex` file is the single source of truth — it compiles
+directly with `pdflatex` and can also be used with `texfrog html build` for the HTML viewer.
 
-### `examples/example-compositekems/` — QSH IND-CCA (cryptocode)
+### `examples/tutorial-cryptocode/` and `examples/tutorial-nicodemus/` — IND-CPA (YAML format)
 
-`examples/example-compositekems/proof.yaml` + `examples/example-compositekems/games_source.tex`
-implements the QSH IND-CCA proof from `CompositeKEMs/simple_extract.tex`, with 12
-entries: G0–G9, Red2, Red5. Uses `package: cryptocode` (default). The source file uses
-`\begin{pcvstack}[boxed]` with two `\procedure` environments (main body + oracle).
+Legacy YAML-format tutorials implementing the same small IND-CPA proof (4 entries: G0,
+G1, Red1, G2). `tutorial-cryptocode/` uses `package: cryptocode` (default);
+`tutorial-nicodemus/` uses `package: nicodemus`.
+
+### `examples/example-compositekems/` — QSH IND-CCA (YAML format, cryptocode)
+
+A larger YAML-format example with 12 entries: G0–G9, Red2, Red5.
 
 ---
 

@@ -34,12 +34,13 @@ class Figure:
 
 @dataclass
 class Proof:
-    """The top-level proof object, parsed from the YAML input."""
-    macros: list[str]               # Paths to macro .tex files (relative to yaml dir)
+    """The top-level proof object, parsed from the YAML or .tex input."""
+    macros: list[str]               # Paths to macro .tex files (relative to input dir)
     games: list[Game]               # All games/reductions in order
-    source_lines: list[SourceLine]  # Combined source lines
+    source_lines: list[SourceLine]  # Combined source lines (from YAML %:tags: format)
     commentary: dict[str, str]      # game_label -> LaTeX commentary text (loaded from files)
     figures: list[Figure]           # Consolidated figure specs
     package: str = "cryptocode"     # Package profile name (see packages.py)
-    preamble: Optional[str] = None  # Path to extra preamble .tex file (relative to yaml dir)
+    preamble: Optional[str] = None  # Path to extra preamble .tex file (relative to input dir)
     commentary_files: dict[str, str] = field(default_factory=dict)  # game_label -> relative file path
+    source_text: Optional[str] = None  # Raw tfsource body (from .tex \tfonly format)

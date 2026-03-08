@@ -12,32 +12,50 @@ pip install -e ".[dev]"          # if reinstall needed
 
 **Run tests:**
 ```bash
-.venv/bin/pytest tests/ -q       # 100 tests, should all pass
+.venv/bin/pytest tests/ -q       # 269 tests, should all pass
 ```
 
 **Try the tool:**
 ```bash
-.venv/bin/texfrog check examples/tutorial-cryptocode/proof.yaml     # validate without building
-.venv/bin/texfrog check --strict examples/example-compositekems/proof.yaml  # strict mode (warnings → exit 1)
-.venv/bin/texfrog init /tmp/tfinit                        # scaffold a new proof
+# Pure LaTeX input (.tex with TeXFrog commands — preferred)
+.venv/bin/texfrog check examples/tutorial-pure-latex/main.tex
+.venv/bin/texfrog html build examples/tutorial-pure-latex/main.tex -o /tmp/tfhtml
+.venv/bin/texfrog html serve --live-reload examples/tutorial-pure-latex/main.tex -o /tmp/tfhtml
+
+# YAML input (backward compatible)
+.venv/bin/texfrog check examples/tutorial-cryptocode/proof.yaml
+.venv/bin/texfrog html build examples/tutorial-cryptocode/proof.yaml -o /tmp/tfhtml
+
+# Scaffold a new proof
+.venv/bin/texfrog init /tmp/tfinit                        # cryptocode (default)
 .venv/bin/texfrog init /tmp/tfinit-nic --package nicodemus # nicodemus variant
-.venv/bin/texfrog latex examples/example-compositekems/proof.yaml -o /tmp/tflatex
-.venv/bin/texfrog html build examples/example-compositekems/proof.yaml -o /tmp/tfhtml
-.venv/bin/texfrog latex examples/tutorial-cryptocode/proof.yaml -o /tmp/tflatex-tutorial
-.venv/bin/texfrog latex examples/tutorial-nicodemus/proof.yaml -o /tmp/tflatex-tutorial-nic
-.venv/bin/texfrog html serve --live-reload examples/tutorial-cryptocode/proof.yaml -o /tmp/tfhtml
 ```
 
 System requirements (not pip): `pdflatex`, `pdftocairo` (or `pdf2svg`), `pdfcrop`.
 
+## Input Formats
+
+### Pure LaTeX (.tex) — Preferred
+The `.tex` file is the single source of truth. It uses the `texfrog.sty` LaTeX package
+for compilation and is parsed by `texfrog/tex_parser.py` for HTML export.
+
+Key commands: `\tfgames`, `\tfgamename`, `\tfdescription`, `\tfreduction`,
+`\tfrelatedgames`, `\tfsetpackage`, `\tfmacrofile`, `\tfpreamble`, `\tfcommentary`,
+`\tffigure`, `\begin{tfsource}...\end{tfsource}`, `\tfonly{tags}{content}`,
+`\tfonly*{tags}{content}` (suppressed in figures), `\tffigonly{content}` (figure-only),
+`\tfrendergame`, `\tfrenderfigure`.
+
+### YAML (.yaml) — Legacy
+Still supported for backward compatibility. Uses `%:tags:` comment syntax in
+separate source files. Parsed by `texfrog/parser.py`.
+
 ## Key Conventions
 
-- **Package profiles**: `package: cryptocode` (default) or `package: nicodemus` in
-  proof.yaml. Profiles are defined in `texfrog/packages.py`.
-- **Tag syntax**: `%:tags: G1,G3-G5` at end of line — ranges resolved by position
-  in the `games:` list, not alphabetically.
-- **Source line ordering**: variant lines for the same "slot" must be consecutive;
-  the tool filters but never reorders.
+- **Package profiles**: `\tfsetpackage{cryptocode}` (default) or `nicodemus`.
+  Profiles are defined in `texfrog/packages.py`.
+- **Tag syntax**: `\tfonly{G1,G3-G5}{content}` in .tex format;
+  `%:tags: G1,G3-G5` at end of line in YAML format. Ranges resolved by position
+  in the games list, not alphabetically.
 - **`\tfchanged` wrapping skips**: lines ending with `{` (procedure headers) and
   pure comment lines (starting with `%`). For nicodemus, `\item` prefix is kept
   outside `\tfchanged{}`.
@@ -45,24 +63,21 @@ System requirements (not pip): `pdflatex`, `pdftocairo` (or `pdf2svg`), `pdfcrop
   wraps it in `\ensuremath` (LaTeX) or `$...$` (HTML/MathJax).
 - **Blank lines are stripped** from per-game `.tex` output to avoid `varwidth`
   dimension errors inside `pcvstack` environments.
-- **.sty/.cls files** in `macros:` are copied but not `\input`'d (loaded via `\usepackage`).
 
 ## Critical HTML Build Gotchas
 
 - Use `\documentclass{article}` — NOT `standalone` (incompatible with pcvstack).
 - Do NOT use `\usepackage[active,tightpage]{preview}` — conflicts with `varwidth`.
-- HTML wrapper `\tfchanged` uses `\ensuremath{#1}` for cryptocode (math-mode content)
-  but plain `{#1}` for nicodemus (text-mode content). This is handled automatically
-  by the package profile.
+- HTML wrapper `\tfchanged` uses `\ifmmode` to detect math vs text context:
+  in math mode wraps with `\ensuremath`, in text mode passes through directly.
+  This allows wrapping both procedure body content (math) and title content (text).
 - `pdftocairo -svg in.pdf out.svg` writes to the exact path given (no `.svg` appended).
-- Files are copied to a flat temp dir before pdflatex — paths with spaces (this project
-  lives in "Formal methods/") break `\input{}`.
+- Files are copied to a flat temp dir before pdflatex — paths with spaces break `\input{}`.
 
 ## When Making Changes
 
 - **Update user documentation**: When adding or changing features, update the relevant
-  docs (e.g., `docs/*.md`, tutorial READMEs, example `proof.yaml` files)
-  to reflect the new behavior.
+  docs (e.g., `docs/*.md`, tutorial READMEs, example files) to reflect the new behavior.
 - **Write unit tests**: For any new feature or bug fix, add both positive tests
   (expected behavior works correctly) and negative tests (invalid input is rejected
   with appropriate errors/warnings) in `tests/`.

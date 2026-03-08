@@ -53,13 +53,21 @@ class PackageProfile:
     def html_tfchanged(self) -> str:
         r"""``\newcommand`` definition for the HTML wrapper."""
         if self.math_mode_content:
-            return r"\newcommand{\tfchanged}[1]{\highlightbox{\ensuremath{#1}}}"
+            return (
+                r"\newcommand{\tfchanged}[1]{"
+                r"\ifmmode\highlightbox{\ensuremath{#1}}"
+                r"\else\highlightbox{#1}\fi}"
+            )
         return r"\newcommand{\tfchanged}[1]{\highlightbox{#1}}"
 
     def html_tfremoved(self) -> str:
         r"""``\newcommand`` definition for the HTML wrapper."""
         if self.math_mode_content:
-            return r"\newcommand{\tfremoved}[1]{\textcolor{red}{\ensuremath{#1}}}"
+            return (
+                r"\newcommand{\tfremoved}[1]{"
+                r"\ifmmode\textcolor{red}{\ensuremath{#1}}"
+                r"\else\textcolor{red}{#1}\fi}"
+            )
         return r"\newcommand{\tfremoved}[1]{\textcolor{red}{#1}}"
 
     def html_tfgamelabel(self) -> str:

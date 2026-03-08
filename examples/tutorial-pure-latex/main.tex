@@ -1,0 +1,83 @@
+\documentclass{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[n,advantage,operators,sets,adversary,landau,probability,notions,logic,ff,mm,primitives,events,complexity,oracles,asymptotics,keys]{cryptocode}
+\usepackage{texfrog}
+
+\input{macros.tex}
+
+%%% Game registration
+\tfgames{G0, G1, Red1, G2, G3}
+\tfgamename{G0}{G_0}
+\tfgamename{G1}{G_1}
+\tfgamename{Red1}{\Bdversary_1}
+\tfgamename{G2}{G_2}
+\tfgamename{G3}{G_3}
+
+\tfdescription{G0}{Starting game (real IND-CPA).}
+\tfdescription{G1}{Replace PRF with truly random function.}
+\tfdescription{Red1}{Reduction to PRF security.}
+\tfdescription{G2}{Replace random function output with uniform randomness.}
+\tfdescription{G3}{Ciphertext independent of message.}
+
+\tfreduction{Red1}
+\tfrelatedgames{Red1}{G0, G1}
+
+\tfsetpackage{cryptocode}
+\tfmacrofile{macros.tex}
+
+%%% Proof source
+\begin{tfsource}{indcpa}
+\begin{pcvstack}[boxed]
+  \procedure[linenumbering]{%
+    \tfonly*{G0}{Game $\tfgamename{G0} = \INDCPA_\Enc^\Adversary()$}%
+    \tfonly*{G1}{Game $\tfgamename{G1}$}%
+    \tfonly*{G2}{Game $\tfgamename{G2}$}%
+    \tfonly*{G3}{Game $\tfgamename{G3}$}%
+    \tfonly*{Red1}{Reduction $\Bdversary_1^{\OPRF}$}%
+    \tffigonly{Games $\tfgamename{G0}$--$\tfgamename{G3}$}%
+  }{
+    \tfonly{G0}{k \getsr \{0,1\}^\lambda \\}
+    b \getsr \{0,1\} \\
+    b' \gets \Adversary^{\mathsf{LR}}() \\
+    \pcreturn (b' = b)
+  }
+  \pclb
+  \procedure[linenumbering]{$\mathsf{LR}(m_0, m_1)$}{
+    r \getsr \{0,1\}^\lambda \\
+    \tfonly{G0}{y \gets \mathrm{PRF}(k, r) \\}
+    \tfonly{G1}{y \gets \RF(r) \\}
+    \tfonly{G2}{y \getsr \{0,1\}^\lambda \\}
+    \tfonly{Red1}{y \gets \OPRF(r) \\}
+    \tfonly{G0-G2}{c \gets y \oplus m_b \\}
+    \tfonly{G3}{c \getsr \{0,1\}^\lambda \\}
+    \pcreturn (r, c)
+  }
+\end{pcvstack}
+\end{tfsource}
+
+\begin{document}
+
+\section*{IND-CPA Proof (Pure \LaTeX{} TeXFrog)}
+
+\subsection*{Game $\tfgamename{G0}$ (no highlighting --- first game)}
+\tfrendergame{indcpa}{G0}
+
+\subsection*{Game $\tfgamename{G1}$ (with highlighting)}
+\tfrendergame{indcpa}{G1}
+
+\subsection*{Game $\tfgamename{G1}$ (clean, no highlighting)}
+\tfrendergame[highlight=false]{indcpa}{G1}
+
+\subsection*{Game $\tfgamename{G2}$ (with highlighting)}
+\tfrendergame{indcpa}{G2}
+
+\subsection*{Reduction $\tfgamename{Red1}$ (with highlighting)}
+\tfrendergame{indcpa}{Red1}
+
+\subsection*{Game $\tfgamename{G3}$ (with highlighting)}
+\tfrendergame{indcpa}{G3}
+
+\subsection*{Consolidated figure}
+\tfrenderfigure{indcpa}{G0,G1,G2,G3}
+
+\end{document}

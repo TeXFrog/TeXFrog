@@ -1,0 +1,631 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{texfrog}[2025/01/01 TeXFrog: game-hopping proof management]
+
+\RequirePackage{xcolor}
+\RequirePackage{xparse}
+\RequirePackage{expl3}
+\RequirePackage{l3keys2e}
+
+% ======================================================================
+% expl3 implementation
+% ======================================================================
+
+\ExplSyntaxOn
+
+% ----------------------------------------------------------------------
+% Variables
+% ----------------------------------------------------------------------
+
+% Ordered sequence of game labels
+\seq_new:N \g__tf_games_seq
+
+% Game name property list: label -> latex_name
+\prop_new:N \g__tf_gamename_prop
+
+% Reduction set (labels that are reductions)
+\prop_new:N \g__tf_reduction_prop
+
+% Related games property list: label -> comma-list of related labels
+\prop_new:N \g__tf_related_prop
+
+% Current mode for \tfonly:
+%   0 = inactive (inside tfsource capture)
+%   1 = record (recording pass)
+%   2 = render (render with highlighting)
+%   3 = clean (render without highlighting)
+%   4 = figure
+\int_new:N \g__tf_mode_int
+
+% Current game label being rendered
+\tl_new:N \g__tf_current_game_tl
+
+% Sequential counter for \tfonly positions
+\int_new:N \g__tf_pos_int
+
+% Property list recording active positions from recording pass
+% Maps position (as string) -> "1"
+\prop_new:N \g__tf_recorded_prop
+
+% Package profile: "cryptocode" or "nicodemus"
+\tl_new:N \g__tf_package_tl
+\tl_gset:Nn \g__tf_package_tl { cryptocode }
+
+% Whether content is math mode (derived from package)
+\bool_new:N \g__tf_math_mode_bool
+\bool_gset_true:N \g__tf_math_mode_bool
+
+% Whether package uses \\ line separators
+\bool_new:N \g__tf_line_sep_bool
+\bool_gset_true:N \g__tf_line_sep_bool
+
+% Game label comment command (e.g., \pccomment for cryptocode)
+\tl_new:N \g__tf_gamelabel_cmd_tl
+\tl_gset:Nn \g__tf_gamelabel_cmd_tl { \pccomment }
+
+% Figure game list (comma list of labels for current figure rendering)
+\clist_new:N \g__tf_figure_games_clist
+
+% Flag: was the previous output a procedure header? (for deduplication)
+\bool_new:N \g__tf_last_was_proc_header_bool
+
+% Scratch box for recording pass
+\box_new:N \g__tf_scratch_box
+
+% ======================================================================
+% Game registration
+% ======================================================================
+
+% \tfgames{G0, G1, Red1, G2, G3}
+\NewDocumentCommand{\tfgames}{ m }
+  {
+    \seq_gclear:N \g__tf_games_seq
+    \clist_map_inline:nn { #1 }
+      {
+        \seq_gput_right:Nn \g__tf_games_seq { ##1 }
+      }
+  }
+
+% \tfgamename{G0}{G_0}
+\NewDocumentCommand{\tfgamename}{ m m }
+  {
+    \prop_gput:Nnn \g__tf_gamename_prop { #1 } { #2 }
+  }
+
+% \tfreduction{Red1}
+\NewDocumentCommand{\tfreduction}{ m }
+  {
+    \prop_gput:Nnn \g__tf_reduction_prop { #1 } { 1 }
+  }
+
+% \tfrelatedgames{Red1}{G0, G1}
+\NewDocumentCommand{\tfrelatedgames}{ m m }
+  {
+    \prop_gput:Nnn \g__tf_related_prop { #1 } { #2 }
+  }
+
+% ======================================================================
+% Game name dispatch macro
+% ======================================================================
+
+% \tfgamename lookup: \tfgn{label} -> \ensuremath{latex_name}
+% We use \@nameuse-style dispatch via the prop, but for compatibility
+% with the existing pattern, define a user-level command.
+\cs_new_protected:Nn \__tf_gamename_use:n
+  {
+    \prop_get:NnNTF \g__tf_gamename_prop { #1 } \l_tmpa_tl
+      { \ensuremath{ \tl_use:N \l_tmpa_tl } }
+      { \textbf{??#1??} }
+  }
+
+% Redefine \tfgamename for use in document body (dispatch mode).
+% In the preamble it sets names; in the body it looks them up.
+% We handle this by checking arguments: 1 arg = lookup, 2 args = define.
+% Actually, let's use separate commands to keep it clean:
+% \tfgamename{label}{name} for defining (preamble)
+% \tfgn{label} for using in text
+% But the plan says \tfgamename is used both ways. Let's make it work:
+% If called with 1 arg, look up. If called with 2 args, define.
+
+% Override the earlier definition:
+\RenewDocumentCommand{\tfgamename}{ m g }
+  {
+    \IfNoValueTF { #2 }
+      { \__tf_gamename_use:n { #1 } }
+      { \prop_gput:Nnn \g__tf_gamename_prop { #1 } { #2 } }
+  }
+
+% ======================================================================
+% No-op commands (consumed by Python parser, ignored by LaTeX)
+% ======================================================================
+
+\NewDocumentCommand{\tfsetpackage}{ m }
+  {
+    \tl_gset:Nn \g__tf_package_tl { #1 }
+    \str_if_eq:nnTF { #1 } { nicodemus }
+      {
+        \bool_gset_false:N \g__tf_math_mode_bool
+        \bool_gset_false:N \g__tf_line_sep_bool
+        \tl_gset:Nn \g__tf_gamelabel_cmd_tl { }
+      }
+      {
+        \bool_gset_true:N \g__tf_math_mode_bool
+        \bool_gset_true:N \g__tf_line_sep_bool
+        \tl_gset:Nn \g__tf_gamelabel_cmd_tl { \pccomment }
+      }
+  }
+
+\NewDocumentCommand{\tfmacrofile}{ m }{ }
+\NewDocumentCommand{\tfpreamble}{ m }{ }
+\NewDocumentCommand{\tfcommentary}{ m m }{ }
+\NewDocumentCommand{\tfdescription}{ m m }{ }
+\NewDocumentCommand{\tffigure}{ o m m }{ }
+
+% ======================================================================
+% Tag parsing and range resolution
+% ======================================================================
+
+% Resolve a tag string (e.g., "G0,G2-G4") to a property list
+% where each matching label maps to "1".
+% Result stored in \l__tf_resolved_tags_prop
+\prop_new:N \l__tf_resolved_tags_prop
+
+% Helper: find index of label in games sequence. Returns -1 if not found.
+\int_new:N \l__tf_idx_int
+
+\cs_new:Nn \__tf_find_index:nN
+  {
+    \int_set:Nn #2 { -1 }
+    \int_zero:N \l__tf_idx_int
+    \seq_map_inline:Nn \g__tf_games_seq
+      {
+        \str_if_eq:nnT { ##1 } { #1 }
+          {
+            \int_set_eq:NN #2 \l__tf_idx_int
+            \seq_map_break:
+          }
+        \int_incr:N \l__tf_idx_int
+      }
+  }
+
+\int_new:N \l__tf_range_start_int
+\int_new:N \l__tf_range_end_int
+\int_new:N \l__tf_range_i_int
+
+\cs_new_protected:Nn \__tf_resolve_tags:n
+  {
+    \prop_clear:N \l__tf_resolved_tags_prop
+    \clist_map_inline:nn { #1 }
+      {
+        \__tf_resolve_single_tag:n { ##1 }
+      }
+  }
+
+% Process a single tag token (may be a label or a range like G0-G3).
+\tl_new:N \l__tf_tag_token_tl
+\cs_new_protected:Nn \__tf_resolve_single_tag:n
+  {
+    \tl_set:Nn \l__tf_tag_token_tl { #1 }
+    % Check if it contains a hyphen by trying to split
+    \__tf_try_range:nTF { #1 }
+      { } % range was resolved, nothing more to do
+      {
+        % Not a range — treat as a literal label
+        \prop_put:Nnn \l__tf_resolved_tags_prop { #1 } { 1 }
+      }
+  }
+
+% Try to interpret token as a range. Returns true if successful.
+% Strategy: try splitting on "-" at each position.
+\prg_new_conditional:Nnn \__tf_try_range:n { TF }
+  {
+    \__tf_try_range_aux:n { #1 }
+  }
+
+\tl_new:N \l__tf_range_before_tl
+\tl_new:N \l__tf_range_after_tl
+\bool_new:N \l__tf_range_found_bool
+
+\cs_new_protected:Nn \__tf_try_range_aux:n
+  {
+    \bool_set_false:N \l__tf_range_found_bool
+    % Use regex to find "X-Y" pattern where X and Y are non-empty
+    \tl_set:Nn \l_tmpa_tl { #1 }
+    % Simple approach: split on first hyphen
+    \exp_args:NnV \__tf_split_on_hyphen:nnN { #1 } \l_tmpa_tl \l__tf_range_found_bool
+    \bool_if:NTF \l__tf_range_found_bool
+      { \prg_return_true: }
+      { \prg_return_false: }
+  }
+
+% Split string on hyphen, try each split point.
+% For simplicity, try the first hyphen position.
+\cs_new_protected:Nn \__tf_split_on_hyphen:nnN
+  {
+    % We'll manually scan for hyphens in the string
+    \bool_set_false:N #3
+    \str_set:Nn \l_tmpa_str { #1 }
+    \int_step_inline:nn { \str_count:N \l_tmpa_str }
+      {
+        \bool_if:NF #3
+          {
+            \str_if_eq:eeT { \str_item:Nn \l_tmpa_str { ##1 } } { - }
+              {
+                % Try split at position ##1
+                \tl_set:Ne \l__tf_range_before_tl
+                  { \str_range:Nnn \l_tmpa_str { 1 } { \int_eval:n { ##1 - 1 } } }
+                \tl_set:Ne \l__tf_range_after_tl
+                  { \str_range:Nnn \l_tmpa_str { \int_eval:n { ##1 + 1 } } { -1 } }
+                % Check both are valid labels
+                \int_set:Nn \l__tf_range_start_int { -1 }
+                \int_set:Nn \l__tf_range_end_int { -1 }
+                \exp_args:NV \__tf_find_index:nN \l__tf_range_before_tl \l__tf_range_start_int
+                \exp_args:NV \__tf_find_index:nN \l__tf_range_after_tl \l__tf_range_end_int
+                \bool_lazy_and:nnT
+                  { \int_compare_p:nNn \l__tf_range_start_int > { -1 } }
+                  { \int_compare_p:nNn \l__tf_range_end_int > { -1 } }
+                  {
+                    % Valid range — add all labels from start to end
+                    \int_step_inline:nnn
+                      { \l__tf_range_start_int }
+                      { \l__tf_range_end_int }
+                      {
+                        \prop_put:Nen \l__tf_resolved_tags_prop
+                          { \seq_item:Nn \g__tf_games_seq { \int_eval:n { ####1 + 1 } } }
+                          { 1 }
+                      }
+                    \bool_set_true:N #3
+                  }
+              }
+          }
+      }
+  }
+
+% Variant needed for putting expanded key
+\cs_generate_variant:Nn \prop_put:Nnn { Ne, Nen }
+\cs_generate_variant:Nn \__tf_find_index:nN { VN }
+
+% Check if a game label is in the resolved tags
+\prg_new_conditional:Nnn \__tf_game_in_tags:n { TF, T, F }
+  {
+    \prop_if_in:NnTF \l__tf_resolved_tags_prop { #1 }
+      { \prg_return_true: }
+      { \prg_return_false: }
+  }
+
+\cs_generate_variant:Nn \__tf_game_in_tags:nTF { VTF }
+\cs_generate_variant:Nn \__tf_game_in_tags:nT { VT }
+
+% ======================================================================
+% tfsource environment — capture body as token list
+% ======================================================================
+
+% Storage: \g__tf_source_<name>_tl
+\NewDocumentEnvironment{tfsource}{ m +b }
+  {
+  }
+  {
+    \tl_gclear_new:c { g__tf_source_ #1 _tl }
+    \tl_gset:cn { g__tf_source_ #1 _tl } { #2 }
+  }
+
+% ======================================================================
+% \tfonly — conditional content based on game tags
+% ======================================================================
+
+\NewDocumentCommand{\tfonly}{ s m +m }
+  {
+    \int_case:nnF { \g__tf_mode_int }
+      {
+        { 0 } { } % inactive: do nothing (captured in tfsource)
+        { 1 } { \__tf_only_record:nn { #2 } { #3 } }
+        { 2 } { \__tf_only_render:nn { #2 } { #3 } }
+        { 3 } { \__tf_only_clean:nn { #2 } { #3 } }
+        { 4 } {
+                 \IfBooleanTF { #1 }
+                   { \int_gincr:N \g__tf_pos_int } % star: suppress in figures
+                   { \__tf_only_figure:nn { #2 } { #3 } }
+               }
+      }
+      { } % unknown mode: do nothing
+  }
+
+% \tffigonly{content} — shown only in figure mode, hidden in all others
+\NewDocumentCommand{\tffigonly}{ +m }
+  {
+    \int_compare:nNnT \g__tf_mode_int = { 4 }
+      { #1 }
+  }
+
+% --- Record mode ---
+% Records which positions are active AND outputs matching content
+% so that structural LaTeX (procedure environments, etc.) stays intact
+% inside the discarded vbox.
+\cs_new_protected:Nn \__tf_only_record:nn
+  {
+    \int_gincr:N \g__tf_pos_int
+    \__tf_resolve_tags:n { #1 }
+    \__tf_game_in_tags:VTF \g__tf_current_game_tl
+      {
+        \prop_gput:Nen \g__tf_recorded_prop
+          { \int_use:N \g__tf_pos_int } { 1 }
+        #2 % output content to keep LaTeX structure valid
+      }
+      { } % not matching — suppress
+  }
+
+% --- Clean render mode (no highlighting) ---
+\cs_new_protected:Nn \__tf_only_clean:nn
+  {
+    \int_gincr:N \g__tf_pos_int
+    \__tf_resolve_tags:n { #1 }
+    \__tf_game_in_tags:VTF \g__tf_current_game_tl
+      { #2 }
+      { }
+  }
+
+% --- Render mode (with highlighting) ---
+\cs_new_protected:Nn \__tf_only_render:nn
+  {
+    \int_gincr:N \g__tf_pos_int
+    \__tf_resolve_tags:n { #1 }
+    \__tf_game_in_tags:VTF \g__tf_current_game_tl
+      {
+        % Check if this position was recorded in previous game
+        \prop_if_in:NeTF \g__tf_recorded_prop
+          { \int_use:N \g__tf_pos_int }
+          { #2 } % was in previous game too — output without highlight
+          { \__tf_wrap_changed:n { #2 } } % new/changed — highlight
+      }
+      { } % not in current game — suppress
+  }
+
+\cs_generate_variant:Nn \prop_if_in:NnTF { NeTF }
+
+% --- Figure mode ---
+\cs_new_protected:Nn \__tf_only_figure:nn
+  {
+    \int_gincr:N \g__tf_pos_int
+    \__tf_resolve_tags:n { #1 }
+    % Count how many of the figure games are in the tags
+    \int_zero:N \l_tmpa_int
+    \int_zero:N \l_tmpb_int % total figure games
+    \tl_clear:N \l_tmpa_tl % matching game names
+    \bool_set_false:N \l_tmpa_bool % first flag
+    \clist_map_inline:Nn \g__tf_figure_games_clist
+      {
+        \int_incr:N \l_tmpb_int
+        \__tf_game_in_tags:nT { ##1 }
+          {
+            \int_incr:N \l_tmpa_int
+            \bool_if:NTF \l_tmpa_bool
+              { \tl_put_right:Nn \l_tmpa_tl { , } }
+              { \bool_set_true:N \l_tmpa_bool }
+            \tl_put_right:Nn \l_tmpa_tl { \tfgamename{##1} }
+          }
+      }
+    \int_compare:nNnTF \l_tmpa_int = \l_tmpb_int
+      { #2 } % all games match — output verbatim
+      {
+        \int_compare:nNnTF \l_tmpa_int = { 0 }
+          { } % no games match — suppress
+          { \__tf_wrap_gamelabel:nn { \l_tmpa_tl } { #2 } }
+      }
+  }
+
+% ======================================================================
+% Change highlighting: \tfchanged wrapping
+% ======================================================================
+
+% The \tfchanged macro (user-facing, can be redefined).
+% Uses \ifmmode to handle both math-mode content (procedure bodies in
+% cryptocode) and text-mode content (procedure titles, nicodemus).
+\providecommand{\tfchanged}[1]{%
+  \ifmmode
+    \colorbox{blue!15}{$\displaystyle#1$}%
+  \else
+    \colorbox{blue!15}{#1}%
+  \fi
+}
+
+% Internal wrapper that extracts trailing \\ and leading \item
+\cs_new_protected:Nn \__tf_wrap_changed:n
+  {
+    \__tf_do_wrap:nnN { #1 } { } \tfchanged
+  }
+
+% Game label wrapping for figures
+\tl_if_empty:NTF \g__tf_gamelabel_cmd_tl
+  {
+    % nicodemus style: custom comment
+    \providecommand{\tfniccommentseparator}
+      {{\color{black!65}\smash{\textbackslash\!\!\textbackslash\hspace{0.1em}}}}
+    \providecommand{\tfniccodecomment}[1]
+      {{\scriptsize{\hfill\tfniccommentseparator{#1}}}}
+    \providecommand{\tfgamelabel}[2]{#2~\tfniccodecomment{#1}}
+  }
+  {
+    % cryptocode style: use \pccomment
+    \providecommand{\tfgamelabel}[2]{#2~\pccomment{#1}}
+  }
+
+\cs_new_protected:Nn \__tf_wrap_gamelabel:nn
+  {
+    \__tf_do_wrap:nnN { #2 } { #1 } \tfgamelabel
+  }
+
+% Core wrapping logic: extract trailing \\
+%
+% The approach: we define a delimited helper that checks if the
+% token list ends with \\. We use \tl_if_in:NnTF to check for \\,
+% then use a delimited macro to split at the last \\.
+%
+% Simpler approach for robustness: scan the token list for \\ using
+% a known-safe pattern match.
+
+\tl_new:N \l__tf_wrap_content_tl
+\tl_new:N \l__tf_wrap_suffix_tl
+
+% Try to strip trailing \\ from content. Uses a grabber macro.
+% We append a sentinel and check if \\ precedes it.
+\tl_new:N \l__tf_wrap_input_tl
+
+\cs_new_protected:Nn \__tf_do_wrap:nnN
+  {
+    % #1 = content, #2 = extra first arg (empty for tfchanged, game names for gamelabel), #3 = macro
+    \tl_set:Nn \l__tf_wrap_content_tl { #1 }
+    \tl_clear:N \l__tf_wrap_suffix_tl
+    % Check for trailing \\ by testing if the tl contains \\
+    % and trying to remove it from the end
+    \tl_if_in:NnTF \l__tf_wrap_content_tl { \\ }
+      {
+        % Has \\ somewhere. Try the split approach.
+        \__tf_split_at_trailing_bs:N \l__tf_wrap_content_tl
+      }
+      { }
+    % Apply wrapping
+    \tl_if_empty:nTF { #2 }
+      { #3 { \tl_use:N \l__tf_wrap_content_tl } }
+      { #3 { #2 } { \tl_use:N \l__tf_wrap_content_tl } }
+    \tl_use:N \l__tf_wrap_suffix_tl
+  }
+
+% Split at trailing \\: append a unique sentinel, grab everything
+% before the last \\ and everything after.
+% Strategy: Use regex replacement to remove trailing \\ if present.
+% Simpler: Just use \tl_reverse and check.
+\cs_new_protected:Nn \__tf_split_at_trailing_bs:N
+  {
+    % We use a trick: set a test token list to the reversed version
+    % and check if it starts with \\
+    \group_begin:
+      \tl_set_eq:NN \l_tmpa_tl #1
+      % Use the delimiter trick: define a helper that grabs up to \\
+      % at the end. We'll test by appending \\ \q_stop and parsing.
+    \group_end:
+    % Fallback: use regex to strip trailing \\
+    \regex_replace_once:nnNTF { (.*) \c{\\} \s* \Z } { \1 } #1
+      { \tl_set:Nn \l__tf_wrap_suffix_tl { ~ \\ } }
+      { }
+  }
+
+% ======================================================================
+% \tfrendergame — render a specific game
+% ======================================================================
+
+\keys_define:nn { texfrog / rendergame }
+  {
+    highlight .bool_set:N = \l__tf_highlight_bool,
+    highlight .default:n = true,
+    highlight .initial:n = true,
+  }
+
+\NewDocumentCommand{\tfrendergame}{ O{} m m }
+  {
+    \group_begin:
+    \keys_set:nn { texfrog / rendergame } { #1 }
+    \bool_if:NTF \l__tf_highlight_bool
+      { \__tf_render_game_highlighted:nn { #2 } { #3 } }
+      { \__tf_render_game_clean:nn { #2 } { #3 } }
+    \group_end:
+  }
+
+% Clean rendering (no highlighting)
+\cs_new_protected:Nn \__tf_render_game_clean:nn
+  {
+    \tl_gset:Nn \g__tf_current_game_tl { #2 }
+    \int_gset:Nn \g__tf_pos_int { 0 }
+    \int_gset:Nn \g__tf_mode_int { 3 } % clean mode
+    \tl_use:c { g__tf_source_ #1 _tl }
+    \int_gset:Nn \g__tf_mode_int { 0 } % back to inactive
+  }
+
+% Highlighted rendering (with diff)
+\cs_new_protected:Nn \__tf_render_game_highlighted:nn
+  {
+    % Determine previous game
+    \tl_clear:N \l_tmpa_tl % will hold previous game label
+    \__tf_find_prev_game:nN { #2 } \l_tmpa_tl
+
+    \tl_if_empty:NTF \l_tmpa_tl
+      {
+        % No previous game — render clean (first game)
+        \__tf_render_game_clean:nn { #1 } { #2 }
+      }
+      {
+        % Recording pass: expand source for previous game, record positions
+        \prop_gclear:N \g__tf_recorded_prop
+        \int_gset:Nn \g__tf_pos_int { 0 }
+        \int_gset:Nn \g__tf_mode_int { 1 } % record mode
+        \tl_gset_eq:NN \g__tf_current_game_tl \l_tmpa_tl
+        \vbox_set:Nn \g__tf_scratch_box
+          { \tl_use:c { g__tf_source_ #1 _tl } }
+        \box_gclear:N \g__tf_scratch_box
+
+        % Render pass: expand source for current game with highlighting
+        \int_gset:Nn \g__tf_pos_int { 0 }
+        \int_gset:Nn \g__tf_mode_int { 2 } % render mode
+        \tl_gset:Nn \g__tf_current_game_tl { #2 }
+        \tl_use:c { g__tf_source_ #1 _tl }
+        \int_gset:Nn \g__tf_mode_int { 0 } % back to inactive
+      }
+  }
+
+% Find previous game for diffing.
+% For non-reductions: previous non-reduction game.
+% For reductions: immediately preceding game.
+% For first game: empty.
+\cs_new_protected:Nn \__tf_find_prev_game:nN
+  {
+    \tl_clear:N #2
+    % Find index of current game
+    \int_set:Nn \l__tf_range_start_int { -1 }
+    \__tf_find_index:nN { #1 } \l__tf_range_start_int
+    \int_compare:nNnT \l__tf_range_start_int > { 0 }
+      {
+        % Check if current game is a reduction
+        \prop_if_in:NnTF \g__tf_reduction_prop { #1 }
+          {
+            % Reduction: previous is immediately preceding game
+            \tl_set:Ne #2
+              { \seq_item:Nn \g__tf_games_seq { \l__tf_range_start_int } }
+          }
+          {
+            % Non-reduction: find previous non-reduction
+            \int_set:Nn \l__tf_range_i_int { \l__tf_range_start_int }
+            \bool_until_do:nn
+              {
+                \int_compare_p:nNn \l__tf_range_i_int < { 1 }
+              }
+              {
+                \int_decr:N \l__tf_range_i_int
+                \tl_set:Ne \l_tmpb_tl
+                  { \seq_item:Nn \g__tf_games_seq
+                    { \int_eval:n { \l__tf_range_i_int + 1 } } }
+                \prop_if_in:NnF \g__tf_reduction_prop { \l_tmpb_tl }
+                  {
+                    \tl_set_eq:NN #2 \l_tmpb_tl
+                    \int_set:Nn \l__tf_range_i_int { 0 } % break
+                  }
+              }
+          }
+      }
+  }
+
+% ======================================================================
+% \tfrenderfigure — consolidated figure
+% ======================================================================
+
+\NewDocumentCommand{\tfrenderfigure}{ o m m }
+  {
+    \group_begin:
+    \clist_gset:Nn \g__tf_figure_games_clist { #3 }
+    \int_gset:Nn \g__tf_pos_int { 0 }
+    \int_gset:Nn \g__tf_mode_int { 4 } % figure mode
+    \bool_gset_false:N \g__tf_last_was_proc_header_bool
+    \tl_use:c { g__tf_source_ #2 _tl }
+    \int_gset:Nn \g__tf_mode_int { 0 } % back to inactive
+    \group_end:
+  }
+
+% ======================================================================
+\ExplSyntaxOff

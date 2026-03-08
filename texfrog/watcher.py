@@ -6,13 +6,13 @@ Monitors proof source files for changes and triggers safe rebuilds.
 from __future__ import annotations
 
 import logging
+import re
 import shutil
 import tempfile
 import threading
 import time
 from pathlib import Path
 
-import yaml
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
 from watchdog.observers import Observer
 
@@ -33,21 +33,10 @@ def _snapshot_mtimes(files: set[Path]) -> dict[Path, float]:
     return result
 
 
-def collect_watched_files(yaml_path: Path) -> set[Path]:
-    """Return the set of absolute paths that should be monitored.
+def _collect_watched_files_yaml(yaml_path: Path) -> set[Path]:
+    """Collect watched files from a YAML proof config."""
+    import yaml
 
-    Reads the YAML file to discover the source, macros, and preamble
-    paths.  All paths are resolved relative to the YAML file's parent
-    directory.
-
-    Args:
-        yaml_path: Absolute path to the proof YAML config file.
-
-    Returns:
-        A set of resolved absolute paths including the YAML file itself,
-        the source .tex file, all macro files, and the preamble file
-        (if specified).
-    """
     paths: set[Path] = {yaml_path}
     base_dir = yaml_path.parent
 
@@ -78,6 +67,48 @@ def collect_watched_files(yaml_path: Path) -> set[Path]:
                 paths.add((base_dir / file_rel).resolve())
 
     return paths
+
+
+def _collect_watched_files_tex(tex_path: Path) -> set[Path]:
+    """Collect watched files from a .tex proof file."""
+    paths: set[Path] = {tex_path}
+    base_dir = tex_path.parent
+
+    try:
+        text = tex_path.read_text(encoding="utf-8")
+    except Exception:
+        return paths
+
+    for m in re.finditer(r"\\tfmacrofile\{([^}]+)\}", text):
+        paths.add((base_dir / m.group(1).strip()).resolve())
+
+    for m in re.finditer(r"\\tfpreamble\{([^}]+)\}", text):
+        paths.add((base_dir / m.group(1).strip()).resolve())
+
+    for m in re.finditer(r"\\tfcommentary\{[^}]+\}\{([^}]+)\}", text):
+        paths.add((base_dir / m.group(1).strip()).resolve())
+
+    for m in re.finditer(r"\\input\{([^}]+)\}", text):
+        paths.add((base_dir / m.group(1).strip()).resolve())
+
+    return paths
+
+
+def collect_watched_files(input_path: Path) -> set[Path]:
+    """Return the set of absolute paths that should be monitored.
+
+    Supports both YAML and .tex input files.
+
+    Args:
+        input_path: Absolute path to the proof config file (.tex or .yaml).
+
+    Returns:
+        A set of resolved absolute paths including the input file itself
+        and all referenced source/macro/commentary files.
+    """
+    if input_path.suffix in (".yaml", ".yml"):
+        return _collect_watched_files_yaml(input_path)
+    return _collect_watched_files_tex(input_path)
 
 
 class _DebouncedHandler(FileSystemEventHandler):
@@ -138,7 +169,7 @@ class _DebouncedHandler(FileSystemEventHandler):
 
 
 def safe_rebuild(
-    yaml_path: Path,
+    input_path: Path,
     output_dir: Path,
     keep_tmp: bool,
 ) -> bool:
@@ -147,29 +178,37 @@ def safe_rebuild(
     On success the *output_dir* is updated with new content.  On failure
     the existing *output_dir* is left untouched and the error is logged.
 
+    Supports both YAML and .tex input files.
+
     Returns:
         ``True`` if the rebuild succeeded, ``False`` otherwise.
     """
-    from .parser import parse_proof, validate_tags
     from .output.html import generate_html
 
     logger.info("Rebuilding …")
     start = time.monotonic()
 
     try:
-        proof = parse_proof(yaml_path)
+        if input_path.suffix in (".yaml", ".yml"):
+            from .parser import parse_proof, validate_tags
+            proof = parse_proof(input_path)
+            for msg in validate_tags(proof):
+                logger.warning(msg)
+        else:
+            from .tex_parser import parse_tex_proof
+            from .validate import validate_proof
+            proof = parse_tex_proof(input_path)
+            for msg in validate_proof(proof, input_path.parent):
+                logger.warning(msg)
     except Exception as exc:
         logger.error("Parse error (keeping existing site): %s", exc)
         return False
-
-    for msg in validate_tags(proof):
-        logger.warning(msg)
 
     staging_dir = Path(tempfile.mkdtemp(
         prefix="texfrog_live_", dir=output_dir.parent,
     ))
     try:
-        generate_html(proof, yaml_path.parent, staging_dir, keep_tmp=keep_tmp)
+        generate_html(proof, input_path.parent, staging_dir, keep_tmp=keep_tmp)
     except Exception as exc:
         logger.error("Build error (keeping existing site): %s", exc)
         shutil.rmtree(staging_dir, ignore_errors=True)
@@ -197,7 +236,7 @@ def safe_rebuild(
 
 
 def start_watcher(
-    yaml_path: Path,
+    input_path: Path,
     output_dir: Path,
     keep_tmp: bool,
     version: list[int],
@@ -206,7 +245,7 @@ def start_watcher(
     """Start watching proof source files for changes.
 
     Args:
-        yaml_path: Absolute path to the proof YAML config.
+        input_path: Absolute path to the proof config (.tex or .yaml).
         output_dir: Destination directory for the HTML site.
         keep_tmp: Whether to preserve intermediate files.
         version: A mutable ``[int]`` list.  ``version[0]`` is incremented
@@ -216,7 +255,7 @@ def start_watcher(
     Returns:
         The running watchdog ``Observer`` instance.
     """
-    watched = collect_watched_files(yaml_path)
+    watched = collect_watched_files(input_path)
     watched_dirs = {p.parent for p in watched}
     rebuild_lock = threading.Lock()
     last_mtimes = _snapshot_mtimes(watched)
@@ -231,13 +270,13 @@ def start_watcher(
             # successful build.  macOS FSEvents can deliver duplicate
             # events well after the debounce window, so we must guard
             # against redundant rebuilds of unchanged content.
-            current_watched = collect_watched_files(yaml_path)
+            current_watched = collect_watched_files(input_path)
             current_mtimes = _snapshot_mtimes(current_watched)
             if current_mtimes == last_mtimes:
                 logger.info("No file changes detected, skipping rebuild.")
                 return
 
-            success = safe_rebuild(yaml_path, output_dir, keep_tmp)
+            success = safe_rebuild(input_path, output_dir, keep_tmp)
             if success:
                 version[0] += 1
                 logger.info("Version bumped to %d", version[0])
