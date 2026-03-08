@@ -8,7 +8,7 @@
 
 TeXFrog helps cryptographers manage game-hopping proofs in LaTeX. If you have ever maintained a dozen nearly-identical game files by hand, copying lines between them and trying to keep highlights consistent, TeXFrog is meant to solve that problem.
 
-**Key idea:** Write your pseudocode once in a single `.tex` file. Tag content with the games it belongs to using `\tfonly{tags}{content}` commands. TeXFrog produces:
+**Key idea:** Write your pseudocode once in a single `.tex` file. Tag content with the games it belongs to using `\tfonly{games}{content}` commands. TeXFrog produces:
 
 - Individual per-game renderings with changed lines automatically highlighted (via `pdflatex` — no extra tools needed)
 - Consolidated comparison figures showing multiple games side by side (via `pdflatex`)
@@ -38,6 +38,13 @@ A snippet of the source file:
 ```
 
 Content outside `\tfonly` appears in every game. Content inside `\tfonly{tags}{...}` appears only in the listed games. Ranges like `G0-G2` are resolved by position in the game list, so reductions interleaved between games work naturally.
+
+When you want to include game figures in a certain spot in your paper:
+
+```latex
+\tfrendergame{myproof}{G1}
+\tfrendergame[diff=G1]{myproof}{G2}
+```
 
 ## Installation
 
