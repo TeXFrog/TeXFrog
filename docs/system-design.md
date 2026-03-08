@@ -117,7 +117,7 @@ The `.tex` file is the single source of truth. It uses `texfrog.sty` for compile
 rendering and is parsed by `texfrog/tex_parser.py` for HTML export.
 
 ```latex
-\usepackage{texfrog}
+\usepackage[package=cryptocode]{texfrog}
 
 % Game registration (order determines range resolution)
 \tfgames{G0, G1, Red1, G2}
@@ -128,7 +128,6 @@ rendering and is parsed by `texfrog/tex_parser.py` for HTML export.
 \tfrelatedgames{Red1}{G0, G1}
 
 % Metadata for Python HTML export (no-ops in LaTeX)
-\tfsetpackage{cryptocode}
 \tfmacrofile{macros.tex}
 \tfcommentary{G0}{commentary/G0.tex}
 

@@ -9,7 +9,7 @@ from __future__ import annotations
 CRYPTOCODE_TEX = r"""\documentclass{article}
 \usepackage[margin=1in]{geometry}
 \usepackage[n,advantage,operators,sets,adversary,landau,probability,notions,logic,ff,mm,primitives,events,complexity,oracles,asymptotics,keys]{cryptocode}
-\usepackage{texfrog}
+\usepackage[package=cryptocode]{texfrog}
 
 \input{macros.tex}
 
@@ -28,7 +28,6 @@ CRYPTOCODE_TEX = r"""\documentclass{article}
 \tfreduction{Red1}
 \tfrelatedgames{Red1}{G0, G1}
 
-\tfsetpackage{cryptocode}
 \tfmacrofile{macros.tex}
 
 \tfcommentary{G0}{commentary/G0.tex}
@@ -96,7 +95,7 @@ CRYPTOCODE_MACROS = r"""% Custom macros for this proof.
 NICODEMUS_TEX = r"""\documentclass{article}
 \usepackage[margin=1in]{geometry}
 \usepackage{nicodemus}
-\usepackage{texfrog}
+\usepackage[package=nicodemus]{texfrog}
 
 \input{macros.tex}
 
@@ -115,7 +114,6 @@ NICODEMUS_TEX = r"""\documentclass{article}
 \tfreduction{Red1}
 \tfrelatedgames{Red1}{G0, G1}
 
-\tfsetpackage{nicodemus}
 \tfmacrofile{macros.tex}
 
 \tfcommentary{G0}{commentary/G0.tex}

@@ -67,7 +67,7 @@ def test_init_nicodemus(tmp_path: Path):
     result = runner.invoke(main, ["init", str(tmp_path), "--package", "nicodemus"])
     assert result.exit_code == 0
     tex_content = (tmp_path / "proof.tex").read_text()
-    assert r"\tfsetpackage{nicodemus}" in tex_content
+    assert r"\usepackage[package=nicodemus]{texfrog}" in tex_content
     assert "nicodemusheader" in tex_content
 
 
@@ -76,7 +76,7 @@ def test_init_cryptocode_is_default(tmp_path: Path):
     result = runner.invoke(main, ["init", str(tmp_path)])
     assert result.exit_code == 0
     tex_content = (tmp_path / "proof.tex").read_text()
-    assert r"\tfsetpackage{cryptocode}" in tex_content
+    assert r"\usepackage[package=cryptocode]{texfrog}" in tex_content
     assert "pcvstack" in tex_content
 
 

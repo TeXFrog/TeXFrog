@@ -48,19 +48,41 @@
 
 % Package profile: "cryptocode" or "nicodemus"
 \tl_new:N \g__tf_package_tl
-\tl_gset:Nn \g__tf_package_tl { cryptocode }
 
 % Whether content is math mode (derived from package)
 \bool_new:N \g__tf_math_mode_bool
-\bool_gset_true:N \g__tf_math_mode_bool
 
 % Whether package uses \\ line separators
 \bool_new:N \g__tf_line_sep_bool
-\bool_gset_true:N \g__tf_line_sep_bool
 
 % Game label comment command (e.g., \pccomment for cryptocode)
 \tl_new:N \g__tf_gamelabel_cmd_tl
-\tl_gset:Nn \g__tf_gamelabel_cmd_tl { \pccomment }
+
+% ----------------------------------------------------------------------
+% Package options (processed via \usepackage[package=...]{texfrog})
+% ----------------------------------------------------------------------
+
+\keys_define:nn { texfrog }
+  {
+    package .choice:,
+    package / cryptocode .code:n =
+      {
+        \tl_gset:Nn \g__tf_package_tl { cryptocode }
+        \bool_gset_true:N \g__tf_math_mode_bool
+        \bool_gset_true:N \g__tf_line_sep_bool
+        \tl_gset:Nn \g__tf_gamelabel_cmd_tl { \pccomment }
+      },
+    package / nicodemus .code:n =
+      {
+        \tl_gset:Nn \g__tf_package_tl { nicodemus }
+        \bool_gset_false:N \g__tf_math_mode_bool
+        \bool_gset_false:N \g__tf_line_sep_bool
+        \tl_gclear:N \g__tf_gamelabel_cmd_tl
+      },
+    package .initial:n = cryptocode,
+  }
+
+\ProcessKeysOptions { texfrog }
 
 % Figure game list (comma list of labels for current figure rendering)
 \clist_new:N \g__tf_figure_games_clist
@@ -137,22 +159,6 @@
 % ======================================================================
 % No-op commands (consumed by Python parser, ignored by LaTeX)
 % ======================================================================
-
-\NewDocumentCommand{\tfsetpackage}{ m }
-  {
-    \tl_gset:Nn \g__tf_package_tl { #1 }
-    \str_if_eq:nnTF { #1 } { nicodemus }
-      {
-        \bool_gset_false:N \g__tf_math_mode_bool
-        \bool_gset_false:N \g__tf_line_sep_bool
-        \tl_gset:Nn \g__tf_gamelabel_cmd_tl { }
-      }
-      {
-        \bool_gset_true:N \g__tf_math_mode_bool
-        \bool_gset_true:N \g__tf_line_sep_bool
-        \tl_gset:Nn \g__tf_gamelabel_cmd_tl { \pccomment }
-      }
-  }
 
 \NewDocumentCommand{\tfmacrofile}{ m }{ }
 \NewDocumentCommand{\tfpreamble}{ m }{ }
@@ -437,20 +443,26 @@
     \__tf_do_wrap:nnN { #1 } { } \tfchanged
   }
 
-% Game label wrapping for figures
-\tl_if_empty:NTF \g__tf_gamelabel_cmd_tl
+% Game label wrapping for figures (defined based on package option)
+\providecommand{\tfniccommentseparator}
+  {{\color{black!65}\smash{\textbackslash\!\!\textbackslash\hspace{0.1em}}}}
+\providecommand{\tfniccodecomment}[1]
+  {{\scriptsize{\hfill\tfniccommentseparator{#1}}}}
+
+\cs_new_protected:Nn \__tf_define_gamelabel:
   {
-    % nicodemus style: custom comment
-    \providecommand{\tfniccommentseparator}
-      {{\color{black!65}\smash{\textbackslash\!\!\textbackslash\hspace{0.1em}}}}
-    \providecommand{\tfniccodecomment}[1]
-      {{\scriptsize{\hfill\tfniccommentseparator{#1}}}}
-    \providecommand{\tfgamelabel}[2]{#2~\tfniccodecomment{#1}}
+    \tl_if_empty:NTF \g__tf_gamelabel_cmd_tl
+      {
+        % nicodemus style: custom comment
+        \cs_gset:Npn \tfgamelabel ##1##2 { ##2~\tfniccodecomment{##1} }
+      }
+      {
+        % cryptocode style: use \pccomment
+        \cs_gset:Npn \tfgamelabel ##1##2 { ##2~\pccomment{##1} }
+      }
   }
-  {
-    % cryptocode style: use \pccomment
-    \providecommand{\tfgamelabel}[2]{#2~\pccomment{#1}}
-  }
+
+\__tf_define_gamelabel:
 
 \cs_new_protected:Nn \__tf_wrap_gamelabel:nn
   {

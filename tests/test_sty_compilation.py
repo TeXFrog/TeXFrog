@@ -82,7 +82,7 @@ def _assert_compiled(tmp_path: Path, result: subprocess.CompletedProcess[str]) -
 
 _CRYPTO_PREAMBLE = r"""\documentclass{article}
 \usepackage[n,advantage,operators,sets,adversary,landau,probability,notions,logic,ff,mm,primitives,events,complexity,oracles,asymptotics,keys]{cryptocode}
-\usepackage{texfrog}
+\usepackage[package=cryptocode]{texfrog}
 """
 
 
@@ -126,7 +126,6 @@ def test_basic_two_game_proof(tmp_path):
 \tfgames{G0, G1}
 \tfgamename{G0}{G_0}
 \tfgamename{G1}{G_1}
-\tfsetpackage{cryptocode}
 
 \begin{tfsource}{test}
 \begin{pchstack}[boxed]

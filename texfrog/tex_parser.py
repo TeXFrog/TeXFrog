@@ -116,6 +116,16 @@ def _extract_one_arg(text: str, cmd_name: str) -> list[str]:
     return results
 
 
+def _extract_texfrog_package_option(text: str) -> str | None:
+    r"""Extract ``package=X`` from ``\usepackage[...]{texfrog}``."""
+    m = re.search(r"\\usepackage\s*\[([^\]]*)\]\s*\{texfrog\}", text)
+    if m:
+        pm = re.search(r"(?:^|,)\s*package\s*=\s*(\w+)", m.group(1))
+        if pm:
+            return pm.group(1)
+    return None
+
+
 def _extract_two_args(text: str, cmd_name: str) -> list[tuple[str, str]]:
     r"""Extract both arguments from each ``\cmd{arg1}{arg2}``."""
     results = []
@@ -352,7 +362,7 @@ def parse_tex_proof(tex_path: Path) -> Proof:
     * ``\tfdescription{label}{text}`` — game descriptions.
     * ``\tfreduction{label}`` — reduction flags.
     * ``\tfrelatedgames{label}{games}`` — related games for reductions.
-    * ``\tfsetpackage{name}`` — package profile.
+    * ``\usepackage[package=name]{texfrog}`` — package profile.
     * ``\tfmacrofile{path}`` — macro file paths.
     * ``\tfpreamble{path}`` — extra preamble file.
     * ``\tfcommentary{label}{path}`` — commentary file paths.
@@ -374,8 +384,7 @@ def parse_tex_proof(tex_path: Path) -> Proof:
     text = tex_path.read_text(encoding="utf-8")
 
     # --- package ---
-    packages = _extract_one_arg(text, "tfsetpackage")
-    package_name = packages[-1] if packages else "cryptocode"
+    package_name = _extract_texfrog_package_option(text) or "cryptocode"
     get_profile(package_name)  # validate
 
     # --- games ---

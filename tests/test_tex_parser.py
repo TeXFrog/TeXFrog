@@ -16,6 +16,7 @@ from texfrog.tex_parser import (
     _extract_two_args,
     _extract_opt_two_args,
     _extract_tfsource,
+    _extract_texfrog_package_option,
 )
 
 
@@ -73,9 +74,9 @@ class TestFindBracketGroup:
 
 class TestExtractOneArg:
     def test_simple(self):
-        text = r"\tfsetpackage{cryptocode}"
-        result = _extract_one_arg(text, "tfsetpackage")
-        assert result == ["cryptocode"]
+        text = r"\tfmacrofile{macros.tex}"
+        result = _extract_one_arg(text, "tfmacrofile")
+        assert result == ["macros.tex"]
 
     def test_multiple(self):
         text = r"\tfmacrofile{a.tex} \tfmacrofile{b.tex}"
@@ -83,13 +84,35 @@ class TestExtractOneArg:
         assert result == ["a.tex", "b.tex"]
 
     def test_no_match(self):
-        result = _extract_one_arg("no commands here", "tfsetpackage")
+        result = _extract_one_arg("no commands here", "tfmacrofile")
         assert result == []
 
     def test_partial_name_not_matched(self):
-        text = r"\tfsetpackagefoo{bar}"
-        result = _extract_one_arg(text, "tfsetpackage")
+        text = r"\tfmacrofilefoo{bar}"
+        result = _extract_one_arg(text, "tfmacrofile")
         assert result == []
+
+
+class TestExtractTexfrogPackageOption:
+    def test_cryptocode(self):
+        text = r"\usepackage[package=cryptocode]{texfrog}"
+        assert _extract_texfrog_package_option(text) == "cryptocode"
+
+    def test_nicodemus(self):
+        text = r"\usepackage[package=nicodemus]{texfrog}"
+        assert _extract_texfrog_package_option(text) == "nicodemus"
+
+    def test_no_option(self):
+        text = r"\usepackage{texfrog}"
+        assert _extract_texfrog_package_option(text) is None
+
+    def test_multiple_options(self):
+        text = r"\usepackage[other=foo,package=nicodemus]{texfrog}"
+        assert _extract_texfrog_package_option(text) == "nicodemus"
+
+    def test_no_package_key(self):
+        text = r"\usepackage[other=foo]{texfrog}"
+        assert _extract_texfrog_package_option(text) is None
 
 
 class TestExtractTwoArgs:

@@ -40,10 +40,12 @@ The `.tex` file is the single source of truth. It uses the `texfrog.sty` LaTeX p
 for compilation and is parsed by `texfrog/tex_parser.py` for HTML export.
 
 Key commands: `\tfgames`, `\tfgamename`, `\tfdescription`, `\tfreduction`,
-`\tfrelatedgames`, `\tfsetpackage`, `\tfmacrofile`, `\tfpreamble`, `\tfcommentary`,
+`\tfrelatedgames`, `\tfmacrofile`, `\tfpreamble`, `\tfcommentary`,
 `\tffigure`, `\begin{tfsource}...\end{tfsource}`, `\tfonly{tags}{content}`,
 `\tfonly*{tags}{content}` (suppressed in figures), `\tffigonly{content}` (figure-only),
 `\tfrendergame`, `\tfrenderfigure`.
+
+Package option: `\usepackage[package=cryptocode]{texfrog}` or `package=nicodemus`.
 
 ### YAML (.yaml) — Legacy
 Still supported for backward compatibility. Uses `%:tags:` comment syntax in
@@ -51,7 +53,7 @@ separate source files. Parsed by `texfrog/parser.py`.
 
 ## Key Conventions
 
-- **Package profiles**: `\tfsetpackage{cryptocode}` (default) or `nicodemus`.
+- **Package profiles**: `\usepackage[package=cryptocode]{texfrog}` (default) or `nicodemus`.
   Profiles are defined in `texfrog/packages.py`.
 - **Tag syntax**: `\tfonly{G1,G3-G5}{content}` in .tex format;
   `%:tags: G1,G3-G5` at end of line in YAML format. Ranges resolved by position

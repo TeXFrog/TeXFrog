@@ -1,7 +1,7 @@
 \documentclass{article}
 \usepackage[margin=1in]{geometry}
 \usepackage[n,advantage,operators,sets,adversary,landau,probability,notions,logic,ff,mm,primitives,events,complexity,oracles,asymptotics,keys]{cryptocode}
-\usepackage{texfrog}
+\usepackage[package=cryptocode]{texfrog}
 
 \input{macros.tex}
 
@@ -22,7 +22,6 @@
 \tfreduction{Red1}
 \tfrelatedgames{Red1}{G0, G1}
 
-\tfsetpackage{cryptocode}
 \tfmacrofile{macros.tex}
 
 %%% Proof source
