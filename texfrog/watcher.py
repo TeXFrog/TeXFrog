@@ -11,6 +11,7 @@ import shutil
 import tempfile
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
 
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
@@ -33,6 +34,30 @@ def _snapshot_mtimes(files: set[Path]) -> dict[Path, float]:
     return result
 
 
+def _skip_brace_group(text: str, pos: int) -> int:
+    """Skip a brace group starting at ``{`` at *pos*, return index after ``}``.
+
+    Handles nested braces.  Returns -1 if no matching close brace is found.
+    """
+    if pos >= len(text) or text[pos] != "{":
+        return -1
+    depth = 0
+    i = pos
+    while i < len(text):
+        ch = text[i]
+        if ch == "\\":
+            i += 2
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return i + 1
+        i += 1
+    return -1
+
+
 def _collect_watched_files_tex(tex_path: Path) -> set[Path]:
     """Collect watched files from a .tex proof file."""
     paths: set[Path] = {tex_path}
@@ -49,8 +74,27 @@ def _collect_watched_files_tex(tex_path: Path) -> set[Path]:
     for m in re.finditer(r"\\tfpreamble\{([^}]+)\}", text):
         paths.add((base_dir / m.group(1).strip()).resolve())
 
-    for m in re.finditer(r"\\tfcommentary\{[^}]+\}\{[^}]+\}\{([^}]+)\}", text):
-        paths.add((base_dir / m.group(1).strip()).resolve())
+    # \tfcommentary{source}{label}{file} — skip first two brace groups
+    # (which may contain nested braces), then extract the third.
+    for m in re.finditer(r"\\tfcommentary\s*\{", text):
+        pos = m.end() - 1  # opening brace of first group
+        pos = _skip_brace_group(text, pos)
+        if pos == -1:
+            continue
+        # skip whitespace
+        while pos < len(text) and text[pos] in " \t\n":
+            pos += 1
+        pos = _skip_brace_group(text, pos)
+        if pos == -1:
+            continue
+        # skip whitespace
+        while pos < len(text) and text[pos] in " \t\n":
+            pos += 1
+        if pos < len(text) and text[pos] == "{":
+            end = _skip_brace_group(text, pos)
+            if end != -1:
+                file_path = text[pos + 1 : end - 1].strip()
+                paths.add((base_dir / file_path).resolve())
 
     for m in re.finditer(r"\\input\{([^}]+)\}", text):
         paths.add((base_dir / m.group(1).strip()).resolve())
@@ -81,7 +125,7 @@ class _DebouncedHandler(FileSystemEventHandler):
     def __init__(
         self,
         watched_files: set[Path],
-        on_change: callable,
+        on_change: Callable[[], None],
         debounce_seconds: float = 0.5,
     ) -> None:
         super().__init__()
@@ -141,7 +185,7 @@ def safe_rebuild(
     Returns:
         ``True`` if the rebuild succeeded, ``False`` otherwise.
     """
-    from .output.html import generate_html, generate_index_page
+    from .output.html import build_all_proofs
     from .tex_parser import parse_tex_proofs
     from .validate import validate_proof
 
@@ -161,13 +205,7 @@ def safe_rebuild(
         prefix="texfrog_live_", dir=output_dir.parent,
     ))
     try:
-        if len(proofs) == 1:
-            generate_html(proofs[0], input_path.parent, staging_dir, keep_tmp=keep_tmp)
-        else:
-            for proof in proofs:
-                proof_out = staging_dir / proof.source_name
-                generate_html(proof, input_path.parent, proof_out, keep_tmp=keep_tmp)
-            generate_index_page(proofs, staging_dir)
+        build_all_proofs(proofs, input_path.parent, staging_dir, keep_tmp=keep_tmp)
     except Exception as exc:
         logger.error("Build error (keeping existing site): %s", exc)
         shutil.rmtree(staging_dir, ignore_errors=True)

@@ -178,7 +178,7 @@ def html_build_cmd(input_file: str, output_dir: str | None, keep_tmp: bool) -> N
     proof.tex.  Requires pdflatex and pdf2svg (or pdftocairo).
     """
     from .deps import MissingDependencyError, check_html_deps
-    from .output.html import generate_html, generate_index_page
+    from .output.html import build_all_proofs
 
     try:
         check_html_deps()
@@ -204,14 +204,10 @@ def html_build_cmd(input_file: str, output_dir: str | None, keep_tmp: bool) -> N
 
     click.echo(f"Building HTML site in {out} …")
     try:
-        if len(proofs) == 1:
-            generate_html(proofs[0], file_path.parent, out, keep_tmp=keep_tmp)
-        else:
-            for proof in proofs:
-                proof_out = out / proof.source_name
-                click.echo(f"  Building proof '{proof.source_name}' …")
-                generate_html(proof, file_path.parent, proof_out, keep_tmp=keep_tmp)
-            generate_index_page(proofs, out)
+        build_all_proofs(
+            proofs, file_path.parent, out, keep_tmp=keep_tmp,
+            on_proof_start=lambda name: click.echo(f"  Building proof '{name}' …"),
+        )
     except Exception as exc:
         click.echo(f"Error building HTML: {exc}", err=True)
         sys.exit(1)
@@ -255,7 +251,7 @@ def html_serve_cmd(
     proof.tex.
     """
     from .deps import MissingDependencyError, check_html_deps
-    from .output.html import generate_html, generate_index_page, serve_html
+    from .output.html import build_all_proofs
 
     try:
         check_html_deps()
@@ -281,14 +277,10 @@ def html_serve_cmd(
 
     click.echo(f"Building HTML site in {out} …")
     try:
-        if len(proofs) == 1:
-            generate_html(proofs[0], file_path.parent, out, keep_tmp=keep_tmp)
-        else:
-            for proof in proofs:
-                proof_out = out / proof.source_name
-                click.echo(f"  Building proof '{proof.source_name}' …")
-                generate_html(proof, file_path.parent, proof_out, keep_tmp=keep_tmp)
-            generate_index_page(proofs, out)
+        build_all_proofs(
+            proofs, file_path.parent, out, keep_tmp=keep_tmp,
+            on_proof_start=lambda name: click.echo(f"  Building proof '{name}' …"),
+        )
     except Exception as exc:
         click.echo(f"Error building HTML: {exc}", err=True)
         sys.exit(1)
@@ -316,4 +308,5 @@ def html_serve_cmd(
             observer.stop()
             observer.join()
     else:
+        from .output.html import serve_html
         serve_html(out, port=port, open_browser=not no_browser)

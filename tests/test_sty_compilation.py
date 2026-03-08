@@ -123,9 +123,9 @@ def test_tutorial_cryptocode_quickstart_compiles(tmp_path):
 def test_basic_two_game_proof(tmp_path):
     r"""A minimal 2-game proof with \tfgames, \tfgamename, \tfrendergame."""
     tex = _CRYPTO_PREAMBLE + r"""
-\tfgames{G0, G1}
-\tfgamename{G0}{G_0}
-\tfgamename{G1}{G_1}
+\tfgames{test}{G0, G1}
+\tfgamename{test}{G0}{G_0}
+\tfgamename{test}{G1}{G_1}
 
 \begin{tfsource}{test}
 \begin{pchstack}[boxed]
@@ -155,10 +155,10 @@ def test_basic_two_game_proof(tmp_path):
 def test_tfonly_range_syntax(tmp_path):
     r"""\tfonly{G0-G2}{...} range syntax resolves correctly."""
     tex = _CRYPTO_PREAMBLE + r"""
-\tfgames{G0, G1, G2}
-\tfgamename{G0}{G_0}
-\tfgamename{G1}{G_1}
-\tfgamename{G2}{G_2}
+\tfgames{test}{G0, G1, G2}
+\tfgamename{test}{G0}{G_0}
+\tfgamename{test}{G1}{G_1}
+\tfgamename{test}{G2}{G_2}
 
 \begin{tfsource}{test}
 \begin{pchstack}[boxed]
@@ -189,9 +189,9 @@ def test_tfonly_range_syntax(tmp_path):
 def test_tfonly_star_variant(tmp_path):
     r"""\tfonly*{tags}{content} renders in games but is suppressed in figures."""
     tex = _CRYPTO_PREAMBLE + r"""
-\tfgames{G0, G1}
-\tfgamename{G0}{G_0}
-\tfgamename{G1}{G_1}
+\tfgames{test}{G0, G1}
+\tfgamename{test}{G0}{G_0}
+\tfgamename{test}{G1}{G_1}
 
 \begin{tfsource}{test}
 \begin{pchstack}[boxed]
@@ -225,9 +225,9 @@ def test_tfonly_star_variant(tmp_path):
 def test_tffigonly(tmp_path):
     r"""\tffigonly{content} appears only in \tfrenderfigure output."""
     tex = _CRYPTO_PREAMBLE + r"""
-\tfgames{G0, G1}
-\tfgamename{G0}{G_0}
-\tfgamename{G1}{G_1}
+\tfgames{test}{G0, G1}
+\tfgamename{test}{G0}{G_0}
+\tfgamename{test}{G1}{G_1}
 
 \begin{tfsource}{test}
 \begin{pchstack}[boxed]
@@ -261,10 +261,10 @@ def test_tffigonly(tmp_path):
 def test_renderfigure_multi_game(tmp_path):
     r"""\tfrenderfigure with multiple games compiles."""
     tex = _CRYPTO_PREAMBLE + r"""
-\tfgames{G0, G1, G2}
-\tfgamename{G0}{G_0}
-\tfgamename{G1}{G_1}
-\tfgamename{G2}{G_2}
+\tfgames{test}{G0, G1, G2}
+\tfgamename{test}{G0}{G_0}
+\tfgamename{test}{G1}{G_1}
+\tfgamename{test}{G2}{G_2}
 
 \begin{tfsource}{test}
 \begin{pchstack}[boxed]
@@ -294,9 +294,9 @@ def test_renderfigure_multi_game(tmp_path):
 def test_rendergame_no_highlight_by_default(tmp_path):
     r"""\tfrendergame without options compiles without highlighting."""
     tex = _CRYPTO_PREAMBLE + r"""
-\tfgames{G0, G1}
-\tfgamename{G0}{G_0}
-\tfgamename{G1}{G_1}
+\tfgames{test}{G0, G1}
+\tfgamename{test}{G0}{G_0}
+\tfgamename{test}{G1}{G_1}
 
 \begin{tfsource}{test}
 \begin{pchstack}[boxed]
@@ -320,9 +320,9 @@ def test_rendergame_no_highlight_by_default(tmp_path):
 def test_rendergame_diff_explicit_target(tmp_path):
     r"""\tfrendergame[diff=G0] compiles with highlighting against G0."""
     tex = _CRYPTO_PREAMBLE + r"""
-\tfgames{G0, G1}
-\tfgamename{G0}{G_0}
-\tfgamename{G1}{G_1}
+\tfgames{test}{G0, G1}
+\tfgamename{test}{G0}{G_0}
+\tfgamename{test}{G1}{G_1}
 
 \begin{tfsource}{test}
 \begin{pchstack}[boxed]
@@ -351,12 +351,12 @@ def test_rendergame_diff_explicit_target(tmp_path):
 def test_reduction_rendering(tmp_path):
     r"""\tfreduction + \tfrelatedgames + rendering a reduction game."""
     tex = _CRYPTO_PREAMBLE + r"""
-\tfgames{G0, Red, G1}
-\tfgamename{G0}{G_0}
-\tfgamename{Red}{\mathcal{B}}
-\tfgamename{G1}{G_1}
-\tfreduction{Red}
-\tfrelatedgames{Red}{G0, G1}
+\tfgames{test}{G0, Red, G1}
+\tfgamename{test}{G0}{G_0}
+\tfgamename{test}{Red}{\mathcal{B}}
+\tfgamename{test}{G1}{G_1}
+\tfreduction{test}{Red}
+\tfrelatedgames{test}{Red}{G0, G1}
 
 \begin{tfsource}{test}
 \begin{pchstack}[boxed]
@@ -388,12 +388,12 @@ def test_reduction_rendering(tmp_path):
 def test_commentary_and_description_noop(tmp_path):
     r"""\tfcommentary and \tfdescription are no-ops but must not cause errors."""
     tex = _CRYPTO_PREAMBLE + r"""
-\tfgames{G0, G1}
-\tfgamename{G0}{G_0}
-\tfgamename{G1}{G_1}
-\tfdescription{G0}{Starting game.}
-\tfdescription{G1}{Modified game.}
-\tfcommentary{G1}{This is a transition argument.}
+\tfgames{test}{G0, G1}
+\tfgamename{test}{G0}{G_0}
+\tfgamename{test}{G1}{G_1}
+\tfdescription{test}{G0}{Starting game.}
+\tfdescription{test}{G1}{Modified game.}
+\tfcommentary{test}{G1}{This is a transition argument.}
 
 \begin{tfsource}{test}
 \begin{pchstack}[boxed]
@@ -423,8 +423,8 @@ def test_commentary_and_description_noop(tmp_path):
 def test_tfpreamble_noop(tmp_path):
     r"""\tfpreamble is a no-op but must not cause errors."""
     tex = _CRYPTO_PREAMBLE + r"""
-\tfgames{G0}
-\tfgamename{G0}{G_0}
+\tfgames{test}{G0}
+\tfgamename{test}{G0}{G_0}
 \tfpreamble{preamble.tex}
 
 \begin{tfsource}{test}
@@ -453,8 +453,8 @@ def test_user_macro_file(tmp_path):
     r"""User macro files loaded via \input work alongside texfrog.sty."""
     tex = _CRYPTO_PREAMBLE + r"""
 \input{mymacros.tex}
-\tfgames{G0}
-\tfgamename{G0}{G_0}
+\tfgames{test}{G0}
+\tfgamename{test}{G0}{G_0}
 \tfmacrofile{mymacros.tex}
 
 \begin{tfsource}{test}
@@ -486,10 +486,10 @@ def test_user_macro_file(tmp_path):
 def test_tffigure_noop(tmp_path):
     r"""\tffigure is a no-op but must not cause errors."""
     tex = _CRYPTO_PREAMBLE + r"""
-\tfgames{G0, G1}
-\tfgamename{G0}{G_0}
-\tfgamename{G1}{G_1}
-\tffigure{indcpa}{G0,G1}
+\tfgames{test}{G0, G1}
+\tfgamename{test}{G0}{G_0}
+\tfgamename{test}{G1}{G_1}
+\tffigure{test}{fig1}{G0,G1}
 
 \begin{tfsource}{test}
 \begin{pchstack}[boxed]

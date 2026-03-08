@@ -15,6 +15,7 @@ from __future__ import annotations
 import click
 import concurrent.futures
 import contextlib
+import html as html_module
 import http.server
 import importlib.resources
 import json
@@ -26,6 +27,7 @@ import sys
 import tempfile
 import threading
 import webbrowser
+from collections.abc import Callable
 from pathlib import Path
 from typing import Optional
 
@@ -347,6 +349,15 @@ def _extract_mathjax_macros(macro_paths: list[str], proof_dir: Path) -> str:
     Collects lines that start with ``\\newcommand``, ``\\renewcommand``,
     ``\\providecommand``, ``\\DeclareMathOperator``, or ``\\def`` so that
     MathJax can render the same custom commands used in the LaTeX source.
+
+    .. note::
+
+       Only *single-line* definitions with balanced braces are collected.
+       Multi-line ``\\newcommand`` definitions are skipped because they
+       often contain LaTeX-only constructs that MathJax cannot handle, and
+       collecting just the opening line would produce invalid TeX.  If a
+       macro does not appear in the HTML viewer, check whether its
+       definition spans multiple lines in the macro file.
     """
     MACRO_PREFIXES = (
         "\\newcommand", "\\renewcommand", "\\providecommand",
@@ -702,9 +713,10 @@ def generate_index_page(proofs: list[Proof], output_dir: Path) -> None:
     for proof in proofs:
         n_games = sum(1 for g in proof.games if not g.reduction)
         n_reductions = sum(1 for g in proof.games if g.reduction)
+        escaped_name = html_module.escape(proof.source_name)
         links.append(
-            f'<li><a href="{proof.source_name}/index.html">'
-            f"<strong>{proof.source_name}</strong></a> "
+            f'<li><a href="{escaped_name}/index.html">'
+            f"<strong>{escaped_name}</strong></a> "
             f"— {n_games} game{'s' if n_games != 1 else ''}, "
             f"{n_reductions} reduction{'s' if n_reductions != 1 else ''}"
             f"</li>"
@@ -728,6 +740,38 @@ def generate_index_page(proofs: list[Proof], output_dir: Path) -> None:
         "</body>\n</html>\n"
     )
     (output_dir / "index.html").write_text(html, encoding="utf-8")
+
+
+def build_all_proofs(
+    proofs: list[Proof],
+    proof_dir: Path,
+    output_dir: Path,
+    *,
+    keep_tmp: bool = False,
+    on_proof_start: Callable[[str], None] | None = None,
+) -> None:
+    """Build HTML output for one or more proofs.
+
+    For a single proof, builds directly into *output_dir*.  For multiple
+    proofs, builds each into a subdirectory and generates an index page.
+
+    Args:
+        proofs: Parsed proof objects.
+        proof_dir: Directory containing the source .tex file.
+        output_dir: Destination directory for the HTML site.
+        keep_tmp: Whether to preserve intermediate files.
+        on_proof_start: Optional callback invoked with each proof's source
+            name before building it (useful for progress messages).
+    """
+    if len(proofs) == 1:
+        generate_html(proofs[0], proof_dir, output_dir, keep_tmp=keep_tmp)
+    else:
+        for proof in proofs:
+            if on_proof_start is not None:
+                on_proof_start(proof.source_name)
+            proof_out = output_dir / proof.source_name
+            generate_html(proof, proof_dir, proof_out, keep_tmp=keep_tmp)
+        generate_index_page(proofs, output_dir)
 
 
 def serve_html(html_dir: Path, port: int = 8080, open_browser: bool = True) -> None:

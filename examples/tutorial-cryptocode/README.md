@@ -51,12 +51,12 @@ The `.tex` file is the single source of truth. It compiles directly with `pdflat
 ```latex
 \usepackage[package=cryptocode]{texfrog}
 
-\tfgames{G0, G1, Red1, G2, G3}
-\tfgamename{G0}{G_0}
-\tfgamename{Red1}{\Bdversary_1}
-\tfdescription{G0}{The IND-CPA game. The LR oracle encrypts using the actual PRF.}
-\tfreduction{Red1}
-\tfrelatedgames{Red1}{G0, G1}
+\tfgames{indcpa}{G0, G1, Red1, G2, G3}
+\tfgamename{indcpa}{G0}{G_0}
+\tfgamename{indcpa}{Red1}{\Bdversary_1}
+\tfdescription{indcpa}{G0}{The IND-CPA game. The LR oracle encrypts using the actual PRF.}
+\tfreduction{indcpa}{Red1}
+\tfrelatedgames{indcpa}{Red1}{G0, G1}
 ```
 
 `\tfgames` declares the ordered list of all games and reductions. The order matters for diffing and range resolution. `\tfgamename` sets the display name (math-mode content without `$` delimiters). `\tfreduction` marks an entry as a reduction.
@@ -65,7 +65,7 @@ The `.tex` file is the single source of truth. It compiles directly with `pdflat
 
 ```latex
 \tfmacrofile{macros.tex}
-\tfcommentary{G0}{commentary/G0.tex}
+\tfcommentary{indcpa}{G0}{commentary/G0.tex}
 ```
 
 `\tfmacrofile` declares files needed in the HTML build. `\tfcommentary` associates per-game commentary.
