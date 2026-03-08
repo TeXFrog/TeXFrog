@@ -170,6 +170,24 @@ def test_hash_updates(page, html_server):
 
 
 @needs_playwright
+def test_browser_back_forward(page, html_server):
+    """Browser back/forward buttons update the displayed view."""
+    page.goto(f"{html_server}#G0")
+    _wait_for_game(page, "G0")
+    # Navigate forward to G1 via button
+    page.click("#btn-next")
+    _wait_for_game(page, "G1")
+    # Browser back should return to G0
+    page.go_back()
+    _wait_for_game(page, "G0")
+    expect(page.locator("#game-list li").nth(0)).to_have_class(re.compile(r"active"))
+    # Browser forward should return to G1
+    page.go_forward()
+    _wait_for_game(page, "G1")
+    expect(page.locator("#game-list li").nth(1)).to_have_class(re.compile(r"active"))
+
+
+@needs_playwright
 def test_invalid_hash_fallback(page, html_server):
     page.goto(f"{html_server}#NONEXISTENT")
     # Falls back to first game

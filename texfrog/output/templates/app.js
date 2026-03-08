@@ -357,3 +357,13 @@ document.addEventListener('keydown', e => {
   if (e.key === '+' || e.key === '=') adjustZoom(+0.1);
   if (e.key === '-') adjustZoom(-0.1);
 });
+
+window.addEventListener('hashchange', () => {
+  const hash = window.location.hash.slice(1);
+  if (!hash || hash === 'overview') {
+    if (currentIndex !== -1) showOverview();
+  } else {
+    const idx = games.findIndex(g => g.label === hash);
+    if (idx >= 0 && idx !== currentIndex) showGame(idx);
+  }
+});
