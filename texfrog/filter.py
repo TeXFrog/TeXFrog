@@ -91,7 +91,9 @@ def compute_removed_lines(prev_lines: list[str], curr_lines: list[str]) -> set[i
         return set()
 
     removed: set[int] = set()
-    matcher = difflib.SequenceMatcher(None, prev_lines, curr_lines, autojunk=False)
+    matcher = difflib.SequenceMatcher(
+        lambda x: not x.strip(), prev_lines, curr_lines, autojunk=False,
+    )
     for tag, i1, i2, _j1, _j2 in matcher.get_opcodes():
         if tag in ("delete", "replace"):
             removed.update(range(i1, i2))
@@ -117,7 +119,9 @@ def compute_changed_lines(prev_lines: list[str], curr_lines: list[str]) -> set[i
         return set()
 
     changed: set[int] = set()
-    matcher = difflib.SequenceMatcher(None, prev_lines, curr_lines, autojunk=False)
+    matcher = difflib.SequenceMatcher(
+        lambda x: not x.strip(), prev_lines, curr_lines, autojunk=False,
+    )
     for tag, _i1, _i2, j1, j2 in matcher.get_opcodes():
         if tag in ("insert", "replace"):
             changed.update(range(j1, j2))
