@@ -26,7 +26,6 @@ needs_pdflatex = pytest.mark.skipif(
     reason="pdflatex not found on PATH",
 )
 
-
 # ---------------------------------------------------------------------------
 # Helper
 # ---------------------------------------------------------------------------
@@ -475,6 +474,83 @@ def test_user_macro_file(tmp_path):
         extra_files={"mymacros.tex": r"\newcommand{\myfunc}{\mathsf{F}}"},
     )
     _assert_compiled(tmp_path, result)
+
+
+# ---------------------------------------------------------------------------
+# texfrog init round-trip: scaffold → pdflatex
+# ---------------------------------------------------------------------------
+
+needs_nicodemus = pytest.mark.skipif(
+    shutil.which("kpsewhich") is None
+    or subprocess.run(
+        ["kpsewhich", "nicodemus.sty"], capture_output=True
+    ).returncode != 0,
+    reason="nicodemus.sty not installed",
+)
+
+
+@needs_pdflatex
+@pytest.mark.xfail(
+    reason="init template defines \\Oracle/\\sample which clash with cryptocode's "
+           "oracles/probability options; tracked as a template bug",
+    strict=False,
+)
+def test_init_cryptocode_proof_compiles(tmp_path):
+    """Scaffolded cryptocode proof.tex compiles with pdflatex."""
+    from click.testing import CliRunner
+    from texfrog.cli import main
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["init", str(tmp_path)])
+    assert result.exit_code == 0
+
+    shutil.copy2(_STY_PATH, tmp_path / "texfrog.sty")
+
+    result = subprocess.run(
+        ["pdflatex", "-interaction=nonstopmode", "-no-shell-escape", "proof.tex"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    pdf = tmp_path / "proof.pdf"
+    assert pdf.exists(), (
+        f"pdflatex failed on scaffolded proof.tex.\n"
+        f"Exit code: {result.returncode}\n"
+        f"Log tail:\n{result.stdout[-3000:]}"
+    )
+
+
+@needs_pdflatex
+@needs_nicodemus
+@pytest.mark.xfail(
+    reason="nicodemus.sty not on CTAN; init template may also have macro conflicts",
+    strict=False,
+)
+def test_init_nicodemus_proof_compiles(tmp_path):
+    """Scaffolded nicodemus proof.tex compiles with pdflatex."""
+    from click.testing import CliRunner
+    from texfrog.cli import main
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["init", str(tmp_path), "--package", "nicodemus"])
+    assert result.exit_code == 0
+
+    shutil.copy2(_STY_PATH, tmp_path / "texfrog.sty")
+
+    result = subprocess.run(
+        ["pdflatex", "-interaction=nonstopmode", "-no-shell-escape", "proof.tex"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    pdf = tmp_path / "proof.pdf"
+    assert pdf.exists(), (
+        f"pdflatex failed on scaffolded nicodemus proof.tex.\n"
+        f"Exit code: {result.returncode}\n"
+        f"Log tail:\n{result.stdout[-3000:]}"
+    )
 
 
 # ---------------------------------------------------------------------------

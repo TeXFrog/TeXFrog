@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  python-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.x"]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install LaTeX and PDF tools
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            texlive-latex-extra \
+            texlive-science \
+            texlive-extra-utils \
+            poppler-utils
+
+      - name: Install Python dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Install Playwright browsers
+        run: playwright install chromium --with-deps
+
+      - name: Run tests
+        run: pytest tests/ -q --tb=short
+
+  latex-compat:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        texlive-version: [2024, 2025, 2026]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+
+      - name: Install poppler-utils
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends poppler-utils
+
+      - name: Install TeX Live ${{ matrix.texlive-version }}
+        uses: zauguin/install-texlive@v4.4.0
+        with:
+          texlive_version: ${{ matrix.texlive-version }}
+          packages: |
+            collection-latex
+            collection-latexextra
+            collection-latexrecommended
+            collection-fontsrecommended
+            cryptocode
+            pdfcrop
+
+      - name: Install Python dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run LaTeX tests
+        run: pytest tests/test_sty_compilation.py tests/test_integration.py -q --tb=short
+
+  vscode-extension:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
+          cache-dependency-path: vscode-texfrog/package-lock.json
+
+      - name: Install dependencies
+        working-directory: vscode-texfrog
+        run: npm ci
+
+      - name: Run tests
+        working-directory: vscode-texfrog
+        run: npm test

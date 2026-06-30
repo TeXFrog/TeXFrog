@@ -86,6 +86,40 @@ def test_texfrog_html_build_tex(tmp_path, tutorial_name):
 
 
 @needs_html_tools
+@pytest.mark.parametrize("package", ["cryptocode", "nicodemus"])
+def test_texfrog_init_then_html_build(tmp_path, package):
+    """``texfrog init`` followed by ``texfrog html build`` produces a working site."""
+    from texfrog.tex_parser import parse_tex_proof
+
+    init_dir = tmp_path / "proof"
+    result = subprocess.run(
+        [TEXFROG, "init", str(init_dir), "--package", package],
+        capture_output=True, text=True, timeout=30,
+    )
+    assert result.returncode == 0, f"texfrog init failed:\n{result.stderr}"
+
+    tex_path = init_dir / "proof.tex"
+    assert tex_path.exists(), "texfrog init did not create proof.tex"
+
+    proof = parse_tex_proof(tex_path)
+    game_labels = [g.label for g in proof.games]
+
+    out = tmp_path / "html"
+    result = subprocess.run(
+        [TEXFROG, "html", "build", str(tex_path), "-o", str(out)],
+        capture_output=True, text=True, timeout=120,
+    )
+    assert result.returncode == 0, f"texfrog html build failed:\n{result.stderr}"
+
+    assert (out / "index.html").exists()
+    games_dir = out / "games"
+    for label in game_labels:
+        svg = games_dir / f"{label}.svg"
+        assert svg.exists(), f"SVG not produced for {label}"
+        assert svg.stat().st_size > 100, f"SVG suspiciously small for {label}"
+
+
+@needs_html_tools
 def test_texfrog_html_build_multiproof(tmp_path):
     """``texfrog html build`` on a multi-proof document creates per-proof subdirectories."""
     from texfrog.tex_parser import parse_tex_proofs
