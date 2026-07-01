@@ -490,11 +490,6 @@ needs_nicodemus = pytest.mark.skipif(
 
 
 @needs_pdflatex
-@pytest.mark.xfail(
-    reason="init template defines \\Oracle/\\sample which clash with cryptocode's "
-           "oracles/probability options; tracked as a template bug",
-    strict=False,
-)
 def test_init_cryptocode_proof_compiles(tmp_path):
     """Scaffolded cryptocode proof.tex compiles with pdflatex."""
     from click.testing import CliRunner

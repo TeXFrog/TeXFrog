@@ -44,13 +44,13 @@ CRYPTOCODE_TEX = r"""\documentclass{article}
   \procedure[linenumbering]{%
     \tfonly{G0}{Game $\tfgamename{G0}$}%
     \tfonly{G1}{Game $\tfgamename{G1}$}%
-    \tfonly{Red1}{Reduction $\tfgamename{Red1}^{\Oracle}$}%
+    \tfonly{Red1}{Reduction $\tfgamename{Red1}^{\Oracle{}}$}%
     \tfonly{G2}{Game $\tfgamename{G2}$}%
   }{
     \tfonly{G0,G1,G2}{k \sample \{0,1\}^\lambda \\}
     \tfonly{G0}{y \gets f(k) \\}
     \tfonly{G1,G2}{y \sample \{0,1\}^\lambda \\}
-    \tfonly{Red1}{y \gets \Oracle() \\}
+    \tfonly{Red1}{y \gets \Oracle{}() \\}
     b' \gets \Adversary(y) \\
     \pcreturn b'
   }
@@ -84,8 +84,8 @@ CRYPTOCODE_MACROS = r"""% Custom macros for this proof.
 
 \newcommand{\Adversary}{\mathcal{A}}
 \newcommand{\Bdversary}{\mathcal{B}}
-\newcommand{\Oracle}{\mathcal{O}}
-\newcommand{\sample}{\stackrel{{\scriptscriptstyle\$}}{\gets}}
+% \Oracle and \sample are already provided by cryptocode's oracles/probability
+% package options; don't redefine them here.
 """
 
 # ---------------------------------------------------------------------------
