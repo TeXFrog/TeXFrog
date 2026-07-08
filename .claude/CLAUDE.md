@@ -25,6 +25,7 @@ cd vscode-texfrog && npm test                       # VS Code extension tests (3
 # Scaffold a new proof
 .venv/bin/texfrog init /tmp/tfinit                        # cryptocode (default)
 .venv/bin/texfrog init /tmp/tfinit-nic --package nicodemus # nicodemus variant
+.venv/bin/texfrog init /tmp/tfinit-alg --package algpseudocodex # algpseudocodex variant
 ```
 
 System requirements (not pip): `pdflatex`, `pdftocairo` (or `pdf2svg`), `pdfcrop`.
@@ -46,17 +47,18 @@ multiple proofs per document):
   `\tfrendergame[opt]{source}{game}`, `\tfrenderfigure{source}{games}`,
   `\begin{tfsource}{name}...\end{tfsource}`
 
-Package option: `\usepackage[package=cryptocode]{texfrog}` or `package=nicodemus`.
+Package option: `\usepackage[package=cryptocode]{texfrog}`, `package=nicodemus`, or `package=algpseudocodex`.
 
 ## Key Conventions
 
-- **Package profiles**: `\usepackage[package=cryptocode]{texfrog}` (default) or `nicodemus`.
+- **Package profiles**: `\usepackage[package=cryptocode]{texfrog}` (default), `nicodemus`, or `algpseudocodex`.
   Profiles are defined in `texfrog/packages.py`.
 - **Tag syntax**: `\tfonly{G1,G3-G5}{content}`. Ranges resolved by position
   in the games list, not alphabetically.
 - **`\tfchanged` wrapping skips**: lines ending with `{` (procedure headers) and
   pure comment lines (starting with `%`). For nicodemus, `\item` prefix is kept
-  outside `\tfchanged{}`.
+  outside `\tfchanged{}`; for algpseudocodex, `\State` prefix is kept outside the
+  same way (both implemented in `texfrog/filter.py` and `latex/texfrog.sty`).
 - **`latex_name` is math-mode content** without `$` delimiters. `\tfgamename{source}{label}`
   (or 1-arg `\tfgamename{label}` inside `tfsource`) wraps it in `\ensuremath` (LaTeX)
   or `$...$` (HTML/MathJax).

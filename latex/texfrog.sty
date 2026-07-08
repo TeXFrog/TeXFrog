@@ -66,6 +66,12 @@
 % Package options (processed via \usepackage[package=...]{texfrog})
 % ----------------------------------------------------------------------
 
+\msg_new:nnn { texfrog } { unknown-package }
+  {
+    Unknown~package~option~'#3'~for~texfrog;~valid~choices~are~#2.~
+    Falling~back~to~'cryptocode'.
+  }
+
 \keys_define:nn { texfrog }
   {
     package .choice:,
@@ -82,6 +88,28 @@
         \bool_gset_false:N \g__tf_math_mode_bool
         \bool_gset_false:N \g__tf_line_sep_bool
         \tl_gclear:N \g__tf_gamelabel_cmd_tl
+      },
+    package / algpseudocodex .code:n =
+      {
+        \tl_gset:Nn \g__tf_package_tl { algpseudocodex }
+        \bool_gset_false:N \g__tf_math_mode_bool
+        \bool_gset_false:N \g__tf_line_sep_bool
+        \tl_gset:Nn \g__tf_gamelabel_cmd_tl { \Comment }
+      },
+    % Custom message (rather than l3keys' generic "accepts only a fixed
+    % set of choices" error) so an invalid package= value is clearly
+    % reported, naming the valid choices, instead of silently falling
+    % back to cryptocode's configuration with no explanation.
+    package / unknown .code:n =
+      {
+        \msg_warning:nneee { texfrog } { unknown-package }
+          { package }
+          { cryptocode,~nicodemus,~algpseudocodex }
+          { \exp_not:n {#1} }
+        \tl_gset:Nn \g__tf_package_tl { cryptocode }
+        \bool_gset_true:N \g__tf_math_mode_bool
+        \bool_gset_true:N \g__tf_line_sep_bool
+        \tl_gset:Nn \g__tf_gamelabel_cmd_tl { \pccomment }
       },
     package .initial:n = cryptocode,
   }
@@ -465,6 +493,29 @@
   \fi
 }
 
+% For algpseudocodex, a plain \colorbox would make highlighted lines
+% unbreakable hboxes: long pseudocode lines that normally wrap inside
+% algpseudocodex's per-line varwidth would overflow the margin as soon
+% as they are marked changed. Wrap text-mode content in a varwidth of
+% the remaining line width so highlighted lines break like plain ones.
+% (varwidth is already loaded by algpseudocodex itself.)
+\tl_if_eq:NnT \g__tf_package_tl { algpseudocodex }
+  {
+    \cs_gset_protected:Npn \tfchanged #1
+      {
+        \mode_if_math:TF
+          { \colorbox { blue!15 } { $ \displaystyle #1 $ } }
+          {
+            \colorbox { blue!15 }
+              {
+                \begin { varwidth } [t] { \dimexpr \linewidth - 2 \fboxsep \relax }
+                #1
+                \end { varwidth }
+              }
+          }
+      }
+  }
+
 % Internal wrapper that extracts trailing \\ and leading \item
 \cs_new_protected:Nn \__tf_wrap_changed:n
   {
@@ -485,8 +536,9 @@
         \cs_gset:Npn \tfgamelabel ##1##2 { ##2~\tfniccodecomment{##1} }
       }
       {
-        % cryptocode style: use \pccomment
-        \cs_gset:Npn \tfgamelabel ##1##2 { ##2~\pccomment{##1} }
+        % packages with a built-in comment macro (cryptocode's \pccomment,
+        % algpseudocodex's \Comment): use whichever the profile configured
+        \cs_gset:Npn \tfgamelabel ##1##2 { ##2~\tl_use:N \g__tf_gamelabel_cmd_tl {##1} }
       }
   }
 
@@ -508,16 +560,50 @@
 
 \tl_new:N \l__tf_wrap_content_tl
 \tl_new:N \l__tf_wrap_suffix_tl
+\tl_new:N \l__tf_wrap_prefix_tl
+\tl_new:N \g__tf_wrap_output_tl
 
 % Try to strip trailing \\ from content. Uses a grabber macro.
 % We append a sentinel and check if \\ precedes it.
 \tl_new:N \l__tf_wrap_input_tl
+
+% Extract a leading \item (nicodemus) or \State (algorithmicx-style, e.g.
+% algpseudocodex) prefix from the tl variable #1, storing it in
+% \l__tf_wrap_prefix_tl (empty if no match) and stripping it from #1.
+% Both must stay outside the highlight-wrapping macro: \item to preserve
+% list structure, \State because its internal box/prevdepth bookkeeping
+% breaks if nested inside the highlight box. Mirrors the Python HTML-build
+% pipeline's wrap_changed_line() prefix handling (texfrog/filter.py).
+%
+% Note on \Statex: \c{\State} below matches the whole control-sequence
+% token atomically (l3regex operates on tokens, not characters), so
+% \Statex can never partially match it the way it does the Python side's
+% plain-character regex in filter.py (which needed an explicit \b fix for
+% exactly this) -- no equivalent fix is needed here.
+\cs_new_protected:Nn \__tf_extract_wrap_prefix:N
+  {
+    \tl_set_eq:NN \l__tf_wrap_prefix_tl #1
+    \regex_replace_once:nnNTF
+      { \A ( \s* (?: \c{\item} | \c{\State} ) \s* ) .* \Z }
+      { \1 }
+      \l__tf_wrap_prefix_tl
+      {
+        \regex_replace_once:nnN
+          { \A \s* (?: \c{\item} | \c{\State} ) \s* }
+          { }
+          #1
+      }
+      {
+        \tl_clear:N \l__tf_wrap_prefix_tl
+      }
+  }
 
 \cs_new_protected:Nn \__tf_do_wrap:nnN
   {
     % #1 = content, #2 = extra first arg (empty for tfchanged, game names for gamelabel), #3 = macro
     \tl_set:Nn \l__tf_wrap_content_tl { #1 }
     \tl_clear:N \l__tf_wrap_suffix_tl
+    \__tf_extract_wrap_prefix:N \l__tf_wrap_content_tl
     % Check for trailing \\ by testing if the tl contains \\
     % and trying to remove it from the end
     \tl_if_in:NnTF \l__tf_wrap_content_tl { \\ }
@@ -526,11 +612,23 @@
         \__tf_split_at_trailing_bs:N \l__tf_wrap_content_tl
       }
       { }
-    % Apply wrapping
-    \tl_if_empty:nTF { #2 }
-      { #3 { \tl_use:N \l__tf_wrap_content_tl } }
-      { #3 { #2 } { \tl_use:N \l__tf_wrap_content_tl } }
-    \tl_use:N \l__tf_wrap_suffix_tl
+    % Apply wrapping (prefix, if any, stays outside the macro call).
+    % The full output is assembled in a GLOBAL tl and emitted in a single
+    % expansion: emitting the prefix directly would execute \State, which
+    % in algpseudocodex closes the varwidth group opened at the previous
+    % \State and thereby reverts all LOCAL assignments made above -- the
+    % content tl would already be empty by the time #3 grabs its argument.
+    % (#2 is o-expanded because figure mode passes a scratch tl variable
+    % holding the game-name list, which dies in the same group close.)
+    \tl_gset:Ne \g__tf_wrap_output_tl
+      {
+        \exp_not:V \l__tf_wrap_prefix_tl
+        \exp_not:N #3
+        \tl_if_empty:nF { #2 } { { \exp_not:o { #2 } } }
+        { \exp_not:V \l__tf_wrap_content_tl }
+        \exp_not:V \l__tf_wrap_suffix_tl
+      }
+    \tl_use:N \g__tf_wrap_output_tl
   }
 
 % Split at trailing \\: append a unique sentinel, grab everything
@@ -593,7 +691,10 @@
     \prop_gclear:N \g__tf_recorded_prop
     \int_gset:Nn \g__tf_pos_int { 0 }
     \int_gset:Nn \g__tf_mode_int { 1 } % record mode
-    \tl_gset:Nn \g__tf_current_game_tl { #3 }
+    % #3 may be a tl var (e.g. \l__tf_diff_tl from the diff= key); expand it
+    % so the game label is stored as characters, not as an unexpanded token
+    % (otherwise tag matching silently fails and every line looks changed).
+    \tl_gset:Ne \g__tf_current_game_tl { #3 }
     \vbox_set:Nn \g__tf_scratch_box
       { \tl_use:c { g__tf_source_ #1 _tl } }
     \box_gclear:N \g__tf_scratch_box

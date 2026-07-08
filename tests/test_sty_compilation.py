@@ -84,6 +84,12 @@ _CRYPTO_PREAMBLE = r"""\documentclass{article}
 \usepackage[package=cryptocode]{texfrog}
 """
 
+_ALGPSEUDOCODEX_PREAMBLE = r"""\documentclass{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{algpseudocodex}
+\usepackage[package=algpseudocodex]{texfrog}
+"""
+
 
 # ---------------------------------------------------------------------------
 # Full tutorial compilation
@@ -282,6 +288,72 @@ def test_renderfigure_multi_game(tmp_path):
 """
     result = _compile_tex(tmp_path, tex)
     _assert_compiled(tmp_path, result)
+
+
+@needs_pdflatex
+def test_algpseudocodex_package_option(tmp_path):
+    r"""package=algpseudocodex is accepted and \tfgamelabel uses \Comment."""
+    tex = _ALGPSEUDOCODEX_PREAMBLE + r"""
+\tfgames{test}{G0, G1, G2}
+\tfgamename{test}{G0}{G_0}
+\tfgamename{test}{G1}{G_1}
+\tfgamename{test}{G2}{G_2}
+
+\begin{tfsource}{test}
+\begin{algorithmic}[1]
+\Procedure{Game}{}
+\tfonly{G0}{\State $x \gets 0$}
+\tfonly{G1}{\State $x \gets 1$}
+\tfonly{G2}{\State $x \gets 2$}
+\State \Return $x$
+\EndProcedure
+\end{algorithmic}
+\end{tfsource}
+
+\begin{document}
+\tfrenderfigure{test}{G0,G1,G2}
+\end{document}
+"""
+    result = _compile_tex(tmp_path, tex)
+    _assert_compiled(tmp_path, result)
+    # pdflatex -interaction=nonstopmode still writes a PDF after an undefined
+    # control sequence (it skips the token and continues), so _assert_compiled
+    # alone can't tell "compiled cleanly" from "compiled with swallowed
+    # errors" — check the log directly to guard against the fallback-to-
+    # cryptocode bug this test exists to catch.
+    assert "Undefined control sequence" not in result.stdout, (
+        f"pdflatex reported undefined control sequences despite producing a "
+        f"PDF (package=algpseudocodex may have fallen back to cryptocode's "
+        f"\\pccomment).\nLog tail:\n{result.stdout[-3000:]}"
+    )
+
+
+@needs_pdflatex
+def test_unknown_package_option_warns_and_falls_back(tmp_path):
+    r"""An invalid package= value emits a clear texfrog warning (naming the
+    valid choices) and falls back to cryptocode, instead of failing silently
+    or with l3keys' generic "accepts only a fixed set of choices" error.
+    """
+    tex = r"""\documentclass{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[package=bogus]{texfrog}
+\begin{document}
+hi
+\end{document}
+"""
+    result = _compile_tex(tmp_path, tex)
+    _assert_compiled(tmp_path, result)
+    error_lines = [
+        line for line in result.stdout.splitlines() if line.startswith("!")
+    ]
+    assert not error_lines, (
+        f"pdflatex reported errors for an invalid package= value: {error_lines}\n"
+        f"Log tail:\n{result.stdout[-3000:]}"
+    )
+    assert "texfrog Warning" in result.stdout
+    assert "cryptocode, nicodemus, algpseudocodex" in " ".join(
+        result.stdout.split()
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -535,6 +607,45 @@ def test_init_nicodemus_proof_compiles(tmp_path):
     assert pdf.exists(), (
         f"pdflatex failed on scaffolded nicodemus proof.tex.\n"
         f"Exit code: {result.returncode}\n"
+        f"Log tail:\n{result.stdout[-3000:]}"
+    )
+
+
+@needs_pdflatex
+def test_init_algpseudocodex_proof_compiles(tmp_path):
+    """Scaffolded algpseudocodex proof.tex compiles with pdflatex."""
+    from click.testing import CliRunner
+    from texfrog.cli import main
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["init", str(tmp_path), "--package", "algpseudocodex"])
+    assert result.exit_code == 0
+
+    shutil.copy2(_STY_PATH, tmp_path / "texfrog.sty")
+
+    result = subprocess.run(
+        ["pdflatex", "-interaction=nonstopmode", "-no-shell-escape", "proof.tex"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    pdf = tmp_path / "proof.pdf"
+    assert pdf.exists(), (
+        f"pdflatex failed on scaffolded algpseudocodex proof.tex.\n"
+        f"Exit code: {result.returncode}\n"
+        f"Log tail:\n{result.stdout[-3000:]}"
+    )
+    # pdflatex -interaction=nonstopmode still writes a PDF after LaTeX
+    # errors (it recovers and continues), so pdf.exists() alone can't catch
+    # a broken \tfrendergame[diff=...] highlighted render — check the log
+    # directly. This is exactly the failure mode a naive \tfchanged wrap of
+    # a whole \State line produces for algorithmicx-style packages.
+    error_lines = [
+        line for line in result.stdout.splitlines() if line.startswith("!")
+    ]
+    assert not error_lines, (
+        f"pdflatex reported errors despite producing a PDF: {error_lines}\n"
         f"Log tail:\n{result.stdout[-3000:]}"
     )
 

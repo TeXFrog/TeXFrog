@@ -17,7 +17,7 @@ from texfrog.templates import get_templates
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("package", ["cryptocode", "nicodemus"])
+@pytest.mark.parametrize("package", ["cryptocode", "nicodemus", "algpseudocodex"])
 def test_get_templates_returns_expected_files(package: str):
     templates = get_templates(package)
     assert "proof.tex" in templates
@@ -100,6 +100,15 @@ def test_init_nicodemus(tmp_path: Path):
     assert (tmp_path / ".gitignore").exists()
 
 
+def test_init_algpseudocodex(tmp_path: Path):
+    runner = CliRunner()
+    result = runner.invoke(main, ["init", str(tmp_path), "--package", "algpseudocodex"])
+    assert result.exit_code == 0
+    tex_content = (tmp_path / "proof.tex").read_text()
+    assert r"\usepackage[package=algpseudocodex]{texfrog}" in tex_content
+    assert r"\Procedure" in tex_content
+
+
 def test_init_cryptocode_is_default(tmp_path: Path):
     runner = CliRunner()
     result = runner.invoke(main, ["init", str(tmp_path)])
@@ -148,7 +157,7 @@ def test_init_default_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("package", ["cryptocode", "nicodemus"])
+@pytest.mark.parametrize("package", ["cryptocode", "nicodemus", "algpseudocodex"])
 def test_init_output_is_parseable(tmp_path: Path, package: str):
     """Scaffolded files can be parsed by the TeXFrog parser without errors."""
     runner = CliRunner()

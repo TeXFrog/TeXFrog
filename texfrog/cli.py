@@ -52,7 +52,7 @@ def main() -> None:
 @click.argument("directory", default=".", type=click.Path())
 @click.option(
     "--package",
-    type=click.Choice(["cryptocode", "nicodemus"], case_sensitive=False),
+    type=click.Choice(["cryptocode", "nicodemus", "algpseudocodex"], case_sensitive=False),
     default="cryptocode",
     show_default=True,
     help="Package profile for the generated templates.",
