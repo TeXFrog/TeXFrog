@@ -361,10 +361,15 @@ INPUT can be a `.tex` file with TeXFrog commands or a directory containing `proo
 Scaffolds a new proof directory with a `proof.tex` file containing TeXFrog commands,
 a `macros.tex` file, and a `commentary/` subdirectory with starter commentary files.
 The `--package` option selects the template flavour (default: `cryptocode`).
-Existing files are never overwritten — skipped with a warning instead.
+The `nicodemus` scaffold additionally bundles `nicodemus.sty` (copied from the
+repository's `resources/` directory and registered via `\tfmacrofile{nicodemus.sty}`)
+because that package is not on CTAN; this keeps the scaffold self-contained for both
+`pdflatex` and `texfrog html build`. Existing files are never overwritten — skipped
+with a warning instead.
 
-Templates are stored as inline strings in `texfrog/templates.py`. Each template set
-produces a minimal 4-game proof that is immediately compilable with `pdflatex`.
+Templates are stored as inline strings in `texfrog/templates.py` (non-CTAN `.sty`
+resources live in `resources/`). Each template set produces a minimal 4-game proof
+that is immediately compilable with `pdflatex`.
 
 Default output dir: `texfrog_html/` next to the input file.
 

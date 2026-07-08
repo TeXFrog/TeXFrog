@@ -48,6 +48,33 @@ needs_html_tools = pytest.mark.skipif(
     reason="pdflatex and/or SVG converter (pdf2svg/pdftocairo) not on PATH",
 )
 
+
+def _assert_rendered_svg(svg: Path) -> None:
+    """Assert *svg* is a real render, not the build's error placeholder.
+
+    When pdflatex fails, ``texfrog html build`` writes a tiny placeholder SVG
+    reading ``[SVG render failed for …]`` and still exits 0, so a size check
+    alone (the placeholder is ~160 bytes) does not catch a broken build.
+    """
+    assert svg.exists(), f"SVG not produced for {svg.stem}"
+    content = svg.read_text(encoding="utf-8")
+    assert "render failed" not in content, (
+        f"{svg.name} is a render-failure placeholder, not a real render:\n{content}"
+    )
+    assert svg.stat().st_size > 100, f"SVG suspiciously small for {svg.stem}"
+
+
+def test_assert_rendered_svg_rejects_placeholder(tmp_path):
+    """The SVG guard must reject the build's render-failure placeholder."""
+    placeholder = tmp_path / "G0.svg"
+    placeholder.write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="60">'
+        '<text x="10" y="40">[SVG render failed for G0]</text></svg>'
+    )
+    with pytest.raises(AssertionError, match="render-failure placeholder"):
+        _assert_rendered_svg(placeholder)
+
+
 # ---------------------------------------------------------------------------
 # texfrog html build (pure LaTeX .tex-based tutorials)
 # ---------------------------------------------------------------------------
@@ -77,12 +104,10 @@ def test_texfrog_html_build_tex(tmp_path, tutorial_name):
     assert (out / "style.css").exists()
     assert (out / "app.js").exists()
 
-    # Every game should have a non-empty SVG.
+    # Every game should have a real (non-placeholder) SVG.
     games_dir = out / "games"
     for label in game_labels:
-        svg = games_dir / f"{label}.svg"
-        assert svg.exists(), f"SVG not produced for {label}"
-        assert svg.stat().st_size > 100, f"SVG suspiciously small for {label}"
+        _assert_rendered_svg(games_dir / f"{label}.svg")
 
 
 @needs_html_tools
@@ -114,9 +139,7 @@ def test_texfrog_init_then_html_build(tmp_path, package):
     assert (out / "index.html").exists()
     games_dir = out / "games"
     for label in game_labels:
-        svg = games_dir / f"{label}.svg"
-        assert svg.exists(), f"SVG not produced for {label}"
-        assert svg.stat().st_size > 100, f"SVG suspiciously small for {label}"
+        _assert_rendered_svg(games_dir / f"{label}.svg")
 
 
 @needs_html_tools

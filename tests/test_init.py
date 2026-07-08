@@ -36,6 +36,19 @@ def test_get_templates_unknown_package():
         get_templates("nonexistent")
 
 
+def test_nicodemus_templates_bundle_sty():
+    """nicodemus is not on CTAN, so the scaffold must ship ``nicodemus.sty``."""
+    templates = get_templates("nicodemus")
+    assert "nicodemus.sty" in templates
+    content, _ = templates["nicodemus.sty"]
+    assert r"\ProvidesPackage{nicodemus}" in content
+
+
+def test_cryptocode_templates_do_not_bundle_sty():
+    """cryptocode ships with TeX Live, so no ``.sty`` should be scaffolded."""
+    assert "nicodemus.sty" not in get_templates("cryptocode")
+
+
 # ---------------------------------------------------------------------------
 # CLI tests
 # ---------------------------------------------------------------------------
@@ -69,6 +82,12 @@ def test_init_nicodemus(tmp_path: Path):
     tex_content = (tmp_path / "proof.tex").read_text()
     assert r"\usepackage[package=nicodemus]{texfrog}" in tex_content
     assert "nicodemusheader" in tex_content
+    # The scaffold must be self-contained: nicodemus.sty is bundled and
+    # registered so ``texfrog html build`` can find it.
+    sty = tmp_path / "nicodemus.sty"
+    assert sty.exists()
+    assert r"\ProvidesPackage{nicodemus}" in sty.read_text()
+    assert r"\tfmacrofile{nicodemus.sty}" in tex_content
 
 
 def test_init_cryptocode_is_default(tmp_path: Path):

@@ -19,7 +19,6 @@ import pytest
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _STY_PATH = _PROJECT_ROOT / "latex" / "texfrog.sty"
-_NICODEMUS_STY_PATH = _PROJECT_ROOT / "resources" / "nicodemus.sty"
 _TUTORIAL_DIR = _PROJECT_ROOT / "examples" / "tutorial-cryptocode-quickstart"
 
 needs_pdflatex = pytest.mark.skipif(
@@ -510,12 +509,12 @@ def test_init_cryptocode_proof_compiles(tmp_path):
 
 
 @needs_pdflatex
-@pytest.mark.xfail(
-    reason="init template may have macro conflicts",
-    strict=False,
-)
 def test_init_nicodemus_proof_compiles(tmp_path):
-    """Scaffolded nicodemus proof.tex compiles with pdflatex."""
+    """Scaffolded nicodemus proof.tex compiles with pdflatex.
+
+    ``texfrog init --package nicodemus`` bundles ``nicodemus.sty`` (it is not
+    on CTAN), so only ``texfrog.sty`` needs to be supplied here.
+    """
     from click.testing import CliRunner
     from texfrog.cli import main
 
@@ -524,7 +523,6 @@ def test_init_nicodemus_proof_compiles(tmp_path):
     assert result.exit_code == 0
 
     shutil.copy2(_STY_PATH, tmp_path / "texfrog.sty")
-    shutil.copy2(_NICODEMUS_STY_PATH, tmp_path / "nicodemus.sty")
 
     result = subprocess.run(
         ["pdflatex", "-interaction=nonstopmode", "-no-shell-escape", "proof.tex"],

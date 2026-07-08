@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Bug fixes
+
+- **`texfrog init --package nicodemus` is now self-contained.** The scaffold bundles
+  `nicodemus.sty` (which is not on CTAN) and registers it with `\tfmacrofile`, so the
+  generated proof compiles with `pdflatex` and renders with `texfrog html build`
+  without a system-wide nicodemus install.
+
 ## v0.0.2
 
 ### Breaking changes

@@ -2,6 +2,17 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+# Bundled LaTeX resources (e.g. the ``nicodemus`` pseudocode package, which is
+# not on CTAN) live in the repository's top-level ``resources/`` directory.
+_RESOURCES_DIR = Path(__file__).resolve().parent.parent / "resources"
+
+
+def _read_resource(name: str) -> str:
+    """Return the text of a bundled resource file from ``resources/``."""
+    return (_RESOURCES_DIR / name).read_text(encoding="utf-8")
+
 # ---------------------------------------------------------------------------
 # cryptocode templates (pure LaTeX format)
 # ---------------------------------------------------------------------------
@@ -114,6 +125,9 @@ NICODEMUS_TEX = r"""\documentclass{article}
 \tfreduction{myproof}{Red1}
 \tfrelatedgames{myproof}{Red1}{G0, G1}
 
+%%% nicodemus.sty is bundled by ``texfrog init`` (it is not on CTAN); register
+%%% it so ``texfrog html build`` copies it alongside each rendered game.
+\tfmacrofile{nicodemus.sty}
 \tfmacrofile{macros.tex}
 
 \tfcommentary{myproof}{G0}{commentary/G0.tex}
@@ -221,6 +235,8 @@ def get_templates(package: str) -> dict[str, tuple[str, str]]:
         return {
             "proof.tex": (NICODEMUS_TEX.lstrip("\n"), "proof document"),
             "macros.tex": (NICODEMUS_MACROS.lstrip("\n"), "custom macros"),
+            # nicodemus is not on CTAN, so ship it inside the scaffold.
+            "nicodemus.sty": (_read_resource("nicodemus.sty"), "nicodemus package"),
             **commentary_files,
         }
     else:
