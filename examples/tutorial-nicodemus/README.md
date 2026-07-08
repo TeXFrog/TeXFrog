@@ -1,7 +1,7 @@
 # TeXFrog Tutorial (nicodemus)
 
 > [!NOTE]
-> **Package:** This tutorial uses [`nicodemus`](https://github.com/awslabs/nicodemus). For the same proof using `cryptocode` (the default, with a more detailed walkthrough), see [tutorial-cryptocode/](../tutorial-cryptocode/).
+> **Package:** This tutorial uses [`nicodemus`](../../resources/nicodemus.sty) (by Bertram Poettering; not on CTAN, bundled with TeXFrog). For the same proof using `cryptocode` (the default, with a more detailed walkthrough), see [tutorial-cryptocode/](../tutorial-cryptocode/).
 
 This tutorial contains the same IND-CPA proof as the cryptocode tutorial, rewritten for the `nicodemus` pseudocode package. Comparing the two shows the key syntax differences.
 
