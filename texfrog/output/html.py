@@ -126,7 +126,12 @@ def _build_wrapper_template(
     profile = get_profile(package_name)
     parts: list[str] = [
         r"\documentclass{{article}}",
-        r"\usepackage[letterpaper,margin=1in]{{geometry}}",
+        # Fixed width (matches letterpaper minus 1in margins), but a very
+        # tall page so long games never overflow onto a 2nd page: pdftocairo
+        # emits a non-standard multi-page <pageSet>/<page> SVG for multi-page
+        # input, which browsers (and rsvg-convert) silently fail to render,
+        # producing seemingly-empty SVG files (see CHANGELOG).
+        r"\usepackage[paperwidth=8.5in,paperheight=200in,margin=1in]{{geometry}}",
         r"\usepackage{{amsfonts,amsmath,amsthm}}",
         r"\usepackage{{adjustbox}}",
         r"\usepackage[dvipsnames,table]{{xcolor}}",
@@ -334,8 +339,38 @@ def _compile_game_to_svg(
                 f"pdflatex failed for game {game_label}:\n{result.stdout[-3000:]}"
             )
 
+        _check_single_page(pdf_path, game_label)
+
         cropped_pdf = _pdfcrop(pdf_path)
         _pdf_to_svg(cropped_pdf, svg_out_path, converter)
+
+
+def _check_single_page(pdf_path: Path, game_label: str) -> None:
+    """Raise if ``pdf_path`` has more than one page.
+
+    A multi-page input makes ``pdftocairo -svg`` emit a non-standard
+    multi-page ``<pageSet>``/``<page>`` wrapper that browsers (and
+    rsvg-convert) silently fail to render, producing a blank SVG.
+
+    Raises:
+        RuntimeError: If pdfinfo is unavailable or reports more than 1 page.
+    """
+    if not shutil.which("pdfinfo"):
+        return
+    result = subprocess.run(
+        ["pdfinfo", str(pdf_path)],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    match = re.search(r"^Pages:\s*(\d+)", result.stdout, re.MULTILINE)
+    if match and int(match.group(1)) > 1:
+        raise RuntimeError(
+            f"Game {game_label} overflowed onto {match.group(1)} pages "
+            "(200in page height exceeded); its rendered SVG would be blank. "
+            "Shorten the game or widen the wrapper page height in "
+            "_build_wrapper_template()."
+        )
 
 
 # ---------------------------------------------------------------------------
