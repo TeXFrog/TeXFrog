@@ -4,6 +4,12 @@
 
 ### Bug fixes
 
+- **Tall games no longer render as blank SVGs in `texfrog html`.** Games taller
+  than one page previously overflowed onto a 2nd page, making `pdftocairo -svg`
+  emit a non-standard multi-page `<pageSet>`/`<page>` wrapper that browsers
+  silently fail to render. The wrapper page height is now 200in (width
+  unchanged) so games stay on a single page, with a `pdfinfo`-based guard that
+  raises a clear error instead of producing a broken SVG if one still overflows.
 - **`texfrog init --package nicodemus` is now self-contained.** The scaffold bundles
   `nicodemus.sty` (which is not on CTAN) and registers it with `\tfmacrofile`, so the
   generated proof compiles with `pdflatex` and renders with `texfrog html build`

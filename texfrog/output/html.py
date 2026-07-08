@@ -352,8 +352,10 @@ def _check_single_page(pdf_path: Path, game_label: str) -> None:
     multi-page ``<pageSet>``/``<page>`` wrapper that browsers (and
     rsvg-convert) silently fail to render, producing a blank SVG.
 
+    No-op if ``pdfinfo`` is unavailable.
+
     Raises:
-        RuntimeError: If pdfinfo is unavailable or reports more than 1 page.
+        RuntimeError: If pdfinfo reports more than 1 page.
     """
     if not shutil.which("pdfinfo"):
         return
