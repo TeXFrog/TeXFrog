@@ -69,7 +69,9 @@ jobs:
             collection-latexextra
             collection-latexrecommended
             collection-fontsrecommended
+            collection-mathscience
             cryptocode
+            pgf
             pdfcrop
 
       - name: Install Python dependencies
