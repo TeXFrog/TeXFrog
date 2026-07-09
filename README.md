@@ -16,7 +16,7 @@ TeXFrog helps cryptographers manage game-hopping proofs in LaTeX. If you have ev
 
 All from that one source file.
 
-TeXFrog currently supports the [`cryptocode`](https://ctan.org/pkg/cryptocode) and [`nicodemus`](https://github.com/TeXFrog/TeXFrog/blob/main/resources/nicodemus.sty) (by Bertram Poettering; not on CTAN, bundled with TeXFrog) pseudocode packages, and we are open to supporting others.
+TeXFrog currently supports the [`cryptocode`](https://ctan.org/pkg/cryptocode), [`nicodemus`](https://github.com/TeXFrog/TeXFrog/blob/main/resources/nicodemus.sty) (by Bertram Poettering; not on CTAN, bundled with TeXFrog), and [`algpseudocodex`](https://ctan.org/pkg/algpseudocodex) pseudocode packages, and we are open to supporting others.
 
 ## Live Demos
 
@@ -120,6 +120,9 @@ texfrog init mydirectory
 
 # ... or using the nicodemus package for pseudocode
 texfrog init myproof --package nicodemus
+
+# ... or using the algpseudocodex package for pseudocode
+texfrog init myproof --package algpseudocodex
 ```
 
 The [TeXFrog repository contains tutorials](https://github.com/TeXFrog/TeXFrog/tree/main/examples) you can study:
@@ -139,7 +142,7 @@ texfrog html serve tutorial-cryptocode/main.tex
 ### Scaffold a new proof
 
 ```bash
-texfrog init [DIRECTORY] [--package cryptocode|nicodemus]
+texfrog init [DIRECTORY] [--package cryptocode|nicodemus|algpseudocodex]
 ```
 
 Creates starter files in `DIRECTORY` (default: current directory). The `--package` option selects the pseudocode package (default: `cryptocode`). Existing files are never overwritten.
@@ -185,9 +188,10 @@ All examples compile directly with `pdflatex` — no Python needed. Just place `
 | [`examples/tutorial-cryptocode-quickstart/`](https://github.com/TeXFrog/TeXFrog/tree/main/examples/tutorial-cryptocode-quickstart) | Minimal IND-CPA proof (recommended starting point) | `cryptocode` | |
 | [`examples/tutorial-cryptocode/`](https://github.com/TeXFrog/TeXFrog/tree/main/examples/tutorial-cryptocode) | Same proof with detailed walkthrough and commentary | `cryptocode` | [View demo](https://texfrog.github.io/demos/tutorial-cryptocode/) |
 | [`examples/tutorial-nicodemus/`](https://github.com/TeXFrog/TeXFrog/tree/main/examples/tutorial-nicodemus) | Same proof using `nicodemus` syntax | `nicodemus` | [View demo](https://texfrog.github.io/demos/tutorial-nicodemus/) |
+| [`examples/tutorial-algpseudocodex/`](https://github.com/TeXFrog/TeXFrog/tree/main/examples/tutorial-algpseudocodex) | Same proof using `algpseudocodex` syntax | `algpseudocodex` | |
 | [`examples/example-multiproof/`](https://github.com/TeXFrog/TeXFrog/tree/main/examples/example-multiproof) | Multiple proofs in one document | `cryptocode` | |
 
-Comparing the cryptocode and nicodemus tutorials shows the syntax differences between pseudocode packages.
+Comparing the cryptocode, nicodemus, and algpseudocodex tutorials shows the syntax differences between pseudocode packages.
 
 ## Documentation
 

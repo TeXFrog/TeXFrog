@@ -84,20 +84,20 @@ If these were scattered in different parts of the file, each game would see them
 
 ### Math mode errors (`\mathsf allowed only in math mode`)
 
-**Cause:** Mismatch between the pseudocode package's mode and the `\tfchanged` definition. `cryptocode` content is in math mode; `nicodemus` content is in text mode.
+**Cause:** Mismatch between the pseudocode package's mode and the `\tfchanged` definition. `cryptocode` content is in math mode; `nicodemus` and `algpseudocodex` content is in text mode.
 
 **Fix:** Ensure your package profile is set correctly via `\usepackage[package=...]{texfrog}`. If you override `\tfchanged`, match the mode:
 
 - **cryptocode:** `\newcommand{\tfchanged}[1]{\colorbox{blue!15}{$#1$}}`
-- **nicodemus:** `\newcommand{\tfchanged}[1]{\colorbox{blue!15}{#1}}`
+- **nicodemus / algpseudocodex:** `\newcommand{\tfchanged}[1]{\colorbox{blue!15}{#1}}`
 
-The HTML build wrapper handles this automatically. This error usually appears when a cryptocode proof's `\tfchanged` is defined without `$...$` wrapping, or when you accidentally use `\usepackage[package=nicodemus]{texfrog}` for a cryptocode proof.
+The HTML build wrapper handles this automatically. This error usually appears when a cryptocode proof's `\tfchanged` is defined without `$...$` wrapping, or when you accidentally use a text-mode profile (`package=nicodemus` or `package=algpseudocodex`) for a cryptocode proof.
 
-### `\item` appearing inside `\tfchanged`
+### `\item` or `\State` appearing inside `\tfchanged`
 
-**Cause:** This shouldn't happen — TeXFrog keeps `\item` prefixes outside `\tfchanged{}` for nicodemus to preserve list structure. If you see this, check that:
+**Cause:** This shouldn't happen — TeXFrog keeps the line prefix outside `\tfchanged{}` to preserve structure: `\item` for nicodemus, `\State` for algpseudocodex. If you see this, check that:
 
-1. Your .tex file uses `\usepackage[package=nicodemus]{texfrog}` (not the default `cryptocode`).
+1. Your .tex file uses the matching profile (`\usepackage[package=nicodemus]{texfrog}` or `\usepackage[package=algpseudocodex]{texfrog}`), not the default `cryptocode`.
 2. You haven't manually edited the generated output files.
 
 ### Highlighting is not applied to some changed lines
