@@ -154,6 +154,20 @@ This is a non-fatal warning. Without `pdfcrop`, SVG images will have wider margi
 
 **Fix:** Install `pdfcrop` (see above) and ensure you're not using `standalone` document class in any of your macro files.
 
+### Game names or descriptions render as raw or garbled text in the HTML viewer
+
+**Symptom:** In the proof viewer, the game titles and the sidebar (game names and descriptions) show broken or literal LaTeX — stray backslashes or unknown command names — even though the pseudocode figures themselves render correctly.
+
+**Cause:** Game names (`\tfgamename`) and descriptions (`\tfdescription`) are typeset in the browser by **MathJax**, not by LaTeX. TeXFrog feeds MathJax the custom macros it can harvest from your `\tfmacrofile` files, but it only collects **single-line** definitions written with `\newcommand`, `\renewcommand`, `\providecommand`, `\DeclareMathOperator`, or `\def`. Macros defined with `\NewDocumentCommand`, spread across multiple lines, or produced indirectly (a macro that defines other macros) are not picked up, so MathJax does not know them.
+
+**Fix:** For any macro you use inside a `\tfgamename` or `\tfdescription`, add a plain single-line definition the harvester can read:
+
+```latex
+\newcommand{\Bdversary}{\mathcal{B}}   % picked up for MathJax
+```
+
+rather than `\NewDocumentCommand{...}` or a multi-line definition. This only affects the MathJax-rendered names and descriptions — the pseudocode figures are compiled with real LaTeX and are unaffected.
+
 ## `texfrog check` and Validation
 
 ### What does `texfrog check` validate?
