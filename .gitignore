@@ -8,6 +8,7 @@ texfrog.egg-info
 bundle_preview.sh
 examples/example-compositekems/
 examples/example-ntor/
+uv.lock
 
 # LaTeX build artifacts
 *.aux

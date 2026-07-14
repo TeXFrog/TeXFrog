@@ -32,6 +32,7 @@ _TEX_TUTORIAL_NAMES = [
     "tutorial-cryptocode-quickstart",
     "tutorial-cryptocode",
     "tutorial-nicodemus",
+    "tutorial-algpseudocodex",
 ]
 
 # ---------------------------------------------------------------------------

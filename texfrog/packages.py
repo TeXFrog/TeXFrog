@@ -1,6 +1,7 @@
 """Package profile definitions for TeXFrog.
 
-Each pseudocode LaTeX package (cryptocode, nicodemus, etc.) has different
+Each pseudocode LaTeX package (cryptocode, nicodemus, algpseudocodex, etc.)
+has different
 conventions for line separators, content mode, and available macros.
 A :class:`PackageProfile` captures these differences so that the rest of
 TeXFrog can generate correct output regardless of the package in use.
@@ -150,6 +151,19 @@ BUILTIN_PROFILES: dict[str, PackageProfile] = {
         math_mode_content=False,
         gamelabel_comment_cmd=None,
         procedure_header_cmd="nicodemusheader",
+    ),
+    "algpseudocodex": PackageProfile(
+        name="algpseudocodex",
+        preamble_lines=(
+            r"\usepackage{algpseudocodex}",
+        ),
+        has_line_separators=False,
+        math_mode_content=False,
+        gamelabel_comment_cmd=r"\Comment",
+        # \Procedure is defined by algpseudocodex itself; procedure_header_def()'s
+        # \providecommand is a no-op here (already defined) — this name only
+        # drives wrap_changed_line()'s header-skip detection.
+        procedure_header_cmd="Procedure",
     ),
 }
 

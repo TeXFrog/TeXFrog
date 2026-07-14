@@ -23,7 +23,8 @@ The `.tex` file is the **single source of truth** for both LaTeX compilation and
 export.
 
 The tool supports multiple LaTeX pseudocode packages via a **package profile** system.
-Currently supported: `cryptocode` (default) and `nicodemus`. Each profile captures
+Currently supported: `cryptocode` (default), `nicodemus`, and `algpseudocodex`.
+Each profile captures
 differences in line separators, content mode, and macro definitions.
 
 ---
@@ -69,6 +70,7 @@ TeXFrog/
 │   │   └── macros.tex          # Custom macros
 │   ├── tutorial-cryptocode/    # IND-CPA tutorial (pure LaTeX format, cryptocode)
 │   ├── tutorial-nicodemus/     # IND-CPA tutorial (pure LaTeX format, nicodemus)
+│   ├── tutorial-algpseudocodex/ # IND-CPA tutorial (pure LaTeX format, algpseudocodex)
 │   └── example-multiproof/     # Multiple proofs in a single document
 ```
 
@@ -257,6 +259,9 @@ The `\tfchanged` macro in the HTML wrapper varies by package profile:
   This is necessary because procedure titles are text-mode while procedure bodies are
   math-mode in cryptocode's `\procedure` environment.
 - **nicodemus** (text-mode content): `\newcommand{\tfchanged}[1]{\highlightbox{#1}}`
+- **algpseudocodex** (text-mode content, like nicodemus): `\newcommand{\tfchanged}[1]{\highlightbox{#1}}`.
+  The `\State` prefix is kept *outside* `\tfchanged{}`, exactly like nicodemus's `\item` — algorithmicx's
+  `\State` does real vertical-mode box/`\prevdepth` bookkeeping that breaks if nested inside the highlight box.
 
 ### pdftocairo Behavior
 
@@ -348,7 +353,7 @@ and automatically rebuilds + reloads the browser on changes.
 Built with Click. Entry point: `texfrog` → `texfrog.cli:main`.
 
 ```
-texfrog init [DIRECTORY] [--package cryptocode|nicodemus]
+texfrog init [DIRECTORY] [--package cryptocode|nicodemus|algpseudocodex]
 texfrog check INPUT [--strict]
 texfrog html build INPUT [-o DIR] [--keep-tmp]
 texfrog html serve INPUT [-o DIR] [--port 8080] [--no-browser] [--no-live-reload]
@@ -408,6 +413,12 @@ Pure LaTeX format tutorials implementing the same small IND-CPA proof (4 entries
 G1, Red1, G2). `tutorial-cryptocode/` uses `package=cryptocode` (default);
 `tutorial-nicodemus/` uses `package=nicodemus`.
 
+### `examples/tutorial-algpseudocodex/` — IND-CPA (pure LaTeX format, algpseudocodex)
+
+Pure LaTeX format tutorial implementing the full 5-entry IND-CPA proof (G0, G1, Red1,
+G2, G3), using `package=algpseudocodex`. Ported line-by-line from
+`tutorial-nicodemus/`, demonstrating the `algorithmic`/`\Procedure`/`\State` syntax.
+
 ### `examples/example-multiproof/` — Multiple proofs in one document (pure LaTeX format, cryptocode)
 
 Demonstrates defining multiple independent proofs in a single `.tex` file, each with
@@ -419,11 +430,12 @@ its own source name, games, and `tfsource` block.
 
 Package-specific behavior is abstracted via `PackageProfile`:
 
-| Attribute | cryptocode | nicodemus |
-|-----------|-----------|-----------|
-| `has_line_separators` | `True` (`\\` between lines) | `False` (`\item` per line) |
-| `math_mode_content` | `True` (inside `\procedure`) | `False` (inside `\begin{nicodemus}`) |
-| `gamelabel_comment_cmd` | `\pccomment` | `None` |
+| Attribute | cryptocode | nicodemus | algpseudocodex |
+|-----------|-----------|-----------|-----------|
+| `has_line_separators` | `True` (`\\` between lines) | `False` (`\item` per line) | `False` (`\State` per line) |
+| `math_mode_content` | `True` (inside `\procedure`) | `False` (inside `\begin{nicodemus}`) | `False` (inside `\Procedure`) |
+| `gamelabel_comment_cmd` | `\pccomment` | `None` | `\Comment` |
+| `procedure_header_cmd` | `None` | `nicodemusheader` | `Procedure` |
 
 Derived methods generate `\tfchanged`, `\tfremoved`, and `\tfgamelabel` definitions
 appropriate for each package, used in both the LaTeX harness and HTML wrapper.

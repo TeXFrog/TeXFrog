@@ -16,6 +16,12 @@ _TRAILING_PERCENT = re.compile(r"(?<!\\)%(\s*)$")
 # Matches a \item prefix (nicodemus-style) with optional leading whitespace.
 _ITEM_PREFIX = re.compile(r"^(\s*\\item\s*)")
 
+# Matches a \State prefix (algorithmicx-style, e.g. algpseudocodex) with
+# optional leading whitespace. The \b word boundary is required so this
+# doesn't misparse \Statex (a distinct, common algorithmicx command for
+# unnumbered continuation lines) as \State followed by stray "x ...".
+_STATE_PREFIX = re.compile(r"^(\s*\\State\b\s*)")
+
 
 def _strip_trailing_newline_sep(lines: list[str]) -> list[str]:
     """Strip trailing \\ from the last non-empty line in a list.
@@ -132,10 +138,15 @@ def wrap_changed_line(
 
         \tfchanged{content}%
 
-    For lines without a trailing ``\\`` (last line of a procedure, or lines
-    in algorithmicx-style packages):
+    For lines starting with ``\State`` (algorithmicx-style packages, e.g.
+    algpseudocodex), the ``\State`` prefix is placed *outside* the macro
+    call, exactly like ``\item``:
 
-        \tfchanged{\State $\key_1 \gets ...$}
+        \State \tfchanged{$\key_1 \gets ...$}
+
+    (``\State``'s internals do real vertical-mode box/prevdepth bookkeeping
+    that breaks if nested inside the highlight box, so it cannot be wrapped
+    along with its content the way plain math/text can.)
 
     Args:
         line: A single content line (no tag comment).
@@ -180,13 +191,18 @@ def wrap_changed_line(
     if trimmed.startswith(r"\begin{") or trimmed.startswith(r"\end{"):
         return line
 
-    # Extract \item prefix if present (nicodemus-style enumerate lines).
-    # The \item must stay outside the wrapping macro so the list structure
-    # is preserved.
+    # Extract a \item (nicodemus) or \State (algorithmicx-style) prefix if
+    # present. Both must stay outside the wrapping macro: \item to preserve
+    # list structure, \State because its box/prevdepth internals break if
+    # nested inside the highlight box.
     item_match = _ITEM_PREFIX.match(line)
+    state_match = _STATE_PREFIX.match(line)
     if item_match:
         prefix = item_match.group(0)
         rest = line[item_match.end():]
+    elif state_match:
+        prefix = state_match.group(0)
+        rest = line[state_match.end():]
     else:
         prefix = ""
         rest = line

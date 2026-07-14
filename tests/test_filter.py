@@ -118,9 +118,9 @@ def test_wrap_line_without_trailing_backslash():
 
 
 def test_wrap_custom_macro():
-    line = r"    \State $x \gets 1$"
+    line = r"    $x \gets 1$"
     result = wrap_changed_line(line, macro=r"\myhl")
-    assert result == r"\myhl{    \State $x \gets 1$}"
+    assert result == r"\myhl{    $x \gets 1$}"
 
 
 def test_wrap_line_with_backslash_and_trailing_space():
@@ -173,6 +173,53 @@ def test_wrap_item_with_trailing_backslash():
     assert result.startswith("\t\t\t\\item ")
     assert result.endswith("\\\\")
     assert r"\tfchanged{$x\gets 1$}" in result
+
+
+# ---------------------------------------------------------------------------
+# wrap_changed_line — \State prefix (algorithmicx-style, e.g. algpseudocodex)
+# ---------------------------------------------------------------------------
+
+def test_wrap_state_prefix_stays_outside():
+    r"""The \State prefix must be placed outside \tfchanged{}."""
+    line = r"    \State $x \gets 1$"
+    result = wrap_changed_line(line)
+    assert result.startswith("    \\State ")
+    assert r"\tfchanged{$x \gets 1$}" in result
+
+
+def test_wrap_no_state_prefix_unchanged():
+    r"""Non-\State lines are unaffected by \State handling."""
+    line = r"    $c \gets \mathrm{Enc}(k, m)$"
+    result = wrap_changed_line(line)
+    assert result == r"\tfchanged{    $c \gets \mathrm{Enc}(k, m)$}"
+
+
+def test_wrap_state_custom_macro():
+    r"""Custom macro with \State prefix."""
+    line = r"    \State $k \gets 1$"
+    result = wrap_changed_line(line, macro=r"\tfremoved")
+    assert result.startswith("    \\State ")
+    assert r"\tfremoved{$k \gets 1$}" in result
+
+
+def test_wrap_state_with_trailing_backslash():
+    r"""\State with trailing \\ — both handled correctly."""
+    line = r"    \State $x \gets 1$ \\"
+    result = wrap_changed_line(line)
+    assert result.startswith("    \\State ")
+    assert result.endswith("\\\\")
+    assert r"\tfchanged{$x \gets 1$}" in result
+
+
+def test_wrap_statex_not_misparsed_as_state():
+    r"""\Statex (unnumbered continuation line) is a distinct command from
+    \State and must not be split into \State + a stray "x ..." suffix.
+    It has no dedicated prefix handling, so the whole line is wrapped,
+    same as any other unrecognized command.
+    """
+    line = r"    \Statex continuation text"
+    result = wrap_changed_line(line)
+    assert result == "\\tfchanged{    \\Statex continuation text}"
 
 
 # ---------------------------------------------------------------------------

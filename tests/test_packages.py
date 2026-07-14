@@ -23,6 +23,10 @@ class TestGetProfile:
         profile = get_profile("nicodemus")
         assert profile.name == "nicodemus"
 
+    def test_get_algpseudocodex(self):
+        profile = get_profile("algpseudocodex")
+        assert profile.name == "algpseudocodex"
+
     def test_unknown_profile_raises(self):
         with pytest.raises(ValueError, match="Unknown package profile 'bogus'"):
             get_profile("bogus")
@@ -90,6 +94,34 @@ class TestNicodemusProfile:
 
     def test_preamble_includes_nicodemus(self, profile):
         assert any("nicodemus" in line for line in profile.preamble_lines)
+
+
+# ---------------------------------------------------------------------------
+# Algpseudocodex profile properties
+# ---------------------------------------------------------------------------
+
+
+class TestAlgpseudocodexProfile:
+    """Tests for the algpseudocodex package profile."""
+
+    @pytest.fixture()
+    def profile(self):
+        return get_profile("algpseudocodex")
+
+    def test_no_line_separators(self, profile):
+        assert profile.has_line_separators is False
+
+    def test_no_math_mode_content(self, profile):
+        assert profile.math_mode_content is False
+
+    def test_gamelabel_comment_cmd(self, profile):
+        assert profile.gamelabel_comment_cmd == r"\Comment"
+
+    def test_procedure_header_cmd(self, profile):
+        assert profile.procedure_header_cmd == "Procedure"
+
+    def test_preamble_includes_algpseudocodex(self, profile):
+        assert any("algpseudocodex" in line for line in profile.preamble_lines)
 
 
 # ---------------------------------------------------------------------------
