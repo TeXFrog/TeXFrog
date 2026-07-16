@@ -710,3 +710,23 @@ def test_tfsegment_invisible_in_full_render(tmp_path):
     _assert_compiled(tmp_path, result)
     # \tfsegment must not leak literal text into the PDF/log as an error
     assert "Undefined control sequence" not in result.stdout
+
+
+@needs_pdflatex
+def test_tfsegmentstub_defined_for_algpseudocodex(tmp_path):
+    r"""\tfsegmentstub must have a working default under package=algpseudocodex
+    (the profile Task 6's crop render actually exercises). Regression test for
+    a bug where the base \providecommand was nested inside the cryptocode/
+    nicodemus \tl_if_eq:NnT override blocks, leaving \tfsegmentstub entirely
+    undefined for algpseudocodex."""
+    tex = _ALGPSEUDOCODEX_PREAMBLE + r"""
+\begin{document}
+\begin{algorithmic}[1]
+\tfsegmentstub{Foo}
+\end{algorithmic}
+\end{document}
+"""
+    result = _compile_tex(tmp_path, tex)
+    assert result.returncode == 0
+    _assert_compiled(tmp_path, result)
+    assert "Undefined control sequence" not in result.stdout

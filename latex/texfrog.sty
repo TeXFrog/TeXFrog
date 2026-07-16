@@ -466,10 +466,18 @@
 
 % User-redefinable stub shown in place of an unchanged, cropped-out
 % segment (Task 6 invokes this once per collapsed run of segments).
-% The default above targets algorithmicx-family packages (algpseudocodex),
-% via \Statex. cryptocode's pchstack lines are math-mode and \\-separated;
+% Base default targets algorithmicx-family packages (algpseudocodex), via
+% \Statex. cryptocode's pchstack lines are math-mode and \\-separated;
 % nicodemus's lines are \item-prefixed list entries -- override for those
-% profiles here, mirroring \tfchanged's algpseudocodex-specific override.
+% profiles below, mirroring \tfchanged's \providecommand-base-then-
+% profile-override pattern. \providecommand only sets the meaning if
+% \tfsegmentstub is not already defined, so the \cs_gset_protected:Npn
+% overrides below (which unconditionally redefine it) always win when
+% their profile matches; for algpseudocodex neither override block's
+% condition matches, so this base definition is what remains in effect.
+\providecommand{\tfsegmentstub}[1]
+  {\Statex{\color{black!55}\ensuremath{\cdots}~\textit{#1~(unchanged)}~\ensuremath{\cdots}}}
+
 \tl_if_eq:NnT \g__tf_package_tl { cryptocode }
   {
     \cs_gset_protected:Npn \tfsegmentstub #1
