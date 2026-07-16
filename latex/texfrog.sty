@@ -38,6 +38,7 @@
 %   2 = render (render with highlighting)
 %   3 = clean (render without highlighting)
 %   4 = figure
+%   5 = scan (segment-cropping pre-pass; determines which segments changed)
 \int_new:N \g__tf_mode_int
 
 % Current game label being rendered
@@ -61,6 +62,15 @@
 
 % Game label comment command (e.g., \pccomment for cryptocode)
 \tl_new:N \g__tf_gamelabel_cmd_tl
+
+% Segment cropping state
+\bool_new:N \g__tf_crop_default_bool
+\bool_new:N \g__tf_crop_active_bool      % effective crop for current render
+\int_new:N  \g__tf_seg_int               % current segment index during a pass
+\prop_new:N \g__tf_active_seg_prop       % active segment indices (scan result)
+\bool_new:N \g__tf_seg_changed_bool      % did current segment change? (scan)
+\tl_new:N   \g__tf_stub_caps_tl          % accumulated captions for a stub run
+\bool_new:N \g__tf_stub_pending_bool     % inside an inactive run?
 
 % ----------------------------------------------------------------------
 % Package options (processed via \usepackage[package=...]{texfrog})
@@ -391,6 +401,7 @@
                    { \int_gincr:N \g__tf_pos_int } % star: suppress in figures
                    { \__tf_only_figure:nn { #2 } { #3 } }
                }
+        { 5 } { \__tf_only_scan:nn { #2 } { #3 } }
       }
       { } % unknown mode: do nothing
   }
@@ -400,6 +411,80 @@
   {
     \int_compare:nNnT \g__tf_mode_int = { 4 }
       { #1 }
+  }
+
+% ======================================================================
+% \tfsegment — segment-cropping boundary marker
+% ======================================================================
+%
+% Marks the boundary between two "segments" of a proof for the crop
+% feature (Task 6 renders only the segments that changed vs. the diff
+% target, collapsing unchanged ones to a \tfsegmentstub). In every mode
+% except the scan pre-pass and an active crop render, this is a pure
+% no-op: it must not alter output in any existing mode (0/1/3/4), and
+% the mode-2 (render) branch stays dormant until Task 6 sets
+% \g__tf_crop_active_bool true (nothing does so yet in this task).
+\NewDocumentCommand{\tfsegment}{ m }
+  {
+    \int_case:nnF { \g__tf_mode_int }
+      {
+        { 5 } { \__tf_seg_boundary_scan: }
+        { 2 } { \bool_if:NT \g__tf_crop_active_bool { \__tf_seg_boundary_render:n { #1 } } }
+      }
+      { } % all other modes: pure no-op (invisible)
+  }
+
+% Scan: close the previous segment (commit its changed flag), open the next.
+\cs_new_protected:Nn \__tf_seg_boundary_scan:
+  {
+    \bool_if:NT \g__tf_seg_changed_bool
+      { \prop_gput:Nen \g__tf_active_seg_prop { \int_use:N \g__tf_seg_int } { 1 } }
+    \int_gincr:N \g__tf_seg_int
+    \bool_gset_false:N \g__tf_seg_changed_bool
+  }
+
+% Render-mode boundary handler: stubbed here so the package compiles
+% standalone. Task 6 replaces this with the real 3-pass crop-render
+% boundary logic (closing/opening segments, emitting \tfsegmentstub for
+% unchanged ones). For now it just advances the segment counter so the
+% index stays in sync with the scan pass; it is unreachable in this task
+% because \g__tf_crop_active_bool is never set true.
+\cs_new_protected:Nn \__tf_seg_boundary_render:n
+  {
+    \int_gincr:N \g__tf_seg_int
+  }
+
+% \tfcropdefault{on|off} — sets the document-wide default for whether
+% \tfrendergame crops to changed segments (Task 6 consumes this; the
+% crop= key on \tfrendergame overrides it per call).
+\NewDocumentCommand{\tfcropdefault}{ m }
+  {
+    \str_if_eq:nnTF { #1 } { on }
+      { \bool_gset_true:N  \g__tf_crop_default_bool }
+      { \bool_gset_false:N \g__tf_crop_default_bool }
+  }
+
+% User-redefinable stub shown in place of an unchanged, cropped-out
+% segment (Task 6 invokes this once per collapsed run of segments).
+% The default above targets algorithmicx-family packages (algpseudocodex),
+% via \Statex. cryptocode's pchstack lines are math-mode and \\-separated;
+% nicodemus's lines are \item-prefixed list entries -- override for those
+% profiles here, mirroring \tfchanged's algpseudocodex-specific override.
+\tl_if_eq:NnT \g__tf_package_tl { cryptocode }
+  {
+    \cs_gset_protected:Npn \tfsegmentstub #1
+      {
+        \color{black!55}\ensuremath{\cdots}~\textit{#1~(unchanged)}~\ensuremath{\cdots}
+        \\
+      }
+  }
+
+\tl_if_eq:NnT \g__tf_package_tl { nicodemus }
+  {
+    \cs_gset_protected:Npn \tfsegmentstub #1
+      {
+        \item \color{black!55}\ensuremath{\cdots}~\textit{#1~(unchanged)}~\ensuremath{\cdots}
+      }
   }
 
 % --- Record mode ---
@@ -446,6 +531,32 @@
   }
 
 \cs_generate_variant:Nn \prop_if_in:NnTF { NeTF }
+\cs_generate_variant:Nn \prop_if_in:NnT { NeT }
+\cs_generate_variant:Nn \prop_if_in:NnF { NeF }
+
+% --- Scan mode (mark segment changed if this \tfonly is add/remove) ---
+% Mirrors \__tf_only_render:nn but sets the segment-changed flag instead of
+% emitting content: used by the crop pre-pass (Task 6) to determine which
+% \tfsegment-delimited segments differ between the current game and the
+% diff target, so unchanged segments can be collapsed to a stub.
+\cs_new_protected:Nn \__tf_only_scan:nn
+  {
+    \int_gincr:N \g__tf_pos_int
+    \__tf_resolve_tags:n { #1 }
+    \__tf_game_in_tags:VTF \g__tf_current_game_tl
+      {
+        % active in current game: changed iff NOT recorded in target
+        \prop_if_in:NeF \g__tf_recorded_prop
+          { \int_use:N \g__tf_pos_int }
+          { \bool_gset_true:N \g__tf_seg_changed_bool }
+      }
+      {
+        % not in current: changed iff it WAS recorded in target (a removal)
+        \prop_if_in:NeT \g__tf_recorded_prop
+          { \int_use:N \g__tf_pos_int }
+          { \bool_gset_true:N \g__tf_seg_changed_bool }
+      }
+  }
 
 % --- Figure mode ---
 \cs_new_protected:Nn \__tf_only_figure:nn
@@ -655,16 +766,37 @@
 % ======================================================================
 
 \tl_new:N \l__tf_diff_tl
+\tl_new:N \l__tf_crop_key_tl
 \keys_define:nn { texfrog / rendergame }
   {
     diff .tl_set:N = \l__tf_diff_tl,
     diff .initial:n = {},
+    crop .tl_set:N = \l__tf_crop_key_tl,
+    crop .initial:n = { default },
+  }
+
+% Resolve the effective crop-active bool for the current \tfrendergame
+% call: crop=on/off (the key) wins; crop=default (the key's initial
+% value, i.e. the key was not passed) falls back to \tfcropdefault's
+% setting. Task 6 is what actually consults \g__tf_crop_active_bool
+% during rendering (via \tfsegment's mode-2 branch); resolving it here
+% does not change output on its own.
+\cs_new_protected:Nn \__tf_resolve_crop_active:
+  {
+    \str_if_eq:VnTF \l__tf_crop_key_tl { on }
+      { \bool_gset_true:N \g__tf_crop_active_bool }
+      {
+        \str_if_eq:VnTF \l__tf_crop_key_tl { off }
+          { \bool_gset_false:N \g__tf_crop_active_bool }
+          { \bool_gset_eq:NN \g__tf_crop_active_bool \g__tf_crop_default_bool }
+      }
   }
 
 \NewDocumentCommand{\tfrendergame}{ O{} m m }
   {
     \group_begin:
     \keys_set:nn { texfrog / rendergame } { #1 }
+    \__tf_resolve_crop_active:
     \tl_if_empty:NTF \l__tf_diff_tl
       { \__tf_render_game_clean:nn { #2 } { #3 } }
       { \__tf_render_game_highlighted:nnn { #2 } { #3 } { \l__tf_diff_tl } }

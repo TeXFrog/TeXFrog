@@ -680,3 +680,33 @@ def test_tffigure_noop(tmp_path):
 """
     result = _compile_tex(tmp_path, tex)
     _assert_compiled(tmp_path, result)
+
+
+# ---------------------------------------------------------------------------
+# \tfsegment — scaffolding, must be invisible in existing (non-crop) modes
+# ---------------------------------------------------------------------------
+
+
+@needs_pdflatex
+def test_tfsegment_invisible_in_full_render(tmp_path):
+    r"""\tfsegment must not change full-render output (crop is off by default
+    and nothing sets \g__tf_crop_active_bool yet -- that lands in Task 6)."""
+    tex = _ALGPSEUDOCODEX_PREAMBLE + r"""
+\tfgames{s}{G0,G1}
+\tfgamename{s}{G0}{G_0}\tfgamename{s}{G1}{G_1}
+\begin{tfsource}{s}
+\begin{algorithmic}[1]
+\State \(x \gets 0\)
+\tfsegment{Second}
+\tfonly{G1}{\State \(y \gets 1\)}
+\end{algorithmic}
+\end{tfsource}
+\begin{document}
+\tfrendergame{s}{G0}
+\end{document}
+"""
+    result = _compile_tex(tmp_path, tex)
+    assert result.returncode == 0
+    _assert_compiled(tmp_path, result)
+    # \tfsegment must not leak literal text into the PDF/log as an error
+    assert "Undefined control sequence" not in result.stdout
