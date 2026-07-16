@@ -10,6 +10,7 @@ import pytest
 from texfrog.model import Game, Proof
 from texfrog.output.html import (
     _BUILTIN_MATHJAX_MACROS,
+    _apply_crop,
     _build_wrapper_template,
     _extract_mathjax_macros,
     _find_svg_converter,
@@ -23,6 +24,40 @@ from texfrog.output.html import (
 # ---------------------------------------------------------------------------
 # _write_commentary_file
 # ---------------------------------------------------------------------------
+
+
+def test_apply_crop_remaps_changed_indices():
+    prev = [
+        r"\begin{algorithmic}",
+        r"\tfsegment{Init}",
+        r"\State a",
+        r"\tfsegment{Resp}",
+        r"\State b",
+        r"\end{algorithmic}",
+    ]
+    curr = [
+        r"\begin{algorithmic}",
+        r"\tfsegment{Init}",
+        r"\State a",
+        r"\tfsegment{Resp}",
+        r"\State b2",
+        r"\end{algorithmic}",
+    ]
+    # \State b2 is at original index 4 and changed
+    cropped, changed = _apply_crop(curr, prev, {4})
+    assert cropped == [
+        r"\begin{algorithmic}",
+        r"\tfsegmentstub{Init}",
+        r"\State b2",
+        r"\end{algorithmic}",
+    ]
+    assert changed == {2}  # \State b2 now at index 2
+
+
+def test_html_tfsegmentstub_defined_for_each_profile():
+    from texfrog.packages import get_profile
+    for name in ("cryptocode", "nicodemus", "algpseudocodex"):
+        assert r"\tfsegmentstub" in get_profile(name).html_tfsegmentstub()
 
 
 class TestWriteCommentaryFile:

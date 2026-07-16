@@ -34,8 +34,10 @@ from typing import Optional
 from jinja2 import Environment, PackageLoader
 
 from ..filter import (
+    compute_active_segments,
     compute_changed_lines,
     compute_removed_lines,
+    crop_to_active_segments,
     wrap_changed_line,
 )
 from ..model import Proof
@@ -48,6 +50,27 @@ _CHANGED_MACRO = r"\tfchanged"
 # ---------------------------------------------------------------------------
 # Per-game LaTeX file writers
 # ---------------------------------------------------------------------------
+
+
+def _apply_crop(
+    curr_lines: list[str],
+    prev_lines: list[str],
+    changed: set[int],
+) -> tuple[list[str], set[int]]:
+    """Crop ``curr_lines`` to changed segments and remap ``changed`` indices.
+
+    Args:
+        curr_lines: Filtered lines for the current game (with markers).
+        prev_lines: Filtered lines for the diff-target game (with markers).
+        changed: 0-based changed indices into ``curr_lines``.
+
+    Returns:
+        ``(cropped_lines, remapped_changed)``.
+    """
+    active = compute_active_segments(prev_lines, curr_lines)
+    cropped, idx_map = crop_to_active_segments(curr_lines, active)
+    remapped = {k for k, orig in enumerate(idx_map) if orig in changed}
+    return cropped, remapped
 
 
 def _write_game_file(
@@ -150,6 +173,7 @@ def _build_wrapper_template(
             profile.html_tfchanged().replace("{", "{{").replace("}", "}}"),
             profile.html_tfremoved().replace("{", "{{").replace("}", "}}"),
             profile.html_tfgamelabel().replace("{", "{{").replace("}", "}}"),
+            profile.html_tfsegmentstub().replace("{", "{{").replace("}", "}}"),
         ]
         proc_hdr_def = profile.procedure_header_def()
         if proc_hdr_def:
@@ -579,6 +603,7 @@ def generate_html(
             # Non-reduction games diff against the previous non-reduction game
             # (skipping intervening reductions); reductions diff against the
             # immediately preceding entry.
+            prev_label = None
             if i == 0:
                 changed: set[int] = set()
             else:
@@ -597,6 +622,11 @@ def generate_html(
                         _filter_game_for_diff(prev_label),
                         _filter_game_for_diff(label),
                     )
+
+            if proof.crop_default and i > 0 and prev_label is not None:
+                game_lines, changed = _apply_crop(
+                    game_lines, _filter_game(prev_label), changed
+                )
 
             _write_game_file(
                 label, game_lines, changed, latex_dir / f"{label}.tex",
@@ -624,8 +654,15 @@ def generate_html(
             prev_diff = _filter_game_for_diff(game.label)
             next_diff = _filter_game_for_diff(next_game.label)
             removed_indices = compute_removed_lines(prev_diff, next_diff)
+            out_prev_lines = prev_lines
+            if proof.crop_default:
+                active = compute_active_segments(next_lines, prev_lines)
+                out_prev_lines, idx_map = crop_to_active_segments(prev_lines, active)
+                removed_indices = {
+                    k for k, orig in enumerate(idx_map) if orig in removed_indices
+                }
             _write_game_file(
-                game.label, prev_lines, removed_indices,
+                game.label, out_prev_lines, removed_indices,
                 latex_dir / f"{game.label}-removed.tex",
                 macro=r"\tfremoved",
                 procedure_header_cmd=proc_hdr_cmd,

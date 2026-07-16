@@ -113,6 +113,14 @@ class PackageProfile:
             r"\providecommand{\tfgamelabel}[2]{#2 \tfniccodecomment{#1}}"
         )
 
+    def html_tfsegmentstub(self) -> str:
+        r"""Return the \tfsegmentstub definition for the HTML wrapper."""
+        body = r"{\color{black!55}$\cdots$~\textit{#1 (unchanged)}~$\cdots$}"
+        if self.has_line_separators:  # cryptocode: math + \\ separated lines
+            return r"\newcommand{\tfsegmentstub}[1]{" + body + r" \\}"
+        # algpseudocodex / nicodemus: unnumbered continuation line
+        return r"\newcommand{\tfsegmentstub}[1]{\Statex " + body + r"}"
+
     def procedure_header_def(self) -> str | None:
         r"""``\providecommand`` definition for the procedure header command.
 
