@@ -257,3 +257,98 @@ def split_into_segments(lines: list[str]) -> list[Segment]:
         else:
             segments[-1].lines.append(line)
     return segments
+
+
+def _seg_content(seg: Segment) -> list[str]:
+    """Non-blank content lines of a segment (blank lines ignored for diffing)."""
+    return [ln for ln in seg.lines if ln.strip()]
+
+
+def compute_active_segments(
+    target_lines: list[str], curr_lines: list[str]
+) -> set[int]:
+    """Indices of current segments that differ from the aligned target segment.
+
+    Segment i in ``curr_lines`` aligns with segment i in ``target_lines`` (the
+    \\tfsegment marker sequence is identical across games). A segment is active
+    if its non-blank content differs, or (when it has no target counterpart) if
+    it contains any non-blank line.
+
+    Segment 0 (preamble) is reported like any other; callers keep it regardless.
+
+    Args:
+        target_lines: Filtered lines of the diff-target game.
+        curr_lines: Filtered lines of the current game.
+
+    Returns:
+        Set of 0-based active segment indices into the current segmentation.
+    """
+    target_segs = split_into_segments(target_lines)
+    curr_segs = split_into_segments(curr_lines)
+    active: set[int] = set()
+    for i, seg in enumerate(curr_segs):
+        tgt = _seg_content(target_segs[i]) if i < len(target_segs) else []
+        if _seg_content(seg) != tgt:
+            active.add(i)
+    return active
+
+
+def crop_to_active_segments(
+    lines: list[str],
+    active: set[int],
+    stub_macro: str = r"\tfsegmentstub",
+) -> tuple[list[str], list[int]]:
+    """Rebuild ``lines`` keeping active segments, stubbing inactive runs.
+
+    Segment 0 (preamble) is always kept verbatim. Each maximal run of inactive
+    segments (index >= 1) collapses to a single ``\\tfsegmentstub{captions}``
+    line, captions joined with ``", "`` (blank/None captions skipped; if the
+    whole run has no captions the stub argument is empty).
+
+    Args:
+        lines: Filtered content lines (with markers) for the current game.
+        active: Active segment indices from :func:`compute_active_segments`.
+        stub_macro: Macro name emitted for a stubbed run.
+
+    Returns:
+        ``(new_lines, idx_map)`` where ``idx_map[k]`` is the original index of
+        ``new_lines[k]`` in ``lines``, or ``-1`` for a synthesized stub line.
+    """
+    segs = split_into_segments(lines)
+    # Precompute, for each segment, the original index of its first content line.
+    orig_index: list[list[int]] = []
+    cursor = 0
+    for i, seg in enumerate(segs):
+        if i > 0:
+            cursor += 1  # the \tfsegment marker line consumed at this boundary
+        idxs = list(range(cursor, cursor + len(seg.lines)))
+        orig_index.append(idxs)
+        cursor += len(seg.lines)
+
+    new_lines: list[str] = []
+    idx_map: list[int] = []
+    pending_caps: list[str] = []
+
+    def flush_stub() -> None:
+        if not pending_caps and not _stub_pending[0]:
+            return
+        caps = ", ".join(c for c in pending_caps if c)
+        new_lines.append(f"{stub_macro}{{{caps}}}")
+        idx_map.append(-1)
+        pending_caps.clear()
+        _stub_pending[0] = False
+
+    _stub_pending = [False]  # whether any inactive segment was seen in this run
+    for i, seg in enumerate(segs):
+        keep = (i == 0) or (i in active)
+        if keep:
+            flush_stub()
+            for ln, oi in zip(seg.lines, orig_index[i]):
+                new_lines.append(ln)
+                idx_map.append(oi)
+        else:
+            _stub_pending[0] = True
+            if seg.caption:
+                pending_caps.append(seg.caption)
+    flush_stub()
+    return new_lines, idx_map

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from texfrog.filter import (
     Segment,
+    compute_active_segments,
     compute_changed_lines,
     compute_removed_lines,
+    crop_to_active_segments,
     split_into_segments,
     wrap_changed_line,
 )
@@ -366,3 +368,39 @@ def test_split_into_segments_leading_marker():
         Segment(caption=None, lines=[]),
         Segment(caption="First", lines=[r"\State a"]),
     ]
+
+
+# ---------------------------------------------------------------------------
+# compute_active_segments / crop_to_active_segments
+# ---------------------------------------------------------------------------
+
+def test_compute_active_segments_detects_change():
+    target = [r"\State a", r"\tfsegment{R}", r"\State b"]
+    curr = [r"\State a", r"\tfsegment{R}", r"\State b2"]
+    assert compute_active_segments(target, curr) == {1}
+
+
+def test_compute_active_segments_none_changed():
+    lines = [r"\State a", r"\tfsegment{R}", r"\State b"]
+    assert compute_active_segments(lines, lines) == set()
+
+
+def test_crop_keeps_active_and_stubs_inactive():
+    lines = [
+        r"\begin{algorithmic}",
+        r"\tfsegment{Init}",
+        r"\State a",
+        r"\tfsegment{Resp}",
+        r"\State b",
+        r"\end{algorithmic}",
+    ]
+    # active segments: 0 (preamble, always kept) and 2 (Resp)
+    new_lines, idx_map = crop_to_active_segments(lines, active={2})
+    assert new_lines == [
+        r"\begin{algorithmic}",
+        r"\tfsegmentstub{Init}",
+        r"\State b",
+        r"\end{algorithmic}",
+    ]
+    # stub line maps to -1; kept lines map to their original indices
+    assert idx_map == [0, -1, 4, 5]
