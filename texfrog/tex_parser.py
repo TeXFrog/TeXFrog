@@ -435,6 +435,10 @@ def parse_tex_proofs(tex_path: Path) -> list[Proof]:
     package_name = _extract_texfrog_package_option(text) or "cryptocode"
     get_profile(package_name)  # validate
 
+    # --- crop_default (global) ---
+    _crop_vals = _extract_one_arg(text, "tfcropdefault")
+    crop_default = any(v.strip().lower() == "on" for v in _crop_vals)
+
     # --- source blocks ---
     sources = _extract_tfsource(text)
     if not sources:
@@ -605,6 +609,7 @@ def parse_tex_proofs(tex_path: Path) -> list[Proof]:
             figures=figures_by_source.get(source_name, []),
             package=package_name,
             preamble=preamble_rel,
+            crop_default=crop_default,
             commentary_files=commentary_files_by_source.get(source_name, {}),
         ))
 
