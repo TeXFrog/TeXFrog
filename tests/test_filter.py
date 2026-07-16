@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from texfrog.filter import (
+    Segment,
     compute_changed_lines,
     compute_removed_lines,
+    split_into_segments,
     wrap_changed_line,
 )
 
@@ -331,3 +333,36 @@ def test_wrap_item_not_affected_by_header_cmd():
     result = wrap_changed_line(line, procedure_header_cmd="nicodemusheader")
     assert result.startswith("\t\t\t\\item ")
     assert r"\tfchanged{$x\getsr\Zp$}" in result
+
+
+# ---------------------------------------------------------------------------
+# split_into_segments
+# ---------------------------------------------------------------------------
+
+def test_split_into_segments_basic():
+    lines = [
+        r"\State a",
+        r"\tfsegment{Responder}",
+        r"\State b",
+        r"\State c",
+    ]
+    segs = split_into_segments(lines)
+    assert segs == [
+        Segment(caption=None, lines=[r"\State a"]),
+        Segment(caption="Responder", lines=[r"\State b", r"\State c"]),
+    ]
+
+
+def test_split_into_segments_no_markers():
+    lines = [r"\State a", r"\State b"]
+    segs = split_into_segments(lines)
+    assert segs == [Segment(caption=None, lines=[r"\State a", r"\State b"])]
+
+
+def test_split_into_segments_leading_marker():
+    lines = [r"\tfsegment{First}", r"\State a"]
+    segs = split_into_segments(lines)
+    assert segs == [
+        Segment(caption=None, lines=[]),
+        Segment(caption="First", lines=[r"\State a"]),
+    ]

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import difflib
 import re
+from dataclasses import dataclass, field
 
 # Matches a trailing \\ possibly followed by whitespace at end of a line.
 _TRAILING_BACKSLASH_BS = re.compile(r"\\\\(\s*)$")
@@ -21,6 +22,18 @@ _ITEM_PREFIX = re.compile(r"^(\s*\\item\s*)")
 # doesn't misparse \Statex (a distinct, common algorithmicx command for
 # unnumbered continuation lines) as \State followed by stray "x ...".
 _STATE_PREFIX = re.compile(r"^(\s*\\State\b\s*)")
+
+# Matches a \tfsegment{caption} marker line (optional leading whitespace).
+_SEGMENT_RE = re.compile(r"^\s*\\tfsegment\s*\{(?P<caption>.*)\}\s*$")
+SEGMENT_RE = _SEGMENT_RE
+
+
+@dataclass
+class Segment:
+    """A run of content lines between two \\tfsegment markers."""
+
+    caption: str | None  # None for the implicit preamble segment (segment 0)
+    lines: list[str] = field(default_factory=list)
 
 
 def _strip_trailing_newline_sep(lines: list[str]) -> list[str]:
@@ -222,3 +235,25 @@ def wrap_changed_line(
             content = rest[:pm.start()].rstrip()
             return f"{prefix}{macro}{{{content}}}%"
         return f"{prefix}{macro}{{{rest}}}"
+
+
+def split_into_segments(lines: list[str]) -> list[Segment]:
+    """Split filtered content lines into segments at \\tfsegment markers.
+
+    Content before the first marker is segment 0 with ``caption=None``.
+    Marker lines are consumed (not included in any segment's ``lines``).
+
+    Args:
+        lines: Filtered content lines for one game (may contain markers).
+
+    Returns:
+        A list of :class:`Segment`, always at least one element long.
+    """
+    segments: list[Segment] = [Segment(caption=None)]
+    for line in lines:
+        m = _SEGMENT_RE.match(line)
+        if m:
+            segments.append(Segment(caption=m.group("caption").strip()))
+        else:
+            segments[-1].lines.append(line)
+    return segments
