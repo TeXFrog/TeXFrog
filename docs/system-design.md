@@ -48,7 +48,7 @@ TeXFrog/
 │   ├── watcher.py              # File watching + safe rebuild for live-reload
 │   └── output/
 │       ├── __init__.py
-│       └── html.py             # build_html_site() + serve_html(): per-game .tex, pdflatex → SVG → HTML site
+│       └── html.py             # generate_html() + serve_html(): per-game .tex, pdflatex → SVG → HTML site
 ├── tests/
 │   ├── test_tex_parser.py      # Tests for .tex format parsing
 │   ├── test_filter.py          # Line filtering, diff, \tfchanged wrapping
@@ -241,7 +241,7 @@ The HTML build path mirrors the same semantics without any expl3 machinery, oper
 - `crop_to_active_segments(lines, active, stub_macro=r"\tfsegmentstub") -> tuple[list[str], list[int]]` rebuilds the line list keeping segment 0, the final segment, and every segment in `active` --- mirroring the LaTeX keep-0-and-final rule. Each maximal run of skipped interior segments collapses to one `{stub_macro}{{captions}}` line (captions joined with `", "`, blank captions skipped). Returns `(new_lines, idx_map)`, where `idx_map[k]` is the original line index of `new_lines[k]` (or `-1` for a synthesized stub line), so callers can remap other per-line data against the cropped output.
 - `_apply_crop` (`output/html.py`) is the call site: it combines `compute_active_segments` + `crop_to_active_segments` and remaps the `changed`-line index set through `idx_map`, so highlighting still lands on the correct (renumbered) lines in the cropped output.
 
-`_apply_crop` is called from `build_html_site`'s per-game loop **only when `proof.crop_default` is true** --- there is no per-game HTML override; the `crop=` key on `\tfrendergame` is consumed only by `texfrog.sty`, for the PDF path. `proof.crop_default` is parsed once per document (`tex_parser.py`, via `_extract_one_arg(text, "tfcropdefault")` over the whole file) and applies to every `Proof`/source block parsed from that file, matching the LaTeX side's single global `\g__tf_crop_default_bool`.
+`_apply_crop` is called from `generate_html`'s per-game loop **only when `proof.crop_default` is true** --- there is no per-game HTML override; the `crop=` key on `\tfrendergame` is consumed only by `texfrog.sty`, for the PDF path. `proof.crop_default` is parsed once per document (`tex_parser.py`, via `_extract_one_arg(text, "tfcropdefault")` over the whole file) and applies to every `Proof`/source block parsed from that file, matching the LaTeX side's single global `\g__tf_crop_default_bool`.
 
 ### Validation (`validate.py`)
 
