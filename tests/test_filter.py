@@ -404,3 +404,62 @@ def test_crop_keeps_active_and_stubs_inactive():
     ]
     # stub line maps to -1; kept lines map to their original indices
     assert idx_map == [0, -1, 4, 5]
+
+
+def test_crop_keeps_final_segment_even_if_inactive():
+    """Regression test: the final segment must never be stubbed.
+
+    Segment 0 (preamble, holding \\begin{...}) and the final segment
+    (holding \\end{...}) are always kept verbatim, matching the LaTeX
+    macro. Previously only segment 0 was force-kept, so when the final
+    segment had no changes it was folded into the trailing stub run and
+    its \\end{algorithmic} line was lost, producing malformed output.
+    """
+    lines = [
+        r"\begin{algorithmic}",
+        r"\tfsegment{Init}",
+        r"\State a",
+        r"\tfsegment{Resp}",
+        r"\State b",
+        r"\end{algorithmic}",
+    ]
+    # No segments are active: Init (interior) must stub, but Resp (final)
+    # must still be kept verbatim -- including \end{algorithmic}.
+    new_lines, idx_map = crop_to_active_segments(lines, active=set())
+    assert new_lines == [
+        r"\begin{algorithmic}",
+        r"\tfsegmentstub{Init}",
+        r"\State b",
+        r"\end{algorithmic}",
+    ]
+    assert idx_map == [0, -1, 4, 5]
+
+
+def test_crop_stubs_multi_segment_interior_run_but_keeps_final():
+    """A purely-interior run of inactive segments still collapses to one
+    stub, while the final segment (also inactive here) is kept verbatim
+    rather than being absorbed into the trailing stub run."""
+    lines = [
+        r"\begin{algorithmic}",
+        r"\tfsegment{A}",
+        r"\State a",
+        r"\tfsegment{B}",
+        r"\State b",
+        r"\tfsegment{C}",
+        r"\State c",
+        r"\tfsegment{D}",
+        r"\State d",
+        r"\end{algorithmic}",
+    ]
+    # segments: 0=preamble, 1=A (active), 2=B (inactive), 3=C (inactive),
+    # 4=D (last, inactive). B and C are strictly interior -> one stub.
+    # D is the final segment -> always kept, even though it's inactive.
+    new_lines, idx_map = crop_to_active_segments(lines, active={1})
+    assert new_lines == [
+        r"\begin{algorithmic}",
+        r"\State a",
+        r"\tfsegmentstub{B, C}",
+        r"\State d",
+        r"\end{algorithmic}",
+    ]
+    assert idx_map == [0, 2, -1, 8, 9]

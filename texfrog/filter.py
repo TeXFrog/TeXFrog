@@ -300,10 +300,15 @@ def crop_to_active_segments(
 ) -> tuple[list[str], list[int]]:
     """Rebuild ``lines`` keeping active segments, stubbing inactive runs.
 
-    Segment 0 (preamble) is always kept verbatim. Each maximal run of inactive
-    segments (index >= 1) collapses to a single ``\\tfsegmentstub{captions}``
-    line, captions joined with ``", "`` (blank/None captions skipped; if the
-    whole run has no captions the stub argument is empty).
+    Segment 0 (preamble) and the final segment are always kept verbatim,
+    matching the LaTeX macro ``\\__tf_seg_render_one:n`` in ``texfrog.sty``:
+    the preamble typically holds an opening ``\\begin{...}`` and the final
+    segment typically holds the matching ``\\end{...}``, so both must survive
+    cropping regardless of whether they changed. Each maximal run of
+    strictly-interior inactive segments (index in ``1..len(segs) - 2``)
+    collapses to a single ``\\tfsegmentstub{captions}`` line, captions joined
+    with ``", "`` (blank/None captions skipped; if the whole run has no
+    captions the stub argument is empty).
 
     Args:
         lines: Filtered content lines (with markers) for the current game.
@@ -338,9 +343,10 @@ def crop_to_active_segments(
         pending_caps.clear()
         _stub_pending[0] = False
 
+    last = len(segs) - 1
     _stub_pending = [False]  # whether any inactive segment was seen in this run
     for i, seg in enumerate(segs):
-        keep = (i == 0) or (i in active)
+        keep = (i == 0) or (i == last) or (i in active)
         if keep:
             flush_stub()
             for ln, oi in zip(seg.lines, orig_index[i]):
