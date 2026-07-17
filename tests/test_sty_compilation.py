@@ -836,3 +836,157 @@ def test_crop_requires_diff_full(tmp_path):
     assert "unchanged" not in text
     assert "x" in text
     assert "y" in text
+
+
+# ---------------------------------------------------------------------------
+# Task 6b: harder crop-render correctness invariants
+# ---------------------------------------------------------------------------
+
+
+@needs_pdflatex
+def test_crop_position_alignment_after_skip(tmp_path):
+    r"""Skipping the unchanged interior "Early" segment must jump
+    \g__tf_pos_int to its recorded end position (\g__tf_seg_endpos_prop) so
+    the highlight decision for later \tfonly lines in the kept "Late"
+    segment stays aligned with the record pass. Highlight color itself is
+    invisible to pdftotext, so \tfchanged is redefined to emit a plain-text
+    "HILITE" marker immediately before its content -- if the position jump
+    is wrong, the unchanged "q <- 2" line in "Late" would also get
+    mis-highlighted, producing 2 HILITE markers instead of 1."""
+    tex = (
+        _ALGPSEUDOCODEX_PREAMBLE
+        + r"\renewcommand{\tfchanged}[1]{HILITE #1}"
+        + r"\tfcropdefault{on}"
+        + r"""
+\tfgames{s}{G0,G1}
+\tfgamename{s}{G0}{G_0}
+\tfgamename{s}{G1}{G_1}
+\begin{tfsource}{s}
+\begin{algorithmic}[1]
+\State untagged
+\tfsegment{Early}
+\tfonly{G0,G1}{\State \(p \gets 1\)}
+\tfsegment{Late}
+\tfonly{G0,G1}{\State \(q \gets 2\)}
+\tfonly{G0}{\State \(r \gets 0\)}
+\tfonly{G1}{\State \(r \gets 9\)}
+\end{algorithmic}
+\end{tfsource}
+\begin{document}
+\tfrendergame[diff=G0]{s}{G1}
+\end{document}
+"""
+    )
+    result = _compile_tex(tmp_path, tex)
+    assert result.returncode == 0
+    _assert_compiled(tmp_path, result)
+    text = _pdftotext(tmp_path)
+    # "Early" is stubbed (unchanged across G0/G1, despite containing a
+    # \tfonly line that advances the position counter).
+    assert "unchanged" in text
+    assert "Early" in text
+    # Exactly one HILITE: the genuinely changed "r <- 9" line. If the
+    # endpos jump were wrong, the unchanged "q <- 2" line in the kept
+    # "Late" segment would be mis-highlighted too.
+    assert text.count("HILITE") == 1
+    assert "9" in text
+    assert "q" in text
+    assert "2" in text
+
+
+@needs_pdflatex
+def test_crop_coalesces_consecutive_inactive_interiors(tmp_path):
+    r"""Two consecutive unchanged interior segments ("Alpha", "Beta")
+    collapse into a SINGLE stub whose caption joins both names, rather than
+    emitting one stub per skipped segment."""
+    tex = (
+        _ALGPSEUDOCODEX_PREAMBLE
+        + r"\tfcropdefault{on}"
+        + r"""
+\tfgames{s}{G0,G1}
+\tfgamename{s}{G0}{G_0}
+\tfgamename{s}{G1}{G_1}
+\begin{tfsource}{s}
+\begin{algorithmic}[1]
+\State untagged
+\tfsegment{Alpha}
+\tfonly{G0,G1}{\State \(a \gets 1\)}
+\tfsegment{Beta}
+\tfonly{G0,G1}{\State \(b \gets 2\)}
+\tfsegment{Gamma}
+\tfonly{G0}{\State \(c \gets 0\)}
+\tfonly{G1}{\State \(c \gets 9\)}
+\end{algorithmic}
+\end{tfsource}
+\begin{document}
+\tfrendergame[diff=G0]{s}{G1}
+\end{document}
+"""
+    )
+    result = _compile_tex(tmp_path, tex)
+    assert result.returncode == 0
+    _assert_compiled(tmp_path, result)
+    text = _pdftotext(tmp_path)
+    assert "Alpha, Beta" in text
+    assert text.count("unchanged") == 1
+    assert "9" in text  # the changed final "Gamma" content is kept
+
+
+@needs_pdflatex
+def test_crop_all_interior_changed_no_stub(tmp_path):
+    r"""When every interior segment differs between G0 and G1, nothing is
+    skipped -- no stub is emitted and all content is present."""
+    tex = (
+        _ALGPSEUDOCODEX_PREAMBLE
+        + r"\tfcropdefault{on}"
+        + r"""
+\tfgames{s}{G0,G1}
+\tfgamename{s}{G0}{G_0}
+\tfgamename{s}{G1}{G_1}
+\begin{tfsource}{s}
+\begin{algorithmic}[1]
+\State untagged
+\tfsegment{Alpha}
+\tfonly{G0}{\State \(a \gets 0\)}
+\tfonly{G1}{\State \(a \gets 1\)}
+\tfsegment{Beta}
+\tfonly{G0}{\State \(b \gets 0\)}
+\tfonly{G1}{\State \(b \gets 3\)}
+\end{algorithmic}
+\end{tfsource}
+\begin{document}
+\tfrendergame[diff=G0]{s}{G1}
+\end{document}
+"""
+    )
+    result = _compile_tex(tmp_path, tex)
+    assert result.returncode == 0
+    _assert_compiled(tmp_path, result)
+    text = _pdftotext(tmp_path)
+    assert "unchanged" not in text
+    assert "1" in text
+    assert "3" in text
+
+
+@needs_pdflatex
+def test_full_render_of_segmented_source_unchanged(tmp_path):
+    r"""Regression: a segmented source rendered WITHOUT crop (no
+    \tfcropdefault set) must show every segment's content and no stub --
+    \tfsegment stays invisible and the token-split path is not entered when
+    crop is off."""
+    tex = (
+        _ALGPSEUDOCODEX_PREAMBLE
+        + _CROP_SOURCE
+        + r"""
+\begin{document}
+\tfrendergame[diff=G0]{s}{G1}
+\end{document}
+"""
+    )
+    result = _compile_tex(tmp_path, tex)
+    assert result.returncode == 0
+    _assert_compiled(tmp_path, result)
+    text = _pdftotext(tmp_path)
+    assert "unchanged" not in text
+    assert "x" in text  # interior "Initiator" content, always rendered
+    assert "y" in text  # final "Responder" content, always rendered

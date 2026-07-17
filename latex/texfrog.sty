@@ -492,7 +492,15 @@
   {
     \bool_if:NT \g__tf_seg_changed_bool
       { \prop_gput:Nen \g__tf_active_seg_prop { \int_use:N \g__tf_seg_int } { 1 } }
-    \prop_gput:Nen \g__tf_seg_endpos_prop
+    % NOTE: value must be "e" (expanded), not "n" -- \int_use:N
+    % \g__tf_pos_int is a deferred macro call, not a constant like the
+    % active-seg prop's "1" above. Storing it with "n" (as
+    % \prop_gput:Nen previously did) keeps the unexpanded tokens
+    % "\int_use:N \g__tf_pos_int" as the stored value, so every key
+    % lazily re-evaluates to whatever \g__tf_pos_int happens to be at
+    % READ time (i.e. all keys collapse to the same final position) --
+    % this was Task 6b's position-alignment bug.
+    \prop_gput:Nee \g__tf_seg_endpos_prop
       { \int_use:N \g__tf_seg_int } { \int_use:N \g__tf_pos_int }
     \int_gincr:N \g__tf_seg_int
     \bool_gset_false:N \g__tf_seg_changed_bool
@@ -1073,7 +1081,10 @@
     % for it.
     \bool_if:NT \g__tf_seg_changed_bool
       { \prop_gput:Nen \g__tf_active_seg_prop { \int_use:N \g__tf_seg_int } { 1 } }
-    \prop_gput:Nen \g__tf_seg_endpos_prop
+    % See the matching note in \__tf_seg_boundary_scan: -- value must be
+    % "e" (expanded at PUT time), not "n" (which stores an unexpanded,
+    % lazily-re-evaluating macro call).
+    \prop_gput:Nee \g__tf_seg_endpos_prop
       { \int_use:N \g__tf_seg_int } { \int_use:N \g__tf_pos_int }
     \int_gset_eq:NN \g__tf_seg_last_int \g__tf_seg_int
 
