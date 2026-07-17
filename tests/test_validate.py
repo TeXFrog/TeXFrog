@@ -111,3 +111,22 @@ class TestValidateProof:
         warnings = validate_proof(proof, tmp_path)
         # Should have: empty game G1, missing macro, unknown commentary
         assert len(warnings) >= 3
+
+    def test_warns_empty_segment_caption(self, minimal_proof_factory, tmp_path):
+        """\\tfsegment with empty caption should produce a warning."""
+        proof = minimal_proof_factory(source_text="\\State a\n\\tfsegment{}\n\\State b\n")
+        warnings = validate_proof(proof, tmp_path)
+        assert any("empty" in w.lower() and "tfsegment" in w for w in warnings)
+
+    def test_warns_segment_inside_if(self, minimal_proof_factory, tmp_path):
+        """\\tfsegment inside \\If block should produce a warning."""
+        src = "\\If{c}\n\\tfsegment{Bad}\n\\EndIf\n"
+        proof = minimal_proof_factory(source_text=src)
+        warnings = validate_proof(proof, tmp_path)
+        assert any("depth" in w.lower() or "inside" in w.lower() for w in warnings)
+
+    def test_warns_crop_without_segments(self, minimal_proof_factory, tmp_path):
+        """\\tfcropdefault on but no \\tfsegment markers should warn."""
+        proof = minimal_proof_factory(source_text="\\State a\n", crop_default=True)
+        warnings = validate_proof(proof, tmp_path)
+        assert any("no" in w.lower() and "tfsegment" in w for w in warnings)
