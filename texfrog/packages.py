@@ -114,11 +114,29 @@ class PackageProfile:
         )
 
     def html_tfsegmentstub(self) -> str:
-        r"""Return the \tfsegmentstub definition for the HTML wrapper."""
-        body = r"{\color{black!55}$\cdots$~\textit{#1 (unchanged)}~$\cdots$}"
+        r"""Return the \tfsegmentstub definition for the HTML wrapper.
+
+        Mirrors the three ``\tfsegmentstub`` definitions in ``latex/texfrog.sty``
+        exactly, so the HTML output matches the PDF:
+
+        - cryptocode (``has_line_separators``): math content terminated by
+          ``\\`` (cryptocode's pchstack lines are ``\\``-separated).
+        - nicodemus (``gamelabel_comment_cmd is None``): ``\item``-prefixed,
+          since nicodemus is an ``\item``-based list environment where
+          ``\Statex`` is undefined.
+        - algpseudocodex (otherwise): ``\Statex``-prefixed unnumbered
+          continuation line.
+
+        ``\ensuremath`` (not literal ``$...$``) is required for ``\cdots``:
+        cryptocode's procedure body is already in implicit math mode, so a
+        literal ``$`` would toggle back out to text mode mid-line.
+        """
+        body = r"{\color{black!55}\ensuremath{\cdots}~\textit{#1~(unchanged)}~\ensuremath{\cdots}}"
         if self.has_line_separators:  # cryptocode: math + \\ separated lines
             return r"\newcommand{\tfsegmentstub}[1]{" + body + r" \\}"
-        # algpseudocodex / nicodemus: unnumbered continuation line
+        if self.gamelabel_comment_cmd is None:  # nicodemus: \item-based list env
+            return r"\newcommand{\tfsegmentstub}[1]{\item " + body + r"}"
+        # algpseudocodex: unnumbered continuation line
         return r"\newcommand{\tfsegmentstub}[1]{\Statex " + body + r"}"
 
     def procedure_header_def(self) -> str | None:

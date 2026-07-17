@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import shutil
+import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -18,6 +20,14 @@ from texfrog.output.html import (
     _pdf_to_svg,
     _write_commentary_file,
     generate_index_page,
+)
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_NICODEMUS_STY = _PROJECT_ROOT / "resources" / "nicodemus.sty"
+
+needs_pdflatex = pytest.mark.skipif(
+    shutil.which("pdflatex") is None,
+    reason="pdflatex not found on PATH",
 )
 
 
@@ -58,6 +68,93 @@ def test_html_tfsegmentstub_defined_for_each_profile():
     from texfrog.packages import get_profile
     for name in ("cryptocode", "nicodemus", "algpseudocodex"):
         assert r"\tfsegmentstub" in get_profile(name).html_tfsegmentstub()
+
+
+# ---------------------------------------------------------------------------
+# End-to-end compile of html_tfsegmentstub() inside each profile's env
+# ---------------------------------------------------------------------------
+
+# Each profile's minimal pseudocode environment, with a \tfsegmentstub{Foo}
+# line typeset the way the real HTML pipeline would emit it (as one filtered
+# content line, alongside one ordinary line). Regression coverage for the
+# nicodemus \Statex bug: nicodemus is an \item-based list environment
+# (enumitem via resources/nicodemus.sty) where \Statex is undefined, so the
+# pre-fix html_tfsegmentstub() (which used \Statex unconditionally for any
+# non-cryptocode profile) fails to compile here.
+_STUB_GAME_BODIES = {
+    "cryptocode": (
+        r"\begin{pchstack}[boxed]" "\n"
+        r"  \procedure{Test}{" "\n"
+        r"    \tfsegmentstub{Foo}" "\n"
+        r"    \pcreturn 1" "\n"
+        r"  }" "\n"
+        r"\end{pchstack}" "\n"
+    ),
+    "nicodemus": (
+        r"\begin{nicodemus}" "\n"
+        r"\tfsegmentstub{Foo}" "\n"
+        r"\item $x \gets 1$" "\n"
+        r"\end{nicodemus}" "\n"
+    ),
+    "algpseudocodex": (
+        r"\begin{algorithmic}" "\n"
+        r"\tfsegmentstub{Foo}" "\n"
+        r"\State $x \gets 1$" "\n"
+        r"\end{algorithmic}" "\n"
+    ),
+}
+
+
+def _compile_profile_stub(
+    tmp_path: Path, profile_name: str
+) -> subprocess.CompletedProcess[str]:
+    """Typeset ``\\tfsegmentstub{Foo}`` inside *profile_name*'s pseudocode
+    environment, using the exact wrapper the real HTML pipeline builds
+    (``_build_wrapper_template``), and compile it with pdflatex.
+    """
+    if profile_name == "nicodemus":
+        # nicodemus.sty is not on CTAN; supply it locally like other
+        # nicodemus-compiling tests do (see test_sty_compilation.py).
+        shutil.copy2(_NICODEMUS_STY, tmp_path / "nicodemus.sty")
+
+    wrapper_src = _build_wrapper_template(profile_name).format(
+        macro_inputs="", gamename_defs="", game_file="game.tex"
+    )
+    (tmp_path / "wrapper.tex").write_text(wrapper_src, encoding="utf-8")
+    (tmp_path / "game.tex").write_text(
+        _STUB_GAME_BODIES[profile_name], encoding="utf-8"
+    )
+
+    return subprocess.run(
+        ["pdflatex", "-interaction=nonstopmode", "-no-shell-escape", "wrapper.tex"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+
+
+@needs_pdflatex
+@pytest.mark.parametrize("profile_name", ["cryptocode", "nicodemus", "algpseudocodex"])
+def test_html_tfsegmentstub_compiles_per_profile(tmp_path, profile_name):
+    r"""\tfsegmentstub{...} from html_tfsegmentstub() must actually typeset
+    (no undefined-control-sequence errors) inside each profile's pseudocode
+    environment -- this is what the real HTML game-rendering pipeline
+    (_compile_game_to_svg) does. Regression test for the nicodemus \Statex
+    bug: \Statex is undefined in nicodemus's \item-based list environment.
+    """
+    result = _compile_profile_stub(tmp_path, profile_name)
+    pdf = tmp_path / "wrapper.pdf"
+    assert pdf.exists(), (
+        f"pdflatex failed for profile {profile_name!r}.\n"
+        f"Exit code: {result.returncode}\n"
+        f"Log tail:\n{result.stdout[-3000:]}"
+    )
+    assert "Undefined control sequence" not in result.stdout
+    assert "! " not in result.stdout, (
+        f"pdflatex reported an error for profile {profile_name!r}:\n"
+        f"{result.stdout[-3000:]}"
+    )
 
 
 class TestWriteCommentaryFile:
