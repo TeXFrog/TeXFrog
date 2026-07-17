@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .filter import SEGMENT_RE
 from .model import Proof
 from .tex_parser import filter_for_game_from_text
 
@@ -50,9 +51,13 @@ def validate_proof(proof: Proof, base_dir: Path) -> list[str]:
                 f"Commentary key '{key}' does not match any game label."
             )
 
-    # Segment warnings for cropping feature
-    from .filter import SEGMENT_RE
-
+    # Segment warnings for cropping feature.
+    # Block-depth tracking is intentionally limited to the algpseudocodex block
+    # commands \If/\For/\While (and their \End... closers); \Procedure,
+    # \Function, \Loop and \Repeat are not tracked, so a \tfsegment misplaced
+    # inside one of those will not be flagged. This matches the spec's scoped
+    # check and keeps the heuristic from raising false positives on constructs
+    # other packages spell differently.
     src_lines = proof.source_text.split("\n")
     seg_count = 0
     depth = 0
@@ -65,7 +70,8 @@ def validate_proof(proof: Proof, base_dir: Path) -> list[str]:
             seg_count += 1
             if not m.group("caption").strip():
                 warnings.append(
-                    f"{proof.source_name}: \\tfsegment has an empty caption."
+                    f"{proof.source_name}: \\tfsegment #{seg_count} has an "
+                    "empty caption."
                 )
             if depth != 0:
                 warnings.append(

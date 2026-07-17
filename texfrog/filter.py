@@ -24,7 +24,12 @@ _ITEM_PREFIX = re.compile(r"^(\s*\\item\s*)")
 _STATE_PREFIX = re.compile(r"^(\s*\\State\b\s*)")
 
 # Matches a \tfsegment{caption} marker line (optional leading whitespace).
-_SEGMENT_RE = re.compile(r"^\s*\\tfsegment\s*\{(?P<caption>.*)\}\s*$")
+# The caption charset is ``[^{}]*`` to stay in parity with the LaTeX-side
+# marker regex in ``texfrog.sty`` (``\c{tfsegment} \{ [^\{\}]* \}``): a caption
+# containing braces would otherwise be split differently in the HTML and PDF
+# builds. (The line anchoring here mirrors the convention that a marker sits on
+# its own line.)
+_SEGMENT_RE = re.compile(r"^\s*\\tfsegment\s*\{(?P<caption>[^{}]*)\}\s*$")
 SEGMENT_RE = _SEGMENT_RE
 
 
@@ -333,18 +338,19 @@ def crop_to_active_segments(
     new_lines: list[str] = []
     idx_map: list[int] = []
     pending_caps: list[str] = []
+    stub_pending = False  # whether the current inactive run has any segment
 
     def flush_stub() -> None:
-        if not pending_caps and not _stub_pending[0]:
+        nonlocal stub_pending
+        if not pending_caps and not stub_pending:
             return
         caps = ", ".join(c for c in pending_caps if c)
         new_lines.append(f"{stub_macro}{{{caps}}}")
         idx_map.append(-1)
         pending_caps.clear()
-        _stub_pending[0] = False
+        stub_pending = False
 
     last = len(segs) - 1
-    _stub_pending = [False]  # whether any inactive segment was seen in this run
     for i, seg in enumerate(segs):
         keep = (i == 0) or (i == last) or (i in active)
         if keep:
@@ -353,7 +359,7 @@ def crop_to_active_segments(
                 new_lines.append(ln)
                 idx_map.append(oi)
         else:
-            _stub_pending[0] = True
+            stub_pending = True
             if seg.caption:
                 pending_caps.append(seg.caption)
     flush_stub()
