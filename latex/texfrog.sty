@@ -549,7 +549,7 @@
   {
     \cs_gset_protected:Npn \tfsegmentstub #1
       {
-        \color{black!55}\ensuremath{\cdots}~\textit{#1~(unchanged)}~\ensuremath{\cdots}
+        {\color{black!55}\ensuremath{\cdots}~\textit{#1~(unchanged)}~\ensuremath{\cdots}}
         \\
       }
   }
@@ -558,7 +558,7 @@
   {
     \cs_gset_protected:Npn \tfsegmentstub #1
       {
-        \item \color{black!55}\ensuremath{\cdots}~\textit{#1~(unchanged)}~\ensuremath{\cdots}
+        \item {\color{black!55}\ensuremath{\cdots}~\textit{#1~(unchanged)}~\ensuremath{\cdots}}
       }
   }
 
@@ -886,6 +886,14 @@
 % Clean rendering (no highlighting)
 \cs_new_protected:Nn \__tf_render_game_clean:nn
   {
+    % \__tf_resolve_crop_active: (called unconditionally in \tfrendergame
+    % before dispatch) may have just set \g__tf_crop_active_bool true even
+    % though this no-diff clean path never consults it -- reset it here so
+    % the global doesn't carry a stale "crop active" value past a clean
+    % render (harmless today since every \tfrendergame call re-resolves it
+    % anyway, but avoids the trap for any future code that reads the bool
+    % outside that call path).
+    \bool_gset_false:N \g__tf_crop_active_bool
     \__tf_activate_source:n { #1 }
     \tl_gset:Nn \g__tf_current_game_tl { #2 }
     \int_gset:Nn \g__tf_pos_int { 0 }

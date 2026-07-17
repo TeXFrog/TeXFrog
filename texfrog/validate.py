@@ -2,11 +2,22 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from .filter import SEGMENT_RE
 from .model import Proof
 from .tex_parser import filter_for_game_from_text
+
+# Detects any occurrence of the \tfsegment control word (but not the longer
+# \tfsegmentstub, thanks to the trailing \b) so we can flag lines that
+# contain a marker SEGMENT_RE doesn't recognise: e.g. a brace-containing
+# caption (\tfsegment{Setup \textbf{one}}), a marker sharing a line with
+# other content, or a marker nested inside a \tfonly{...} body. SEGMENT_RE's
+# ``[^{}]*`` caption charset (shared with the LaTeX-side scan regex) accepts
+# none of these, so without this check they would silently misalign the
+# split and cause a cryptic downstream compile failure.
+_TFSEGMENT_OCCURRENCE_RE = re.compile(r"\\tfsegment\b")
 
 
 def validate_proof(proof: Proof, base_dir: Path) -> list[str]:
@@ -79,6 +90,20 @@ def validate_proof(proof: Proof, base_dir: Path) -> list[str]:
                     f"is at block depth {depth} (inside \\If/\\For/\\While); "
                     "segments must start at depth 0 to crop safely."
                 )
+        elif _TFSEGMENT_OCCURRENCE_RE.search(ln):
+            # Contains \tfsegment but doesn't match the plain-marker form:
+            # brace-containing caption, marker not alone on its own line, or
+            # marker nested inside a \tfonly{...} body. Any of these would
+            # be invisible to the split regex and produce a silent
+            # segment/body misalignment rather than a caught error.
+            warnings.append(
+                f"{proof.source_name}: line contains \\tfsegment but is not "
+                "a plain marker of the form '\\tfsegment{caption}' alone on "
+                "its own line: "
+                f"{stripped!r}. Segment captions must not contain braces, "
+                "and the marker must not share a line with other content "
+                "or sit inside a \\tfonly{...} body."
+            )
         # crude block-depth tracking for algpseudocodex-style bodies
         for closer in _CLOSERS:
             if stripped.startswith(closer):

@@ -11,6 +11,7 @@ Skipped automatically when pdflatex is not on PATH.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -99,6 +100,16 @@ _ALGPSEUDOCODEX_PREAMBLE = r"""\documentclass{article}
 \usepackage{algpseudocodex}
 \usepackage[package=algpseudocodex]{texfrog}
 """
+
+_NICODEMUS_PREAMBLE = r"""\documentclass{article}
+\usepackage[margin=1in,letterpaper]{geometry}
+\usepackage{amsfonts,amsmath,amsthm}
+\usepackage{xcolor}
+\usepackage{nicodemus}
+\usepackage[package=nicodemus]{texfrog}
+"""
+
+_NICODEMUS_STY_PATH = _PROJECT_ROOT / "resources" / "nicodemus.sty"
 
 
 # ---------------------------------------------------------------------------
@@ -743,6 +754,110 @@ def test_tfsegmentstub_defined_for_algpseudocodex(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# I3: \tfsegmentstub's \color{black!55} must be grouped in the cryptocode
+# and nicodemus overrides (matching the base algpseudocodex definition),
+# so it doesn't leak past the stub and gray out every subsequent line.
+# ---------------------------------------------------------------------------
+
+# Static source check: a leaked \color still compiles fine (pdflatex has no
+# way to know "this shade of gray was supposed to be scoped"), so a
+# compile-only test would not have caught the original ungrouped-color bug.
+# This regex directly targets the shape of the fix: \color{black!55} must
+# sit inside its own brace group within each override's \tfsegmentstub body.
+_CRYPTOCODE_STUB_GROUPED_RE = re.compile(
+    r"\\cs_gset_protected:Npn\s*\\tfsegmentstub\s*#1\s*"
+    r"\{\s*"
+    r"\{\\color\{black!55\}.*?\\ensuremath\{\\cdots\}\}\s*"
+    r"\\\\\s*"
+    r"\}",
+    re.DOTALL,
+)
+_NICODEMUS_STUB_GROUPED_RE = re.compile(
+    r"\\cs_gset_protected:Npn\s*\\tfsegmentstub\s*#1\s*"
+    r"\{\s*"
+    r"\\item\s*\{\\color\{black!55\}.*?\\ensuremath\{\\cdots\}\}\s*"
+    r"\}",
+    re.DOTALL,
+)
+
+
+def test_tfsegmentstub_color_is_grouped_for_cryptocode_and_nicodemus():
+    r"""I3 regression: the cryptocode and nicodemus \tfsegmentstub overrides
+    must wrap \color{black!55} in a brace group, exactly like the base
+    algpseudocodex definition (\Statex{\color{black!55}...}). Before the
+    fix, both overrides applied \color{black!55} UNGROUPED, so it kept
+    coloring every sibling line rendered after the stub gray instead of
+    just the stub's own text -- a silent visual bug pdflatex's exit code
+    can't detect (see the compile tests below for the "still typesets"
+    half of this regression test)."""
+    sty_text = _STY_PATH.read_text(encoding="utf-8")
+    assert _CRYPTOCODE_STUB_GROUPED_RE.search(sty_text), (
+        "cryptocode's \\tfsegmentstub override must wrap \\color{black!55} "
+        "in its own brace group ({\\color{black!55}...}) with the trailing "
+        "\\\\ outside the group."
+    )
+    assert _NICODEMUS_STUB_GROUPED_RE.search(sty_text), (
+        "nicodemus's \\tfsegmentstub override must wrap \\color{black!55} "
+        "in its own brace group ({\\color{black!55}...}) with \\item "
+        "outside the group."
+    )
+
+
+@needs_pdflatex
+def test_tfsegmentstub_grouped_color_compiles_cryptocode(tmp_path):
+    r"""The grouped \tfsegmentstub form must still typeset correctly for
+    cryptocode: a stub followed by more procedure content on the same
+    brace level (the actual usage pattern -- see
+    \__tf_seg_render_one:n) must compile without errors, and the \\
+    line-separator placed outside the group must still terminate the
+    line correctly."""
+    tex = _CRYPTO_PREAMBLE + r"""
+\begin{document}
+\begin{pchstack}[boxed]
+  \procedure{Game}{
+    \tfsegmentstub{Foo}
+    x \gets 0 \\
+    \pcreturn x
+  }
+\end{pchstack}
+\end{document}
+"""
+    result = _compile_tex(tmp_path, tex)
+    assert result.returncode == 0
+    _assert_compiled(tmp_path, result)
+    assert "Undefined control sequence" not in result.stdout
+    text = _pdftotext(tmp_path)
+    assert "unchanged" in text
+    assert "Foo" in text
+
+
+@needs_pdflatex
+def test_tfsegmentstub_grouped_color_compiles_nicodemus(tmp_path):
+    r"""The grouped \tfsegmentstub form must still typeset correctly for
+    nicodemus: a stub followed by more \item lines on the same brace level
+    must compile without errors, and the \item placed outside the group
+    must still produce a proper list entry."""
+    tex = _NICODEMUS_PREAMBLE + r"""
+\begin{document}
+\begin{nicodemus}
+\tfsegmentstub{Foo}
+\item $x \gets 0$
+\end{nicodemus}
+\end{document}
+"""
+    result = _compile_tex(
+        tmp_path, tex,
+        extra_files={"nicodemus.sty": _NICODEMUS_STY_PATH.read_text(encoding="utf-8")},
+    )
+    assert result.returncode == 0
+    _assert_compiled(tmp_path, result)
+    assert "Undefined control sequence" not in result.stdout
+    text = _pdftotext(tmp_path)
+    assert "unchanged" in text
+    assert "Foo" in text
+
+
+# ---------------------------------------------------------------------------
 # Task 6: crop-aware render pass
 # ---------------------------------------------------------------------------
 
@@ -966,6 +1081,71 @@ def test_crop_all_interior_changed_no_stub(tmp_path):
     assert "unchanged" not in text
     assert "1" in text
     assert "3" in text
+
+
+# ---------------------------------------------------------------------------
+# I1: crop compile path for a non-algpseudocodex, non-cryptocode profile
+# ---------------------------------------------------------------------------
+#
+# I1 documents that PDF crop is unsupported for cryptocode because its
+# content lines live inside a \procedure{...}{...} brace group: a
+# \tfsegment marker between lines therefore sits *inside* a literal brace
+# group, and \regex_split (which operates on the flat stored token list)
+# produces two brace-unbalanced fragments -- "Missing brace inserted", no
+# PDF. nicodemus's \begin{nicodemus}...\end{nicodemus} (a plain
+# \newenvironment built on enumitem's \begin{enumerate}[...]) introduces no
+# extra literal brace group around its \item lines, so markers placed
+# directly between \item lines (i.e. NOT nested inside an additional
+# \nicodemusboxNew{width}{...} wrapper, which -- like \procedure -- would
+# reintroduce the same brace-nesting problem) sit at the top brace level of
+# the stored tfsource body, exactly like algpseudocodex's \State lines. This
+# test is the first green crop path for a profile other than algpseudocodex.
+
+_NICODEMUS_CROP_SOURCE = r"""
+\tfgames{s}{G0,G1}
+\tfgamename{s}{G0}{G_0}
+\tfgamename{s}{G1}{G_1}
+\begin{tfsource}{s}
+\begin{nicodemus}
+\tfsegment{Initiator}
+\item $x \gets 0$
+\tfsegment{Responder}
+\tfonly{G0}{\item $y \gets 0$}
+\tfonly{G1}{\item $y \gets 1$}
+\end{nicodemus}
+\end{tfsource}
+"""
+
+
+@needs_pdflatex
+def test_crop_stubs_unchanged_segment_nicodemus(tmp_path):
+    r"""crop=on for nicodemus stubs the unchanged interior "Initiator"
+    segment and keeps+highlights the changed final "Responder" segment --
+    the non-algpseudocodex crop path referenced by I1 actually works when
+    \tfsegment markers sit at the top brace level of the tfsource body
+    (i.e. directly inside \begin{nicodemus}...\end{nicodemus}, not nested
+    inside an additional \nicodemusboxNew{...}{...} group)."""
+    tex = (
+        _NICODEMUS_PREAMBLE
+        + r"\tfcropdefault{on}"
+        + _NICODEMUS_CROP_SOURCE
+        + r"""
+\begin{document}
+\tfrendergame[diff=G0]{s}{G1}
+\end{document}
+"""
+    )
+    result = _compile_tex(
+        tmp_path, tex,
+        extra_files={"nicodemus.sty": _NICODEMUS_STY_PATH.read_text(encoding="utf-8")},
+    )
+    assert result.returncode == 0
+    _assert_compiled(tmp_path, result)
+    assert "Undefined control sequence" not in result.stdout
+    text = _pdftotext(tmp_path)
+    assert "unchanged" in text
+    assert "Initiator" in text  # stub caption reaches the typeset output
+    assert "1" in text  # the changed Responder line's content is kept
 
 
 @needs_pdflatex

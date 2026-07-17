@@ -130,3 +130,44 @@ class TestValidateProof:
         proof = minimal_proof_factory(source_text="\\State a\n", crop_default=True)
         warnings = validate_proof(proof, tmp_path)
         assert any("no" in w.lower() and "tfsegment" in w for w in warnings)
+
+    def test_warns_segment_with_brace_caption(self, minimal_proof_factory, tmp_path):
+        """A \\tfsegment caption containing braces should produce a warning.
+
+        \\tfsegment{Setup \\textbf{one}} is accepted by the LaTeX
+        NewDocumentCommand (balanced-brace grab), but SEGMENT_RE's
+        ``[^{}]*`` charset does not match it, so it would otherwise be
+        silently missed by the split/crop machinery.
+        """
+        src = "\\State a\n\\tfsegment{Setup \\textbf{one}}\n\\State b\n"
+        proof = minimal_proof_factory(source_text=src)
+        warnings = validate_proof(proof, tmp_path)
+        assert any("tfsegment" in w for w in warnings)
+
+    def test_warns_segment_sharing_line(self, minimal_proof_factory, tmp_path):
+        """A \\tfsegment marker sharing a line with other content should warn."""
+        src = "\\State a\n\\State b \\tfsegment{Mid}\n\\State c\n"
+        proof = minimal_proof_factory(source_text=src)
+        warnings = validate_proof(proof, tmp_path)
+        assert any("tfsegment" in w for w in warnings)
+
+    def test_no_malformed_warning_for_plain_marker(
+        self, minimal_proof_factory, tmp_path
+    ):
+        """A well-formed, standalone \\tfsegment marker should not trigger
+        the malformed-marker warning (only the well-formed-marker checks
+        apply)."""
+        src = "\\State a\n\\tfsegment{Setup}\n\\State b\n"
+        proof = minimal_proof_factory(source_text=src)
+        warnings = validate_proof(proof, tmp_path)
+        assert not any("not a plain marker" in w for w in warnings)
+
+    def test_no_malformed_warning_for_tfsegmentstub(
+        self, minimal_proof_factory, tmp_path
+    ):
+        """\\tfsegmentstub (a distinct, longer command) must not be mistaken
+        for a malformed \\tfsegment marker."""
+        src = "\\State a\n\\tfsegmentstub{Setup}\n\\State b\n"
+        proof = minimal_proof_factory(source_text=src)
+        warnings = validate_proof(proof, tmp_path)
+        assert not any("not a plain marker" in w for w in warnings)

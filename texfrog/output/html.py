@@ -34,6 +34,7 @@ from typing import Optional
 from jinja2 import Environment, PackageLoader
 
 from ..filter import (
+    SEGMENT_RE,
     compute_active_segments,
     compute_changed_lines,
     compute_removed_lines,
@@ -98,6 +99,19 @@ def _write_game_file(
         # cause LaTeX dimension errors inside pseudocode environments
         # (e.g. varwidth used internally by cryptocode's pcvstack).
         if not line.strip():
+            continue
+        # Skip \tfsegment{...} marker lines. These are only meaningful to
+        # crop_to_active_segments(); when cropping is off (or for the -clean/
+        # -removed variants, which never crop), the marker would otherwise
+        # reach the per-game .tex file verbatim. The HTML wrapper doesn't
+        # define \tfsegment, so pdflatex would hit "Undefined control
+        # sequence" and the caption would render as a stray line in the SVG.
+        # Skipping via `continue` (without renumbering `i`) preserves the
+        # `changed_indices` alignment exactly like the blank-line skip above:
+        # `i` still walks the original 0-based index space of `current_lines`,
+        # so `i in changed_indices` checks below remain correct for every
+        # subsequent (non-skipped) line.
+        if SEGMENT_RE.match(line):
             continue
         if i in changed_indices:
             parts.append(
@@ -174,6 +188,11 @@ def _build_wrapper_template(
             profile.html_tfremoved().replace("{", "{{").replace("}", "}}"),
             profile.html_tfgamelabel().replace("{", "{{").replace("}", "}}"),
             profile.html_tfsegmentstub().replace("{", "{{").replace("}", "}}"),
+            # Defense-in-depth no-op: \tfsegment marker lines are stripped in
+            # _write_game_file(), but define it anyway in case a marker ever
+            # reaches the wrapper (e.g. a future writer that forgets to
+            # filter, or -commentary/-clean paths added later).
+            r"\newcommand{{\tfsegment}}[1]{{}}",
         ]
         proc_hdr_def = profile.procedure_header_def()
         if proc_hdr_def:

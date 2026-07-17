@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -19,6 +20,7 @@ from texfrog.output.html import (
     _load_template_resource,
     _pdf_to_svg,
     _write_commentary_file,
+    generate_html,
     generate_index_page,
 )
 
@@ -28,6 +30,11 @@ _NICODEMUS_STY = _PROJECT_ROOT / "resources" / "nicodemus.sty"
 needs_pdflatex = pytest.mark.skipif(
     shutil.which("pdflatex") is None,
     reason="pdflatex not found on PATH",
+)
+
+needs_html_tools = pytest.mark.skipif(
+    shutil.which("pdflatex") is None or _find_svg_converter() is None,
+    reason="pdflatex and/or SVG converter (pdf2svg/pdftocairo) not on PATH",
 )
 
 
@@ -154,6 +161,108 @@ def test_html_tfsegmentstub_compiles_per_profile(tmp_path, profile_name):
     assert "! " not in result.stdout, (
         f"pdflatex reported an error for profile {profile_name!r}:\n"
         f"{result.stdout[-3000:]}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# C1: \tfsegment markers must never leak into an UNCROPPED per-game render
+# ---------------------------------------------------------------------------
+#
+# \tfsegment marker lines are only removed by crop_to_active_segments(). Any
+# per-game .tex file that is NOT cropped -- crop off, game 0 (generate_html's
+# `i == 0` check always skips _apply_crop, even when crop_default is on),
+# and the -clean/-removed variants (never cropped) -- previously got the
+# literal marker line verbatim. The HTML wrapper defines \tfsegmentstub but
+# not \tfsegment, so pdflatex hit "Undefined control sequence" (still
+# emitting a PDF under -interaction=nonstopmode) and the caption text leaked
+# into the rendered SVG as a stray algorithm line.
+
+
+@needs_html_tools
+def test_generate_html_strips_tfsegment_markers_when_crop_off(tmp_path, capsys):
+    r"""Full generate_html() pipeline, crop OFF, on a segmented source: no
+    per-game .tex file may contain a literal \tfsegment marker, no compiled
+    PDF may show the marker captions as stray text, and no compile log may
+    report an undefined control sequence. Exercises game 0 specifically
+    (the `i == 0` case that always skips cropping) since that's the game
+    the underlying bug report called out."""
+    games = [
+        Game(label="G0", latex_name="G_0", description="Game 0",
+             reduction=False, related_games=[]),
+        Game(label="G1", latex_name="G_1", description="Game 1",
+             reduction=False, related_games=[]),
+    ]
+    source_text = (
+        r"\begin{algorithmic}[1]" "\n"
+        r"\tfsegment{Setup phase}" "\n"
+        r"\State $x \gets 0$" "\n"
+        r"\tfsegment{Body phase}" "\n"
+        r"\tfonly{G0}{\State $y \gets 0$}" "\n"
+        r"\tfonly{G1}{\State $y \gets 1$}" "\n"
+        r"\end{algorithmic}" "\n"
+    )
+    proof = Proof(
+        source_name="test",
+        macros=[],
+        games=games,
+        source_text=source_text,
+        commentary={},
+        figures=[],
+        package="algpseudocodex",
+        preamble=None,
+        crop_default=False,  # crop OFF
+    )
+
+    out_dir = tmp_path / "html_out"
+    generate_html(proof, tmp_path, out_dir, keep_tmp=True)
+
+    captured = capsys.readouterr()
+    m = re.search(r"Keeping intermediate files in (\S+)", captured.err)
+    assert m, f"Could not find kept-tmp-dir path in stderr:\n{captured.err}"
+    latex_dir = Path(m.group(1))
+
+    # No per-game .tex file should contain a literal \tfsegment marker.
+    for label in ("G0", "G1"):
+        game_tex = (latex_dir / f"{label}.tex").read_text(encoding="utf-8")
+        assert r"\tfsegment{" not in game_tex, (
+            f"{label}.tex still contains a literal \\tfsegment marker "
+            f"(crop is off, so it should have been stripped):\n{game_tex}"
+        )
+
+    # The compiled PDF (kept alongside the SVG under tmp_parent=latex_dir)
+    # must show neither stray caption text nor an undefined-control-sequence
+    # error -- game 0 in particular, since generate_html's `i == 0` check
+    # always skips _apply_crop regardless of crop_default.
+    for label in ("G0", "G1"):
+        wrapper_pdf = latex_dir / label / "wrapper.pdf"
+        assert wrapper_pdf.exists(), f"No compiled PDF kept for {label}"
+        pdf_text = subprocess.run(
+            ["pdftotext", str(wrapper_pdf), "-"],
+            capture_output=True, text=True, timeout=30,
+        ).stdout
+        assert "Setup phase" not in pdf_text, (
+            f"{label}'s compiled PDF leaks the \\tfsegment caption "
+            f"'Setup phase' as stray text:\n{pdf_text}"
+        )
+        assert "Body phase" not in pdf_text, (
+            f"{label}'s compiled PDF leaks the \\tfsegment caption "
+            f"'Body phase' as stray text:\n{pdf_text}"
+        )
+        log_path = latex_dir / label / "wrapper.log"
+        if log_path.exists():
+            log_text = log_path.read_text(encoding="utf-8", errors="replace")
+            assert "Undefined control sequence" not in log_text, (
+                f"pdflatex reported an undefined control sequence for "
+                f"{label} (likely \\tfsegment leaking to the wrapper):\n"
+                f"{log_text[-3000:]}"
+            )
+
+    # The SVG must be a real render, not the build's error placeholder.
+    svg_g0 = out_dir / "games" / "G0.svg"
+    assert svg_g0.exists()
+    svg_text = svg_g0.read_text(encoding="utf-8")
+    assert "render failed" not in svg_text, (
+        f"G0.svg is a render-failure placeholder:\n{svg_text}"
     )
 
 
