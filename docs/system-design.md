@@ -215,6 +215,44 @@ Wraps a changed line in `\tfchanged{content}`, with special handling:
 
 ---
 
+## Segment Cropping (`\tfsegment`, `\tfcropdefault`, `crop=`)
+
+For proofs with many hops, a diffed render can end up dominated by lines carried over unchanged from earlier games. `\tfsegment{Caption}` markers, placed at block depth 0 inside a `tfsource` body, divide the source into segments; a cropped render keeps only the segments that changed vs. the diff target (plus the always-kept first and last segment) and collapses runs of unchanged interior segments into a single `\tfsegmentstub{captions}` line. The LaTeX package (`texfrog.sty`) and the Python HTML pipeline (`filter.py`/`output/html.py`) implement this independently, but with matching semantics (same keep-segment-0-and-final rule, same caption-joining).
+
+### LaTeX mechanism (`texfrog.sty`, `\__tf_render_game_cropped:nnn`)
+
+Cropped rendering is a **3-pass process**, built on top of the existing diff-highlight machinery (`\g__tf_mode_int` dispatch: `0`=inactive, `1`=record, `2`=render, `3`=clean, `4`=figure; crop adds `5`=scan):
+
+1. **Pass A --- record** (mode 1, identical to a non-cropped highlighted render): expand the source for the diff-*target* game into a discarded `\vbox`, recording which `\tfonly` position indices are active in that game (`\g__tf_recorded_prop`).
+2. **Pass B --- scan** (mode 5, new): expand the source for the *current* game into a discarded `\vbox`. `\__tf_only_scan:nn` mirrors `\__tf_only_render:nn`, but instead of emitting content it flags the enclosing segment as changed (`\g__tf_seg_changed_bool`) whenever a `\tfonly` block is active in the current game but wasn't recorded for the target (an add/change), or vice versa (a removal). Each `\tfsegment` marker encountered during this pass (`\__tf_seg_boundary_scan:`) closes the current segment --- committing its changed flag into `\g__tf_active_seg_prop` and its ending `\tfonly` position into `\g__tf_seg_endpos_prop` --- and opens the next. The final segment (no trailing marker) is committed by hand once the pass finishes.
+3. **Split**: the stored source token list is split at `\tfsegment{...}` markers (`\__tf_split_source_segments:n`, via `l3regex`) into per-segment token lists and captions, numbered identically to Pass B's segment count.
+4. **Pass C --- crop-render** (mode 2, the *same* highlighted-render mode used by non-cropped diffed renders): walk the segments in order (`\__tf_seg_render_one:n`). Segment 0 and the final segment always execute verbatim. Other segments execute verbatim if Pass B marked them active, or get folded into a pending `\tfsegmentstub` run otherwise. `\__tf_only_render:nn` --- the highlight logic --- is reused completely unchanged for whichever segments run.
+
+A skipped segment never executes its `\tfonly` calls, so `\g__tf_pos_int` (the position counter Pass A/B use to align target and current games) would otherwise drift out of sync for later, *executed* segments. To prevent this, skipping a segment jumps `\g__tf_pos_int` forward to that segment's recorded ending position (`\g__tf_seg_endpos_prop`, captured in Pass B) before continuing, keeping highlight alignment correct for subsequent kept segments.
+
+Dispatch: `\tfrendergame[diff=G, crop=on|off]{source}{game}` resolves an effective crop bool (`\__tf_resolve_crop_active:`) --- the `crop=` key wins if given; `crop=default` (the key's initial value) falls back to `\tfcropdefault`. Cropping is only ever consulted when `diff=` is present; a clean render (no `diff=`) always renders in full.
+
+### Python HTML pipeline (`texfrog/filter.py`, `texfrog/output/html.py`)
+
+The HTML build path mirrors the same semantics without any expl3 machinery, operating on plain filtered line lists:
+
+- `split_into_segments(lines) -> list[Segment]` splits a game's filtered lines at `\tfsegment{caption}` marker lines (matched by `SEGMENT_RE`) into `Segment(caption, lines)` objects; content before the first marker becomes segment 0 with `caption=None`.
+- `compute_active_segments(target_lines, curr_lines) -> set[int]` splits both the diff target's and the current game's lines into segments (they align 1:1, since the marker sequence is identical across games sharing one source) and returns the indices of current segments whose non-blank content differs from the aligned target segment.
+- `crop_to_active_segments(lines, active, stub_macro=r"\tfsegmentstub") -> tuple[list[str], list[int]]` rebuilds the line list keeping segment 0, the final segment, and every segment in `active` --- mirroring the LaTeX keep-0-and-final rule. Each maximal run of skipped interior segments collapses to one `{stub_macro}{{captions}}` line (captions joined with `", "`, blank captions skipped). Returns `(new_lines, idx_map)`, where `idx_map[k]` is the original line index of `new_lines[k]` (or `-1` for a synthesized stub line), so callers can remap other per-line data against the cropped output.
+- `_apply_crop` (`output/html.py`) is the call site: it combines `compute_active_segments` + `crop_to_active_segments` and remaps the `changed`-line index set through `idx_map`, so highlighting still lands on the correct (renumbered) lines in the cropped output.
+
+`_apply_crop` is called from `build_html_site`'s per-game loop **only when `proof.crop_default` is true** --- there is no per-game HTML override; the `crop=` key on `\tfrendergame` is consumed only by `texfrog.sty`, for the PDF path. `proof.crop_default` is parsed once per document (`tex_parser.py`, via `_extract_one_arg(text, "tfcropdefault")` over the whole file) and applies to every `Proof`/source block parsed from that file, matching the LaTeX side's single global `\g__tf_crop_default_bool`.
+
+### Validation (`validate.py`)
+
+`validate_proof` scans the raw source text for `\tfsegment{...}` markers plus a crude `\If`/`\For`/`\While` ... `\EndIf`/`\EndFor`/`\EndWhile` depth counter, warning on:
+
+- a marker with an empty caption,
+- a marker found at nonzero depth (inside an open block), and
+- `\tfcropdefault` on with zero `\tfsegment` markers in the source (nothing to crop).
+
+---
+
 ## LaTeX Output (in `output/html.py`)
 
 ### Per-game files: `{label}.tex`

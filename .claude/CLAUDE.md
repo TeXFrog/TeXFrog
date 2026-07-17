@@ -46,6 +46,13 @@ multiple proofs per document):
   `\tfonly{tags}{content}`, `\tfonly*{tags}{content}`, `\tffigonly{content}`,
   `\tfrendergame[opt]{source}{game}`, `\tfrenderfigure{source}{games}`,
   `\begin{tfsource}{name}...\end{tfsource}`
+- Segment cropping (no source arg): `\tfsegment{Caption}` (crop-boundary marker
+  inside `tfsource`, must sit at block depth 0), `\tfcropdefault{on|off}`
+  (document-wide crop default, one global switch, not per-source),
+  `\tfsegmentstub{captions}` (redefinable elision line). The `crop=on|off` key
+  on `\tfrendergame` overrides the default per call and is **PDF only** — the
+  HTML viewer (one SVG per game) honors only `\tfcropdefault`, so a per-call
+  `crop=` override can make the PDF and HTML viewer show a game differently.
 
 Package option: `\usepackage[package=cryptocode]{texfrog}`, `package=nicodemus`, or `package=algpseudocodex`.
 

@@ -278,6 +278,75 @@ When generating the LaTeX output, TeXFrog wraps changed lines in `\tfchanged{}` 
 
 **Avoid blank lines in the source block.** Blank lines in output are stripped to prevent `varwidth` dimension errors in pseudocode environments like `pcvstack`. See [Troubleshooting](troubleshooting.md#dimension-too-large-from-pdflatex) for more on this error.
 
+## Cropping Long Listings
+
+For proofs with many hops, a diffed render of a later game can end up mostly repeating lines carried over unchanged from earlier games. Segment cropping lets you mark boundaries in the source so that a diffed `\tfrendergame` shows only the segments that actually changed, collapsing everything else into a single placeholder line.
+
+### `\tfsegment{Caption}`
+
+Marks a boundary between two segments inside a `tfsource` body. It never produces visible output itself in a full (uncropped) render — it is a pure boundary marker, invisible in every mode except a cropped render, where it decides where one segment ends and the next begins.
+
+```latex
+\begin{tfsource}{myproof}
+\begin{algorithmic}
+  \tfonly*{G0}{\Procedure{Game $\tfgamename{G0}$}{}}
+  \tfsegment{Setup}
+  \State b \gets \{0,1\}
+  \tfsegment{Challenge}
+  \tfonly{G1}{\State y \gets \{0,1\}^\lambda}
+  \State \Return b
+\end{algorithmic}
+\end{tfsource}
+```
+
+Constraints:
+
+- **Markers must sit at block depth 0** --- never inside an `\If`/`\For`/`\While` body (or equivalent). Each segment must be a balanced, self-contained block; a marker placed mid-block would let cropping split an open control structure across a stub, producing invalid LaTeX. `texfrog check` warns if a marker is found at nonzero depth.
+- Give every marker a non-empty caption --- `texfrog check` warns on an empty `\tfsegment{}`. The caption is what readers see in the collapsed stub.
+- `\tfsegment` does not take a source-name argument; use it directly inside the `tfsource` body, the same way you use `\tfonly`.
+
+The content before the first `\tfsegment` (segment 0, typically the environment opener, e.g. `\begin{algorithmic}`/procedure header) and the content after the last marker (the final segment, typically the environment closer, e.g. `\end{algorithmic}`) are **always kept** in a cropped render, whether or not they changed --- this guarantees the emitted output stays a balanced, compilable environment. Only segments strictly in between can ever be collapsed.
+
+### `\tfcropdefault{on|off}`
+
+Sets the document-wide default: when `on`, every diffed `\tfrendergame` call (i.e. one with `diff=`) crops to changed segments, unless overridden per call. This is a single global switch, not scoped per source name --- in a document with multiple proofs it applies to every `tfsource` block. `texfrog check` warns if `\tfcropdefault{on}` is set but the source has no `\tfsegment` markers, since cropping then has nothing to shrink.
+
+```latex
+\tfcropdefault{on}
+```
+
+### The `crop=on|off` key on `\tfrendergame`
+
+Overrides `\tfcropdefault` for a single call:
+
+```latex
+\tfrendergame[diff=G3, crop=off]{myproof}{G4}   % force a full listing for this game
+\tfrendergame[diff=G3, crop=on]{myproof}{G4}    % force cropping even if the default is off
+```
+
+Cropping only ever applies to a *diffed* render (`diff=` present) --- a clean, no-diff `\tfrendergame{myproof}{G4}` always renders the full game, regardless of `\tfcropdefault` or `crop=`.
+
+> [!NOTE]
+> **HTML vs PDF:** the `crop=` key is a **PDF-only** refinement. The HTML viewer compiles one SVG per game and has no per-call override --- HTML cropping is governed solely by `\tfcropdefault`. If you set `crop=off` (or `crop=on`) on a specific `\tfrendergame` call to differ from the document default, the PDF and the HTML viewer will show that game differently.
+
+### What a cropped render looks like
+
+A cropped render keeps segment 0, the final segment, and every segment that differs from the diff target (an add, change, or removal anywhere in that segment). Contiguous runs of unchanged interior segments collapse into a single `\tfsegmentstub{captions}` line, with the captions of the collapsed segments joined by `, `.
+
+### Redefining the stub: `\tfsegmentstub{captions}`
+
+The elision line is produced by the user-redefinable macro `\tfsegmentstub{captions}`, which receives the joined caption text as its single argument. The base default renders a dimmed, unnumbered line, e.g.:
+
+```
+⋯ Setup, Challenge (unchanged) ⋯
+```
+
+Its exact form already varies by package profile --- `cryptocode` stays in math mode and adds a trailing `\\`; `nicodemus` prefixes `\item`; `algpseudocodex` uses `\Statex` --- but you can redefine it further if you want different wording or styling:
+
+```latex
+\renewcommand{\tfsegmentstub}[1]{\Statex \textcolor{gray}{[#1 unchanged]}}
+```
+
 ## Package-Specific Notes
 
 ### cryptocode (default)
