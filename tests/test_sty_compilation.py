@@ -75,6 +75,16 @@ def _assert_compiled(tmp_path: Path, result: subprocess.CompletedProcess[str]) -
     )
 
 
+def _pdftotext(tmp_path: Path) -> str:
+    """Extract plain text from the compiled ``test.pdf`` via ``pdftotext``."""
+    return subprocess.run(
+        ["pdftotext", str(tmp_path / "test.pdf"), "-"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    ).stdout
+
+
 # ---------------------------------------------------------------------------
 # Minimal preamble used by most synthetic tests
 # ---------------------------------------------------------------------------
@@ -730,3 +740,99 @@ def test_tfsegmentstub_defined_for_algpseudocodex(tmp_path):
     assert result.returncode == 0
     _assert_compiled(tmp_path, result)
     assert "Undefined control sequence" not in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# Task 6: crop-aware render pass
+# ---------------------------------------------------------------------------
+
+# Shared fixture body for the crop tests below: segment 0 (before the first
+# \tfsegment) holds the \begin{algorithmic} opener; "Initiator" is an
+# interior segment whose content is NOT \tfonly-tagged, so it never differs
+# between G0 and G1 (unchanged); "Responder" is the final segment (holds
+# \end{algorithmic}) and its \tfonly-gated line differs between G0 and G1
+# (changed).
+_CROP_SOURCE = r"""
+\tfgames{s}{G0,G1}
+\tfgamename{s}{G0}{G_0}
+\tfgamename{s}{G1}{G_1}
+\begin{tfsource}{s}
+\begin{algorithmic}[1]
+\tfsegment{Initiator}
+\State \(x \gets 0\)
+\tfsegment{Responder}
+\tfonly{G0}{\State \(y \gets 0\)}
+\tfonly{G1}{\State \(y \gets 1\)}
+\end{algorithmic}
+\end{tfsource}
+"""
+
+
+@needs_pdflatex
+def test_crop_stubs_unchanged_segment(tmp_path):
+    r"""A crop=on diff render stubs the unchanged interior "Initiator"
+    segment (with its caption) and keeps+highlights the changed final
+    "Responder" segment."""
+    tex = (
+        _ALGPSEUDOCODEX_PREAMBLE
+        + r"\tfcropdefault{on}"
+        + _CROP_SOURCE
+        + r"""
+\begin{document}
+\tfrendergame[diff=G0]{s}{G1}
+\end{document}
+"""
+    )
+    result = _compile_tex(tmp_path, tex)
+    assert result.returncode == 0
+    _assert_compiled(tmp_path, result)
+    text = _pdftotext(tmp_path)
+    assert "unchanged" in text
+    assert "Initiator" in text  # stub caption must reach the typeset output
+    assert "y" in text  # the changed Responder line's content is kept
+
+
+@needs_pdflatex
+def test_crop_off_renders_full(tmp_path):
+    r"""crop=off on the same fixture must fully render both segments -- no
+    stub, and the interior "Initiator" content is present too."""
+    tex = (
+        _ALGPSEUDOCODEX_PREAMBLE
+        + r"\tfcropdefault{on}"
+        + _CROP_SOURCE
+        + r"""
+\begin{document}
+\tfrendergame[diff=G0, crop=off]{s}{G1}
+\end{document}
+"""
+    )
+    result = _compile_tex(tmp_path, tex)
+    assert result.returncode == 0
+    _assert_compiled(tmp_path, result)
+    text = _pdftotext(tmp_path)
+    assert "unchanged" not in text
+    assert "x" in text  # interior "Initiator" line, always rendered
+    assert "y" in text  # final "Responder" line, always rendered
+
+
+@needs_pdflatex
+def test_crop_requires_diff_full(tmp_path):
+    r"""A no-diff clean render must never crop, even with
+    \tfcropdefault{on} set."""
+    tex = (
+        _ALGPSEUDOCODEX_PREAMBLE
+        + r"\tfcropdefault{on}"
+        + _CROP_SOURCE
+        + r"""
+\begin{document}
+\tfrendergame{s}{G0}
+\end{document}
+"""
+    )
+    result = _compile_tex(tmp_path, tex)
+    assert result.returncode == 0
+    _assert_compiled(tmp_path, result)
+    text = _pdftotext(tmp_path)
+    assert "unchanged" not in text
+    assert "x" in text
+    assert "y" in text
