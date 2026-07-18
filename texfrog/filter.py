@@ -303,22 +303,23 @@ def crop_to_active_segments(
     active: set[int],
     stub_macro: str = r"\tfsegmentstub",
 ) -> tuple[list[str], list[int]]:
-    """Rebuild ``lines`` keeping active segments, stubbing inactive runs.
+    """Rebuild ``lines`` keeping active segments, stubbing inactive ones.
 
     Segment 0 (preamble) and the final segment are always kept verbatim,
     matching the LaTeX macro ``\\__tf_seg_render_one:n`` in ``texfrog.sty``:
     the preamble typically holds an opening ``\\begin{...}`` and the final
     segment typically holds the matching ``\\end{...}``, so both must survive
-    cropping regardless of whether they changed. Each maximal run of
-    strictly-interior inactive segments (index in ``1..len(segs) - 2``)
-    collapses to a single ``\\tfsegmentstub{captions}`` line, captions joined
-    with ``", "`` (blank/None captions skipped; if the whole run has no
-    captions the stub argument is empty).
+    cropping regardless of whether they changed. Each strictly-interior
+    inactive segment (index in ``1..len(segs) - 2``) collapses to its own
+    ``\\tfsegmentstub{caption}`` line — one stub per segment, each on its own
+    line, so a run of several unchanged segments produces several stub lines
+    rather than a single comma-joined one (a blank/None caption yields an
+    empty stub argument).
 
     Args:
         lines: Filtered content lines (with markers) for the current game.
         active: Active segment indices from :func:`compute_active_segments`.
-        stub_macro: Macro name emitted for a stubbed run.
+        stub_macro: Macro name emitted for a stubbed segment.
 
     Returns:
         ``(new_lines, idx_map)`` where ``idx_map[k]`` is the original index of
@@ -337,30 +338,15 @@ def crop_to_active_segments(
 
     new_lines: list[str] = []
     idx_map: list[int] = []
-    pending_caps: list[str] = []
-    stub_pending = False  # whether the current inactive run has any segment
-
-    def flush_stub() -> None:
-        nonlocal stub_pending
-        if not pending_caps and not stub_pending:
-            return
-        caps = ", ".join(c for c in pending_caps if c)
-        new_lines.append(f"{stub_macro}{{{caps}}}")
-        idx_map.append(-1)
-        pending_caps.clear()
-        stub_pending = False
 
     last = len(segs) - 1
     for i, seg in enumerate(segs):
         keep = (i == 0) or (i == last) or (i in active)
         if keep:
-            flush_stub()
             for ln, oi in zip(seg.lines, orig_index[i]):
                 new_lines.append(ln)
                 idx_map.append(oi)
         else:
-            stub_pending = True
-            if seg.caption:
-                pending_caps.append(seg.caption)
-    flush_stub()
+            new_lines.append(f"{stub_macro}{{{seg.caption or ''}}}")
+            idx_map.append(-1)
     return new_lines, idx_map

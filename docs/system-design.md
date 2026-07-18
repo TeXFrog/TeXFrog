@@ -217,7 +217,7 @@ Wraps a changed line in `\tfchanged{content}`, with special handling:
 
 ## Segment Cropping (`\tfsegment`, `\tfcropdefault`, `crop=`)
 
-For proofs with many hops, a diffed render can end up dominated by lines carried over unchanged from earlier games. `\tfsegment{Caption}` markers, placed at block depth 0 inside a `tfsource` body, divide the source into segments; a cropped render keeps only the segments that changed vs. the diff target (plus the always-kept first and last segment) and collapses runs of unchanged interior segments into a single `\tfsegmentstub{captions}` line. The LaTeX package (`texfrog.sty`) and the Python HTML pipeline (`filter.py`/`output/html.py`) implement this independently, but with matching semantics (same keep-segment-0-and-final rule, same caption-joining).
+For proofs with many hops, a diffed render can end up dominated by lines carried over unchanged from earlier games. `\tfsegment{Caption}` markers, placed at block depth 0 inside a `tfsource` body, divide the source into segments; a cropped render keeps only the segments that changed vs. the diff target (plus the always-kept first and last segment) and collapses each unchanged interior segment into its own `\tfsegmentstub{caption}` line (one stub per segment, each on its own line). The LaTeX package (`texfrog.sty`) and the Python HTML pipeline (`filter.py`/`output/html.py`) implement this independently, but with matching semantics (same keep-segment-0-and-final rule, same one-stub-per-segment output).
 
 ### LaTeX mechanism (`texfrog.sty`, `\__tf_render_game_cropped:nnn`)
 
@@ -238,7 +238,7 @@ The HTML build path mirrors the same semantics without any expl3 machinery, oper
 
 - `split_into_segments(lines) -> list[Segment]` splits a game's filtered lines at `\tfsegment{caption}` marker lines (matched by `SEGMENT_RE`) into `Segment(caption, lines)` objects; content before the first marker becomes segment 0 with `caption=None`.
 - `compute_active_segments(target_lines, curr_lines) -> set[int]` splits both the diff target's and the current game's lines into segments (they align 1:1, since the marker sequence is identical across games sharing one source) and returns the indices of current segments whose non-blank content differs from the aligned target segment.
-- `crop_to_active_segments(lines, active, stub_macro=r"\tfsegmentstub") -> tuple[list[str], list[int]]` rebuilds the line list keeping segment 0, the final segment, and every segment in `active` --- mirroring the LaTeX keep-0-and-final rule. Each maximal run of skipped interior segments collapses to one `{stub_macro}{{captions}}` line (captions joined with `", "`, blank captions skipped). Returns `(new_lines, idx_map)`, where `idx_map[k]` is the original line index of `new_lines[k]` (or `-1` for a synthesized stub line), so callers can remap other per-line data against the cropped output.
+- `crop_to_active_segments(lines, active, stub_macro=r"\tfsegmentstub") -> tuple[list[str], list[int]]` rebuilds the line list keeping segment 0, the final segment, and every segment in `active` --- mirroring the LaTeX keep-0-and-final rule. Each skipped interior segment collapses to its own `{stub_macro}{{caption}}` line (one stub per segment, each on its own line; a blank/None caption yields an empty stub argument). Returns `(new_lines, idx_map)`, where `idx_map[k]` is the original line index of `new_lines[k]` (or `-1` for a synthesized stub line), so callers can remap other per-line data against the cropped output.
 - `_apply_crop` (`output/html.py`) is the call site: it combines `compute_active_segments` + `crop_to_active_segments` and remaps the `changed`-line index set through `idx_map`, so highlighting still lands on the correct (renumbered) lines in the cropped output.
 
 `_apply_crop` is called from `generate_html`'s per-game loop **only when `proof.crop_default` is true** --- there is no per-game HTML override; the `crop=` key on `\tfrendergame` is consumed only by `texfrog.sty`, for the PDF path. `proof.crop_default` is parsed once per document (`tex_parser.py`, via `_extract_one_arg(text, "tfcropdefault")` over the whole file) and applies to every `Proof`/source block parsed from that file, matching the LaTeX side's single global `\g__tf_crop_default_bool`.
@@ -333,11 +333,12 @@ output_dir/
 └── games/
     ├── G0.svg               # highlighted version (blue on new/changed lines)
     ├── G0-removed.svg       # removed version (red strikethrough on deleted/changed lines)
-    ├── G0-clean.svg         # clean version (no highlighting; only for related_games targets)
     ├── G0_commentary.svg    # rendered commentary (only if commentary was provided)
     ├── G1.svg
     ├── G1-removed.svg
     ├── G1_commentary.svg
+    ├── Red1-G0-clean.svg    # clean panel for reduction Red1's related game G0
+    ├── Red1-G1-clean.svg    # clean panel for reduction Red1's related game G1
     └── ...
 ```
 
@@ -345,8 +346,13 @@ Each game is compiled twice: once with `\tfchanged` highlighting (blue, for the
 current-game panel) and once with `\tfremoved` highlighting (red strikethrough, for
 the previous-game panel in side-by-side view showing lines that will be removed or
 changed in the next game). The last game does not need a removed SVG since it never
-appears as a "previous" game. Games referenced by a reduction's `related_games` also
-get a third "clean" compilation with no highlighting, used in the reduction's display.
+appears as a "previous" game. A reduction's `related_games` panels get a third
+"clean" compilation with no highlighting — one **per (reduction, related-game)
+pair**, named `{reduction}-{related}-clean.svg`. When cropping is on, all panels of
+a reduction (both related games *and* the reduction itself) are cropped to the same
+segment set, so the flanking clean panels line up with the reduction rather than
+showing a full listing (see below). A game related to two reductions therefore gets
+two distinct clean files (different crops).
 
 HTML features: MathJax for LaTeX names and descriptions, URL hash navigation (`#G1`),
 keyboard arrows, commentary rendered as SVG via the LaTeX pipeline, prev/next buttons,
@@ -364,6 +370,16 @@ Reductions support a `related_games` field listing zero, one, or two game labels
   on the right.
 - **2 related games**: the first clean game on the left, the highlighted reduction in
   the middle, the second clean game on the right.
+
+When `\tfcropdefault` is on, every panel of a reduction is cropped to a single shared
+segment set (`_reduction_active_segments`): the union of the segments where any two of
+the reduction's panels differ, plus the segments the reduction changes relative to its
+diff target. All panels therefore keep the *same* segments and stub the rest, so the
+reduction and its flanking related-game panels stay row-aligned. This set is generally
+wider than the reduction's own diff-vs-target set — two related games can differ in a
+segment the reduction leaves untouched (exactly the hop the reduction justifies), and
+that segment must stay visible in all three panels rather than being cropped away or
+shown only in a full, uncropped related-game listing.
 
 ### Live Reload (`watcher.py` + `output/html.py`)
 

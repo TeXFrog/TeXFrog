@@ -136,8 +136,18 @@ class PackageProfile:
             return r"\newcommand{\tfsegmentstub}[1]{" + body + r" \\}"
         if self.gamelabel_comment_cmd is None:  # nicodemus: \item-based list env
             return r"\newcommand{\tfsegmentstub}[1]{\item " + body + r"}"
-        # algpseudocodex: unnumbered continuation line
-        return r"\newcommand{\tfsegmentstub}[1]{\Statex " + body + r"}"
+        # algpseudocodex: unnumbered continuation line. algpseudocodex
+        # \pretocmd's its line-closing hook \algpx@endCodeCommand onto
+        # \State/\If/... but NOT onto \Statex, so a stub directly after a
+        # \State would push that \State's content below its own line number.
+        # Run the hook first (guarded, catcode-agnostic via \csname since the
+        # HTML preamble has no \makeatletter) so the preceding line renders
+        # normally. Mirrors the base \tfsegmentstub in latex/texfrog.sty.
+        hook = (
+            r"\ifcsname algpx@endCodeCommand\endcsname"
+            r"\csname algpx@endCodeCommand\endcsname\fi"
+        )
+        return r"\newcommand{\tfsegmentstub}[1]{" + hook + r"\Statex " + body + r"}"
 
     def procedure_header_def(self) -> str | None:
         r"""``\providecommand`` definition for the procedure header command.

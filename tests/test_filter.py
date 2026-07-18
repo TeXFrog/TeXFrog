@@ -435,10 +435,11 @@ def test_crop_keeps_final_segment_even_if_inactive():
     assert idx_map == [0, -1, 4, 5]
 
 
-def test_crop_stubs_multi_segment_interior_run_but_keeps_final():
-    """A purely-interior run of inactive segments still collapses to one
-    stub, while the final segment (also inactive here) is kept verbatim
-    rather than being absorbed into the trailing stub run."""
+def test_crop_stubs_each_interior_segment_on_its_own_line():
+    """Each strictly-interior inactive segment gets its own stub line
+    (no coalescing of a run into one comma-joined stub), while the final
+    segment (also inactive here) is kept verbatim rather than being
+    absorbed into a trailing stub."""
     lines = [
         r"\begin{algorithmic}",
         r"\tfsegment{A}",
@@ -452,14 +453,15 @@ def test_crop_stubs_multi_segment_interior_run_but_keeps_final():
         r"\end{algorithmic}",
     ]
     # segments: 0=preamble, 1=A (active), 2=B (inactive), 3=C (inactive),
-    # 4=D (last, inactive). B and C are strictly interior -> one stub.
-    # D is the final segment -> always kept, even though it's inactive.
+    # 4=D (last, inactive). B and C are strictly interior -> one stub each,
+    # on separate lines. D is the final segment -> always kept, even inactive.
     new_lines, idx_map = crop_to_active_segments(lines, active={1})
     assert new_lines == [
         r"\begin{algorithmic}",
         r"\State a",
-        r"\tfsegmentstub{B, C}",
+        r"\tfsegmentstub{B}",
+        r"\tfsegmentstub{C}",
         r"\State d",
         r"\end{algorithmic}",
     ]
-    assert idx_map == [0, 2, -1, 8, 9]
+    assert idx_map == [0, 2, -1, -1, 8, 9]

@@ -19,6 +19,7 @@ from texfrog.output.html import (
     _find_svg_converter,
     _load_template_resource,
     _pdf_to_svg,
+    _reduction_active_segments,
     _write_commentary_file,
     generate_html,
     generate_index_page,
@@ -69,6 +70,52 @@ def test_apply_crop_remaps_changed_indices():
         r"\end{algorithmic}",
     ]
     assert changed == {2}  # \State b2 now at index 2
+
+
+def _seg_lines(seg_a: str, seg_b: str) -> list[str]:
+    """A 3-interior-segment algpseudocodex body: A, B, and final C."""
+    return [
+        r"\begin{algorithmic}",
+        r"\tfsegment{A}",
+        seg_a,
+        r"\tfsegment{B}",
+        seg_b,
+        r"\tfsegment{C}",
+        r"\State c",
+        r"\end{algorithmic}",
+    ]
+
+
+def test_reduction_active_includes_related_pair_diff():
+    """Regression for the reduction-panel crop bug: the related-game panels
+    must be cropped to a set that includes the segment where the two related
+    games differ (the hop), even when the reduction's own diff-vs-target set
+    does not touch that segment. Otherwise the flanking clean panels either
+    show a full listing or hide the hop."""
+    games = {
+        # G5 and G6 differ in segment A (index 1) -- the hop.
+        "G5": _seg_lines(r"\State a", r"\State b"),
+        "G6": _seg_lines(r"\State a2", r"\State b"),
+        # Red differs from its diff target G6 only in segment B (index 2).
+        "Red": _seg_lines(r"\State a2", r"\State b2"),
+    }
+    active = _reduction_active_segments(
+        "Red", ["G5", "G6"], "G6", games.__getitem__,
+    )
+    # Segment 1 (G5 vs G6 hop) AND segment 2 (Red's own change) must both be
+    # kept. The reduction's own diff-vs-G6 set alone would be just {2}.
+    assert active == {1, 2}
+
+
+def test_reduction_active_single_related_game():
+    games = {
+        "G4": _seg_lines(r"\State a", r"\State b"),
+        "Red": _seg_lines(r"\State a", r"\State b2"),
+    }
+    active = _reduction_active_segments(
+        "Red", ["G4"], "G4", games.__getitem__,
+    )
+    assert active == {2}
 
 
 def test_html_tfsegmentstub_defined_for_each_profile():

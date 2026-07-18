@@ -69,8 +69,6 @@
 \int_new:N  \g__tf_seg_int               % current segment index during a pass
 \prop_new:N \g__tf_active_seg_prop       % active segment indices (scan result)
 \bool_new:N \g__tf_seg_changed_bool      % did current segment change? (scan)
-\tl_new:N   \g__tf_stub_caps_tl          % accumulated captions for a stub run
-\bool_new:N \g__tf_stub_pending_bool     % inside an inactive run?
 
 % --- Task 6: token-split crop-render state ---
 % \g__tf_seg_endpos_prop maps segment index -> the \g__tf_pos_int value
@@ -532,18 +530,28 @@
   }
 
 % User-redefinable stub shown in place of an unchanged, cropped-out
-% segment (Task 6 invokes this once per collapsed run of segments).
-% Base default targets algorithmicx-family packages (algpseudocodex), via
-% \Statex. cryptocode's pchstack lines are math-mode and \\-separated;
-% nicodemus's lines are \item-prefixed list entries -- override for those
-% profiles below, mirroring \tfchanged's \providecommand-base-then-
-% profile-override pattern. \providecommand only sets the meaning if
-% \tfsegmentstub is not already defined, so the \cs_gset_protected:Npn
-% overrides below (which unconditionally redefine it) always win when
-% their profile matches; for algpseudocodex neither override block's
-% condition matches, so this base definition is what remains in effect.
+% segment (emitted once per collapsed segment). Base default targets
+% algorithmicx-family packages (algpseudocodex), via \Statex. cryptocode's
+% pchstack lines are math-mode and \\-separated; nicodemus's lines are
+% \item-prefixed list entries -- override for those profiles below,
+% mirroring \tfchanged's \providecommand-base-then-profile-override
+% pattern. \providecommand only sets the meaning if \tfsegmentstub is not
+% already defined, so the \cs_gset_protected:Npn overrides below (which
+% unconditionally redefine it) always win when their profile matches; for
+% algpseudocodex neither override block's condition matches, so this base
+% definition is what remains in effect.
+%
+% \algpx@endCodeCommand: algpseudocodex \pretocmd's this line-closing hook
+% onto \State/\If/\For/... but NOT onto \Statex (plain algorithmicx
+% \item[]). A stub is a \Statex directly after the preceding segment's
+% last \State, so without running the hook first that \State's code box is
+% never closed and its content is pushed onto the line below its own line
+% number. Run the hook (if algpseudocodex is loaded) before \Statex so the
+% preceding numbered line renders normally. \cs_if_exist_use:c is a no-op
+% under other profiles / plain algorithmicx.
 \providecommand{\tfsegmentstub}[1]
-  {\Statex{\color{black!55}\ensuremath{\cdots}~\textit{#1~(unchanged)}~\ensuremath{\cdots}}}
+  {\cs_if_exist_use:c { algpx@endCodeCommand }
+   \Statex{\color{black!55}\ensuremath{\cdots}~\textit{#1~(unchanged)}~\ensuremath{\cdots}}}
 
 \tl_if_eq:NnT \g__tf_package_tl { cryptocode }
   {
@@ -992,30 +1000,13 @@
       }
   }
 
-% Note a strictly-interior inactive segment for the pending stub: mark a
-% run as pending and, if the segment had a (non-empty) caption, append it
-% to the accumulated caption list (comma-separated, matching the Python
-% crop_to_active_segments joiner).
-\cs_new_protected:Nn \__tf_seg_stub_note:n
+% Emit a \tfsegmentstub for a single strictly-interior inactive segment.
+% One stub per collapsed segment (each on its own line), matching the Python
+% crop_to_active_segments: a run of several unchanged segments produces
+% several stub lines rather than one comma-joined line.
+\cs_new_protected:Nn \__tf_seg_emit_stub:n
   {
-    \bool_gset_true:N \g__tf_stub_pending_bool
-    \tl_if_empty:nF { #1 }
-      {
-        \tl_if_empty:NF \g__tf_stub_caps_tl
-          { \tl_gput_right:Nn \g__tf_stub_caps_tl { ,~ } }
-        \tl_gput_right:Nn \g__tf_stub_caps_tl { #1 }
-      }
-  }
-
-% Emit \tfsegmentstub for a pending run (no-op if nothing is pending).
-\cs_new_protected:Nn \__tf_flush_stub_render:
-  {
-    \bool_if:NT \g__tf_stub_pending_bool
-      {
-        \tfsegmentstub { \g__tf_stub_caps_tl }
-        \tl_gclear:N \g__tf_stub_caps_tl
-        \bool_gset_false:N \g__tf_stub_pending_bool
-      }
+    \tfsegmentstub { #1 }
   }
 
 % Render (or stub) segment #1 (a plain integer, 0-based). Segment 0 and the
@@ -1031,25 +1022,21 @@
       { \int_compare_p:nNn { #1 } = { 0 } }
       { \int_compare_p:nNn { #1 } = { \g__tf_seg_last_int } }
       {
-        \__tf_flush_stub_render:
         \seq_item:Nn \g__tf_seg_bodies_seq { #1 + 1 }
       }
       {
         \prop_if_in:NnTF \g__tf_active_seg_prop { #1 }
           {
-            \__tf_flush_stub_render:
             \seq_item:Nn \g__tf_seg_bodies_seq { #1 + 1 }
           }
           {
             % \exp_args:Ne fully expands \seq_item:Nn's result (the
             % caption's actual characters) BEFORE it is passed to
-            % \__tf_seg_stub_note:n. Without this, #1 inside that macro
+            % \__tf_seg_emit_stub:n. Without this, #1 inside that macro
             % would be the literal, unexpanded call
-            % "\seq_item:Nn \g__tf_seg_caps_seq {...}" -- never empty per
-            % \tl_if_empty:nF, and stored as those raw (non-expanding-in-
-            % place) tokens by \tl_gput_right:Nn rather than as the
+            % "\seq_item:Nn \g__tf_seg_caps_seq {...}" rather than the
             % caption's characters.
-            \exp_args:Ne \__tf_seg_stub_note:n
+            \exp_args:Ne \__tf_seg_emit_stub:n
               { \seq_item:Nn \g__tf_seg_caps_seq { #1 } }
             \prop_get:NnNTF \g__tf_seg_endpos_prop { #1 } \l_tmpa_tl
               { \int_gset:Nn \g__tf_pos_int { \l_tmpa_tl } }
@@ -1106,15 +1093,10 @@
     % not inside \tfonly's dispatch.
     \bool_gset_true:N \g__tf_crop_active_bool
     \int_gset:Nn \g__tf_pos_int { 0 }
-    \tl_gclear:N \g__tf_stub_caps_tl
-    \bool_gset_false:N \g__tf_stub_pending_bool
     \int_gset:Nn \g__tf_mode_int { 2 }
     \tl_gset:Nn \g__tf_current_game_tl { #2 }
     \int_step_inline:nnn { 0 } { \g__tf_seg_last_int }
       { \__tf_seg_render_one:n { ##1 } }
-    \__tf_flush_stub_render: % flush a trailing inactive run (defensive; the
-                             % final segment is always kept, so this is
-                             % normally a no-op)
     \bool_gset_false:N \g__tf_crop_active_bool
     \int_gset:Nn \g__tf_mode_int { 0 }
   }

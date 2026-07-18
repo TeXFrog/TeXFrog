@@ -336,7 +336,7 @@ Cropping only ever applies to a *diffed* render (`diff=` present) --- a clean, n
 
 ### What a cropped render looks like
 
-A cropped render keeps segment 0, the final segment, and every segment that differs from the diff target (an add, change, or removal anywhere in that segment). Contiguous runs of unchanged interior segments collapse into a single `\tfsegmentstub{captions}` line, with the captions of the collapsed segments joined by `, `.
+A cropped render keeps segment 0, the final segment, and every segment that differs from the diff target (an add, change, or removal anywhere in that segment). Each unchanged interior segment collapses into its own `\tfsegmentstub{caption}` line — one stub per collapsed segment, each on its own line, so a run of several unchanged segments produces several stub lines.
 
 ### Redefining the stub: `\tfsegmentstub{captions}`
 

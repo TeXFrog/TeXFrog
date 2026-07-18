@@ -86,6 +86,20 @@ def _pdftotext(tmp_path: Path) -> str:
     ).stdout
 
 
+def _pdftotext_layout(tmp_path: Path) -> str:
+    """Like :func:`_pdftotext` but preserves horizontal layout (``-layout``).
+
+    Needed to check that a line number stays on the same physical line as its
+    statement's content (vertical alignment is lost without ``-layout``).
+    """
+    return subprocess.run(
+        ["pdftotext", "-layout", str(tmp_path / "test.pdf"), "-"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    ).stdout
+
+
 # ---------------------------------------------------------------------------
 # Minimal preamble used by most synthetic tests
 # ---------------------------------------------------------------------------
@@ -884,6 +898,55 @@ _CROP_SOURCE = r"""
 
 
 @needs_pdflatex
+def test_crop_stub_does_not_orphan_preceding_line_number(tmp_path):
+    r"""Regression: a stub is a \Statex, and algpseudocodex does not run its
+    line-closing hook (\algpx@endCodeCommand) on \Statex the way it does on
+    \State. So a stub emitted directly after a kept \State line would push
+    that \State's content onto the line *below* its own line number, leaving
+    the number orphaned. The base \tfsegmentstub runs the hook first; this
+    test asserts the numbered line's content (marked with a \Comment) stays
+    on the same physical line as its number."""
+    tex = (
+        _ALGPSEUDOCODEX_PREAMBLE
+        + r"\tfcropdefault{on}"
+        + r"""
+\tfgames{s}{G0,G1}
+\tfgamename{s}{G0}{G_0}
+\tfgamename{s}{G1}{G_1}
+\begin{tfsource}{s}
+\begin{algorithmic}[1]
+\tfsegment{First}
+\tfonly{G0}{\State \(a \gets 0\)}
+\tfonly{G1}{\State \(a \gets 1\)}
+\State \(z \gets 9\) \Comment{STAYPUT}
+\tfsegment{Middle}
+\State \(m \gets 0\)
+\tfsegment{Last}
+\State \(w \gets 0\)
+\end{algorithmic}
+\end{tfsource}
+\begin{document}
+\tfrendergame[diff=G0]{s}{G1}
+\end{document}
+"""
+    )
+    result = _compile_tex(tmp_path, tex)
+    assert result.returncode == 0
+    _assert_compiled(tmp_path, result)
+    # "Middle" is unchanged -> stubbed, directly after the STAYPUT \State line.
+    layout = _pdftotext_layout(tmp_path)
+    assert "unchanged" in layout  # the Middle stub was emitted
+    # The STAYPUT line must begin with its line number ("N:  ... STAYPUT"),
+    # not be orphaned onto a line of its own below a bare number.
+    stayput_lines = [ln for ln in layout.splitlines() if "STAYPUT" in ln]
+    assert stayput_lines, "STAYPUT comment did not reach the typeset output"
+    assert re.match(r"\s*\d+:\s", stayput_lines[0]), (
+        "line number was orphaned from its content: "
+        f"{stayput_lines[0]!r}"
+    )
+
+
+@needs_pdflatex
 def test_crop_stubs_unchanged_segment(tmp_path):
     r"""A crop=on diff render stubs the unchanged interior "Initiator"
     segment (with its caption) and keeps+highlights the changed final
@@ -1010,10 +1073,10 @@ def test_crop_position_alignment_after_skip(tmp_path):
 
 
 @needs_pdflatex
-def test_crop_coalesces_consecutive_inactive_interiors(tmp_path):
-    r"""Two consecutive unchanged interior segments ("Alpha", "Beta")
-    collapse into a SINGLE stub whose caption joins both names, rather than
-    emitting one stub per skipped segment."""
+def test_crop_stubs_consecutive_inactive_interiors_separately(tmp_path):
+    r"""Two consecutive unchanged interior segments ("Alpha", "Beta") each
+    emit their OWN stub line (one per skipped segment, on separate lines),
+    rather than collapsing into a single comma-joined stub."""
     tex = (
         _ALGPSEUDOCODEX_PREAMBLE
         + r"\tfcropdefault{on}"
@@ -1042,8 +1105,12 @@ def test_crop_coalesces_consecutive_inactive_interiors(tmp_path):
     assert result.returncode == 0
     _assert_compiled(tmp_path, result)
     text = _pdftotext(tmp_path)
-    assert "Alpha, Beta" in text
-    assert text.count("unchanged") == 1
+    # One stub per skipped segment, on separate lines -- not a single
+    # coalesced "Alpha, Beta" stub.
+    assert "Alpha, Beta" not in text
+    assert "Alpha" in text
+    assert "Beta" in text
+    assert text.count("unchanged") == 2
     assert "9" in text  # the changed final "Gamma" content is kept
 
 
