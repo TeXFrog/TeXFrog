@@ -125,6 +125,37 @@ class TestValidateProof:
         warnings = validate_proof(proof, tmp_path)
         assert any("depth" in w.lower() or "inside" in w.lower() for w in warnings)
 
+    @pytest.mark.parametrize(
+        "opener,closer",
+        [
+            (r"\Function{Foo}{x}", r"\EndFunction"),
+            (r"\Procedure{Foo}{x}", r"\EndProcedure"),
+            (r"\Loop", r"\EndLoop"),
+            (r"\Repeat", r"\Until{c}"),
+        ],
+    )
+    def test_warns_segment_inside_block(
+        self, minimal_proof_factory, tmp_path, opener, closer
+    ):
+        """\\tfsegment inside a \\Function/\\Procedure/\\Loop/\\Repeat block
+        must warn like \\If -- cropping can drop the opener while keeping the
+        closer, unbalancing the block."""
+        src = f"{opener}\n\\State a\n\\tfsegment{{Bad}}\n\\State b\n{closer}\n"
+        proof = minimal_proof_factory(source_text=src)
+        warnings = validate_proof(proof, tmp_path)
+        assert any("depth" in w.lower() for w in warnings), warnings
+
+    def test_no_depth_warning_for_forall_double_count(
+        self, minimal_proof_factory, tmp_path
+    ):
+        """A \\ForAll ... \\EndFor block returns to depth 0 (it is counted
+        once, via the \\For opener prefix, not twice), so a \\tfsegment placed
+        after the block closes is NOT flagged."""
+        src = "\\ForAll{x}\n\\State a\n\\EndFor\n\\tfsegment{OK}\n\\State b\n"
+        proof = minimal_proof_factory(source_text=src)
+        warnings = validate_proof(proof, tmp_path)
+        assert not any("depth" in w.lower() for w in warnings), warnings
+
     def test_warns_crop_without_segments(self, minimal_proof_factory, tmp_path):
         """\\tfcropdefault on but no \\tfsegment markers should warn."""
         proof = minimal_proof_factory(source_text="\\State a\n", crop_default=True)

@@ -63,17 +63,26 @@ def validate_proof(proof: Proof, base_dir: Path) -> list[str]:
             )
 
     # Segment warnings for cropping feature.
-    # Block-depth tracking is intentionally limited to the algpseudocodex block
-    # commands \If/\For/\While (and their \End... closers); \Procedure,
-    # \Function, \Loop and \Repeat are not tracked, so a \tfsegment misplaced
-    # inside one of those will not be flagged. This matches the spec's scoped
-    # check and keeps the heuristic from raising false positives on constructs
-    # other packages spell differently.
+    # Block-depth tracking covers the algpseudocodex block commands whose
+    # opener and closer can straddle a \tfsegment boundary: \If/\For/\While,
+    # plus \Function/\Procedure/\Loop/\Repeat. A marker nested inside any of
+    # these sits at nonzero depth, so cropping could drop the opener while
+    # keeping the closer (or vice versa) and produce an unbalanced block --
+    # the same failure class for all of them (unlike cryptocode's distinct
+    # brace-group split failure). \ForAll is caught by the \For prefix and
+    # is deliberately not listed separately, so a \ForAll line is not counted
+    # twice.
     src_lines = proof.source_text.split("\n")
     seg_count = 0
     depth = 0
-    _OPENERS = (r"\If", r"\For", r"\While")
-    _CLOSERS = (r"\EndIf", r"\EndFor", r"\EndWhile")
+    _OPENERS = (
+        r"\If", r"\For", r"\While",
+        r"\Function", r"\Procedure", r"\Loop", r"\Repeat",
+    )
+    _CLOSERS = (
+        r"\EndIf", r"\EndFor", r"\EndWhile",
+        r"\EndFunction", r"\EndProcedure", r"\EndLoop", r"\Until",
+    )
     for ln in src_lines:
         stripped = ln.strip()
         m = SEGMENT_RE.match(ln)
@@ -87,7 +96,8 @@ def validate_proof(proof: Proof, base_dir: Path) -> list[str]:
             if depth != 0:
                 warnings.append(
                     f"{proof.source_name}: \\tfsegment{{{m.group('caption')}}} "
-                    f"is at block depth {depth} (inside \\If/\\For/\\While); "
+                    f"is at block depth {depth} (inside a block such as "
+                    "\\If/\\For/\\While/\\Function/\\Procedure/\\Loop/\\Repeat); "
                     "segments must start at depth 0 to crop safely."
                 )
         elif _TFSEGMENT_OCCURRENCE_RE.search(ln):

@@ -245,7 +245,7 @@ The HTML build path mirrors the same semantics without any expl3 machinery, oper
 
 ### Validation (`validate.py`)
 
-`validate_proof` scans the raw source text for `\tfsegment{...}` markers plus a crude `\If`/`\For`/`\While` ... `\EndIf`/`\EndFor`/`\EndWhile` depth counter, warning on:
+`validate_proof` scans the raw source text for `\tfsegment{...}` markers plus a crude block-depth counter over `\If`/`\For`/`\While`/`\Function`/`\Procedure`/`\Loop`/`\Repeat` and their closers (`\ForAll` is counted once, via the `\For` opener prefix), warning on:
 
 - a marker with an empty caption,
 - a marker found at nonzero depth (inside an open block),
