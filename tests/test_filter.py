@@ -465,3 +465,78 @@ def test_crop_stubs_each_interior_segment_on_its_own_line():
         r"\end{algorithmic}",
     ]
     assert idx_map == [0, 2, -1, -1, 8, 9]
+
+
+def test_crop_injects_absolute_line_counter_resets():
+    """With ``line_counter`` set, a \\setcounter is inserted before each kept
+    segment after segment 0, holding the count of numbered lines in all
+    preceding segments of the full input (so kept lines keep absolute
+    numbers, jumping across stubs)."""
+    lines = [
+        r"\begin{algorithmic}[1]",
+        r"\tfsegment{Alpha}",
+        r"\State a1",
+        r"\State a2",
+        r"\tfsegment{Beta}",
+        r"\State b1",
+        r"\State b2",
+        r"\tfsegment{Gamma}",
+        r"\State g",
+        r"\end{algorithmic}",
+    ]
+    # Full numbering: a1=1 a2=2 b1=3 b2=4 g=5. Keep seg0 + final (Gamma);
+    # Alpha and Beta stubbed. Gamma (index 3) starts after 4 numbered lines,
+    # so its \State g must resume at absolute line 5 -> \setcounter{..}{4}.
+    new_lines, idx_map = crop_to_active_segments(
+        lines, active=set(), line_counter="ALG@line",
+    )
+    assert new_lines == [
+        r"\begin{algorithmic}[1]",
+        r"\tfsegmentstub{Alpha}",
+        r"\tfsegmentstub{Beta}",
+        r"\setcounter{ALG@line}{4}",
+        r"\State g",
+        r"\end{algorithmic}",
+    ]
+    # The \setcounter line is synthetic (idx_map -1), like the stubs.
+    assert idx_map == [0, -1, -1, -1, 8, 9]
+
+
+def test_crop_line_counter_reset_for_active_interior_segment():
+    """A kept interior (active) segment also gets a \\setcounter reset to its
+    absolute start, not just the final segment."""
+    lines = [
+        r"\begin{algorithmic}[1]",
+        r"\tfsegment{Alpha}",
+        r"\State a1",
+        r"\State a2",
+        r"\tfsegment{Beta}",
+        r"\State b",
+        r"\tfsegment{Gamma}",
+        r"\State g",
+        r"\end{algorithmic}",
+    ]
+    # Keep Beta (active, index 2). Alpha stubbed. Beta starts after 2
+    # numbered lines (a1,a2) -> \setcounter{ALG@line}{2}; its \State b is
+    # absolute line 3.
+    new_lines, _ = crop_to_active_segments(
+        lines, active={2}, line_counter="ALG@line",
+    )
+    assert r"\setcounter{ALG@line}{2}" in new_lines
+    # No reset is emitted for segment 0.
+    assert new_lines[0] == r"\begin{algorithmic}[1]"
+    assert new_lines[1] != r"\setcounter{ALG@line}{0}"
+
+
+def test_crop_no_line_counter_by_default():
+    """Without ``line_counter``, no \\setcounter lines are injected."""
+    lines = [
+        r"\begin{algorithmic}[1]",
+        r"\tfsegment{Alpha}",
+        r"\State a",
+        r"\tfsegment{Beta}",
+        r"\State b",
+        r"\end{algorithmic}",
+    ]
+    new_lines, _ = crop_to_active_segments(lines, active=set())
+    assert not any("setcounter" in ln for ln in new_lines)

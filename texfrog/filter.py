@@ -23,6 +23,21 @@ _ITEM_PREFIX = re.compile(r"^(\s*\\item\s*)")
 # unnumbered continuation lines) as \State followed by stray "x ...".
 _STATE_PREFIX = re.compile(r"^(\s*\\State\b\s*)")
 
+# Matches a pseudocode line that algpseudocodex counts as a NUMBERED line
+# (with the `[1]` line-numbering option). Every statement/block command
+# numbers; \Statex (unnumbered continuation) does not -- the \b after State
+# excludes \Statex, since "State" is immediately followed by the word char
+# "x" there, so no word boundary matches. This assumes default algpseudocodex
+# numbering (no ``noEnd`` option, under which \End... lines would not number);
+# it is used only to reproduce the LaTeX crop-render's ABSOLUTE line numbers
+# in the HTML output. The PDF uses the real ALG@line counter and is always
+# exact; the HTML relies on this heuristic matching it.
+_NUMBERED_LINE_RE = re.compile(
+    r"^\s*\\(?:State|If|ElsIf|Else|For|ForAll|While|Repeat|Until|Loop"
+    r"|EndLoop|Function|Procedure|EndFunction|EndProcedure|EndIf|EndFor"
+    r"|EndWhile|Require|Ensure|Return)\b"
+)
+
 # Matches a \tfsegment{caption} marker line (optional leading whitespace).
 # The caption charset is ``[^{}]*`` to stay in parity with the LaTeX-side
 # marker regex in ``texfrog.sty`` (``\c{tfsegment} \{ [^\{\}]* \}``): a caption
@@ -269,6 +284,14 @@ def _seg_content(seg: Segment) -> list[str]:
     return [ln for ln in seg.lines if ln.strip()]
 
 
+def _count_numbered_lines(lines: list[str]) -> int:
+    """Count algpseudocodex-numbered lines in a list of source lines.
+
+    See :data:`_NUMBERED_LINE_RE` for what counts as numbered.
+    """
+    return sum(1 for ln in lines if _NUMBERED_LINE_RE.match(ln))
+
+
 def compute_active_segments(
     target_lines: list[str], curr_lines: list[str]
 ) -> set[int]:
@@ -302,6 +325,7 @@ def crop_to_active_segments(
     lines: list[str],
     active: set[int],
     stub_macro: str = r"\tfsegmentstub",
+    line_counter: str | None = None,
 ) -> tuple[list[str], list[int]]:
     """Rebuild ``lines`` keeping active segments, stubbing inactive ones.
 
@@ -316,14 +340,25 @@ def crop_to_active_segments(
     rather than a single comma-joined one (a blank/None caption yields an
     empty stub argument).
 
+    When ``line_counter`` is given (e.g. ``"ALG@line"`` for algpseudocodex), a
+    ``\\setcounter{<line_counter>}{N}`` line is inserted before each kept
+    segment after segment 0, where ``N`` is the number of numbered lines in all
+    preceding segments of the *full* (uncropped) input. This gives kept lines
+    their ABSOLUTE numbers from the full listing (numbers jump across a stub),
+    mirroring the LaTeX crop-render's line-count pass. Injected lines get an
+    ``idx_map`` entry of ``-1``, like stubs.
+
     Args:
         lines: Filtered content lines (with markers) for the current game.
         active: Active segment indices from :func:`compute_active_segments`.
         stub_macro: Macro name emitted for a stubbed segment.
+        line_counter: LaTeX line-number counter name to reset per kept segment
+            for absolute numbering, or ``None`` to disable (no injection).
 
     Returns:
         ``(new_lines, idx_map)`` where ``idx_map[k]`` is the original index of
-        ``new_lines[k]`` in ``lines``, or ``-1`` for a synthesized stub line.
+        ``new_lines[k]`` in ``lines``, or ``-1`` for a synthesized stub or
+        ``\\setcounter`` line.
     """
     segs = split_into_segments(lines)
     # Precompute, for each segment, the original index of its first content line.
@@ -336,6 +371,14 @@ def crop_to_active_segments(
         orig_index.append(idxs)
         cursor += len(seg.lines)
 
+    # Absolute starting line number of each segment: numbered lines in all
+    # preceding segments of the full input.
+    start_line: list[int] = []
+    running = 0
+    for seg in segs:
+        start_line.append(running)
+        running += _count_numbered_lines(seg.lines)
+
     new_lines: list[str] = []
     idx_map: list[int] = []
 
@@ -343,6 +386,11 @@ def crop_to_active_segments(
     for i, seg in enumerate(segs):
         keep = (i == 0) or (i == last) or (i in active)
         if keep:
+            if line_counter is not None and i > 0:
+                new_lines.append(
+                    f"\\setcounter{{{line_counter}}}{{{start_line[i]}}}"
+                )
+                idx_map.append(-1)
             for ln, oi in zip(seg.lines, orig_index[i]):
                 new_lines.append(ln)
                 idx_map.append(oi)

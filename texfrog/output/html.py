@@ -57,6 +57,7 @@ def _crop_with_active(
     curr_lines: list[str],
     active: set[int],
     changed: set[int],
+    line_counter: str | None = None,
 ) -> tuple[list[str], set[int]]:
     """Crop ``curr_lines`` to an explicit active-segment set and remap indices.
 
@@ -65,11 +66,15 @@ def _crop_with_active(
         active: Segment indices to keep (segment 0 and the final segment are
             always kept regardless).
         changed: 0-based changed indices into ``curr_lines``.
+        line_counter: LaTeX line-number counter for absolute numbering, or
+            ``None``. Passed through to :func:`crop_to_active_segments`.
 
     Returns:
         ``(cropped_lines, remapped_changed)``.
     """
-    cropped, idx_map = crop_to_active_segments(curr_lines, active)
+    cropped, idx_map = crop_to_active_segments(
+        curr_lines, active, line_counter=line_counter,
+    )
     remapped = {k for k, orig in enumerate(idx_map) if orig in changed}
     return cropped, remapped
 
@@ -78,6 +83,7 @@ def _apply_crop(
     curr_lines: list[str],
     prev_lines: list[str],
     changed: set[int],
+    line_counter: str | None = None,
 ) -> tuple[list[str], set[int]]:
     """Crop ``curr_lines`` to changed segments and remap ``changed`` indices.
 
@@ -85,12 +91,14 @@ def _apply_crop(
         curr_lines: Filtered lines for the current game (with markers).
         prev_lines: Filtered lines for the diff-target game (with markers).
         changed: 0-based changed indices into ``curr_lines``.
+        line_counter: LaTeX line-number counter for absolute numbering, or
+            ``None``. Passed through to :func:`crop_to_active_segments`.
 
     Returns:
         ``(cropped_lines, remapped_changed)``.
     """
     active = compute_active_segments(prev_lines, curr_lines)
-    return _crop_with_active(curr_lines, active, changed)
+    return _crop_with_active(curr_lines, active, changed, line_counter)
 
 
 def _reduction_active_segments(
@@ -649,6 +657,10 @@ def generate_html(
         proof.package, user_preamble, commentary=True,
     )
 
+    # Line-number counter for absolute numbering across crops (algpseudocodex
+    # only; None for packages that don't number lines).
+    line_counter = profile.line_counter_name
+
     # Step 1: generate per-game LaTeX files in a temp directory.
     with contextlib.ExitStack() as stack:
         if keep_tmp:
@@ -718,11 +730,12 @@ def generate_html(
                     )
                     reduction_active[label] = active
                     game_lines, changed = _crop_with_active(
-                        game_lines, active, changed
+                        game_lines, active, changed, line_counter
                     )
                 else:
                     game_lines, changed = _apply_crop(
-                        game_lines, _filter_game(prev_label), changed
+                        game_lines, _filter_game(prev_label), changed,
+                        line_counter,
                     )
 
             _write_game_file(
@@ -754,7 +767,9 @@ def generate_html(
             out_prev_lines = prev_lines
             if proof.crop_default:
                 active = compute_active_segments(next_lines, prev_lines)
-                out_prev_lines, idx_map = crop_to_active_segments(prev_lines, active)
+                out_prev_lines, idx_map = crop_to_active_segments(
+                    prev_lines, active, line_counter=line_counter,
+                )
                 removed_indices = {
                     k for k, orig in enumerate(idx_map) if orig in removed_indices
                 }
@@ -779,7 +794,9 @@ def generate_html(
             for rg_label in game.related_games:
                 rg_lines = _filter_game(rg_label)
                 if active is not None:
-                    rg_lines, _ = _crop_with_active(rg_lines, active, set())
+                    rg_lines, _ = _crop_with_active(
+                        rg_lines, active, set(), line_counter,
+                    )
                 _write_game_file(
                     rg_label, rg_lines, set(),
                     latex_dir / f"{game.label}-{rg_label}-clean.tex",

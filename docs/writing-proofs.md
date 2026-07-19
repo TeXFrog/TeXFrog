@@ -338,6 +338,8 @@ Cropping only ever applies to a *diffed* render (`diff=` present) --- a clean, n
 
 A cropped render keeps segment 0, the final segment, and every segment that differs from the diff target (an add, change, or removal anywhere in that segment). Each unchanged interior segment collapses into its own `\tfsegmentstub{caption}` line — one stub per collapsed segment, each on its own line, so a run of several unchanged segments produces several stub lines.
 
+**Line numbers stay absolute** (`algpseudocodex` only). When the pseudocode is numbered (`\begin{algorithmic}[1]`), the kept lines keep the numbers they hold in the *full* listing, so a given line has the same number in every game's render. Because the collapsed lines keep their numbers too, the visible numbering **jumps** across each stub (e.g. `15` then `47`) — the gap signals how much was elided, alongside the `(unchanged)` caption. This works in both the PDF and the HTML viewer. Packages that don't number lines (`cryptocode`, `nicodemus`) are unaffected.
+
 ### Redefining the stub: `\tfsegmentstub{captions}`
 
 The elision line is produced by the user-redefinable macro `\tfsegmentstub{captions}`, which receives the joined caption text as its single argument. The base default renders a dimmed, unnumbered line, e.g.:

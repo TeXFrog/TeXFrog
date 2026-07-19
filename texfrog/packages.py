@@ -49,6 +49,17 @@ class PackageProfile:
     uses structural braces (``endswith("{")``) to mark headers instead.
     """
 
+    line_counter_name: str | None = None
+    """Name of the LaTeX counter this package uses for line numbers, or
+    ``None`` if the package does not number lines.
+
+    When set (``"ALG@line"`` for algpseudocodex), a cropped HTML render
+    injects ``\\setcounter{<name>}{N}`` before each kept segment so the kept
+    lines keep their ABSOLUTE numbers from the full listing (numbers jump
+    across a stub instead of renumbering contiguously), matching the LaTeX
+    crop-render's line-count pass in ``texfrog.sty``.
+    """
+
     # -- Derived macro definitions ------------------------------------------
 
     def html_tfchanged(self) -> str:
@@ -200,6 +211,7 @@ BUILTIN_PROFILES: dict[str, PackageProfile] = {
         # \providecommand is a no-op here (already defined) — this name only
         # drives wrap_changed_line()'s header-skip detection.
         procedure_header_cmd="Procedure",
+        line_counter_name="ALG@line",
     ),
 }
 

@@ -971,6 +971,49 @@ def test_crop_stubs_unchanged_segment(tmp_path):
 
 
 @needs_pdflatex
+def test_crop_keeps_absolute_line_numbers(tmp_path):
+    r"""A cropped render keeps kept lines' ABSOLUTE line numbers from the full
+    listing: numbers jump across a stub instead of renumbering contiguously.
+    Here p=1, Alpha=(2,3), Beta=(4,5) are stubbed, and the changed Gamma line
+    is line 6 in the full listing -- it must render as "6:", not "2:"."""
+    tex = (
+        _ALGPSEUDOCODEX_PREAMBLE
+        + r"\tfcropdefault{on}"
+        + r"""
+\tfgames{s}{G0,G1}
+\tfgamename{s}{G0}{G_0}
+\tfgamename{s}{G1}{G_1}
+\begin{tfsource}{s}
+\begin{algorithmic}[1]
+\State \(p \gets 0\)
+\tfsegment{Alpha}
+\State \(a1 \gets 0\)
+\State \(a2 \gets 0\)
+\tfsegment{Beta}
+\State \(b1 \gets 0\)
+\State \(b2 \gets 0\)
+\tfsegment{Gamma}
+\tfonly{G0}{\State \(z \gets 0\) \Comment{TAILMARK}}
+\tfonly{G1}{\State \(z \gets 1\) \Comment{TAILMARK}}
+\end{algorithmic}
+\end{tfsource}
+\begin{document}
+\tfrendergame[diff=G0]{s}{G1}
+\end{document}
+"""
+    )
+    result = _compile_tex(tmp_path, tex)
+    assert result.returncode == 0
+    _assert_compiled(tmp_path, result)
+    layout = _pdftotext_layout(tmp_path)
+    tail = [ln for ln in layout.splitlines() if "TAILMARK" in ln]
+    assert tail, "TAILMARK line missing from output"
+    # Absolute number 6 (its position in the full listing), not 2 (its
+    # position among the kept lines).
+    assert re.match(r"\s*6:\s", tail[0]), tail[0]
+
+
+@needs_pdflatex
 def test_crop_off_renders_full(tmp_path):
     r"""crop=off on the same fixture must fully render both segments -- no
     stub, and the interior "Initiator" content is present too."""
