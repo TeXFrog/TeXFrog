@@ -80,7 +80,7 @@
 \prop_new:N \g__tf_seg_endpos_prop
 % \g__tf_seg_startline_prop maps segment index -> the algpseudocodex line
 % counter (ALG@line) value recorded at that segment's opening boundary during
-% the line-count pass (mode 6). Used to restore ABSOLUTE line numbers in a
+% the scan pass (mode 5). Used to restore ABSOLUTE line numbers in a
 % cropped render: before each kept segment the counter is set to this value,
 % so kept lines keep the numbers they would have in the full listing (numbers
 % jump across a stub instead of renumbering contiguously). Populated only when
@@ -460,8 +460,6 @@
                    { \__tf_only_figure:nn { #2 } { #3 } }
                }
         { 5 } { \__tf_only_scan:nn { #2 } { #3 } }
-        { 6 } { \__tf_only_clean:nn { #2 } { #3 } } % line-count pass: emit so
-                                                    % ALG@line steps as normal
       }
       { } % unknown mode: do nothing
   }
@@ -489,7 +487,6 @@
     \int_case:nnF { \g__tf_mode_int }
       {
         { 5 } { \__tf_seg_boundary_scan: }
-        { 6 } { \__tf_seg_boundary_countline: }
         { 2 } { \bool_if:NT \g__tf_crop_active_bool { \__tf_seg_boundary_render:n { #1 } } }
       }
       { } % all other modes: pure no-op (invisible)
@@ -512,24 +509,24 @@
     % this was Task 6b's position-alignment bug.
     \prop_gput:Nee \g__tf_seg_endpos_prop
       { \int_use:N \g__tf_seg_int } { \int_use:N \g__tf_pos_int }
+    % Record the ABSOLUTE starting line number of the segment that begins at
+    % this boundary: the algpseudocodex line counter (ALG@line) reached so far
+    % is the number of numbered lines in all preceding segments. The scan pass
+    % now emits the current game's content (see \__tf_only_scan:nn), so the
+    % counter is accurate here. \g__tf_seg_int is the index of the segment
+    % that just ended, so the new segment's index is \g__tf_seg_int + 1.
+    % \arabic{ALG@line} fully expands to the counter's digits (the name's `@'
+    % is a plain character inside the braced argument, so no catcode juggling
+    % is needed under \ExplSyntaxOn). Guarded so it is a pure no-op for
+    % packages without a line counter (cryptocode/nicodemus). Segment 0 gets
+    % no entry; \begin{algorithmic} resets ALG@line to 0 for it.
+    \cs_if_exist:cT { c@ALG@line }
+      {
+        \prop_gput:Nee \g__tf_seg_startline_prop
+          { \int_eval:n { \g__tf_seg_int + 1 } } { \arabic { ALG@line } }
+      }
     \int_gincr:N \g__tf_seg_int
     \bool_gset_false:N \g__tf_seg_changed_bool
-  }
-
-% Line-count pass (mode 6): at a segment's opening boundary, record the
-% algpseudocodex line counter (ALG@line) reached so far -- i.e. the number of
-% numbered lines in all preceding segments -- as the ABSOLUTE starting line
-% number for the segment that begins here. \g__tf_seg_int at this point is the
-% index of the segment that just ended, so the new segment's index is
-% \g__tf_seg_int + 1. \arabic{ALG@line} fully expands to the counter's digits
-% (the counter name's `@' is a plain character inside the braced argument, so
-% no catcode juggling is needed under \ExplSyntaxOn). Segment 0 gets no entry;
-% \begin{algorithmic} resets ALG@line to 0 for it in the render pass.
-\cs_new_protected:Nn \__tf_seg_boundary_countline:
-  {
-    \prop_gput:Nee \g__tf_seg_startline_prop
-      { \int_eval:n { \g__tf_seg_int + 1 } } { \arabic { ALG@line } }
-    \int_gincr:N \g__tf_seg_int
   }
 
 % Before rendering a kept segment, restore its absolute line number by setting
@@ -671,9 +668,19 @@
         \prop_if_in:NeF \g__tf_recorded_prop
           { \int_use:N \g__tf_pos_int }
           { \bool_gset_true:N \g__tf_seg_changed_bool }
+        % Emit the content (into the discarded scan vbox) so the line-number
+        % counter (ALG@line, algpseudocodex) steps for this game's \tfonly
+        % lines too -- untagged lines already execute normally in the scan
+        % pass. \__tf_seg_boundary_scan: reads \arabic{ALG@line} at each
+        % boundary to record absolute per-segment start lines, folding the
+        % old separate line-count pass into this one. Mirrors
+        % \__tf_only_record:nn, which likewise emits into its discarded vbox.
+        #2
       }
       {
-        % not in current: changed iff it WAS recorded in target (a removal)
+        % not in current: changed iff it WAS recorded in target (a removal).
+        % Do NOT emit -- this line is absent from the current game, so it must
+        % not advance the line counter.
         \prop_if_in:NeT \g__tf_recorded_prop
           { \int_use:N \g__tf_pos_int }
           { \bool_gset_true:N \g__tf_seg_changed_bool }
@@ -1101,10 +1108,15 @@
     \vbox_set:Nn \g__tf_scratch_box { \tl_use:c { g__tf_source_ #1 _tl } }
     \box_gclear:N \g__tf_scratch_box
 
-    % Pass B: scan current game (mode 5), collecting active segment
-    % indices and each segment's ending \tfonly position.
+    % Pass B: scan current game (mode 5), collecting active segment indices,
+    % each segment's ending \tfonly position, AND (when the algpseudocodex
+    % ALG@line counter exists) each segment's absolute starting line number.
+    % The scan pass emits the current game's content into its discarded vbox
+    % (see \__tf_only_scan:nn), so ALG@line steps correctly here -- no
+    % separate line-count pass is needed.
     \prop_gclear:N \g__tf_active_seg_prop
     \prop_gclear:N \g__tf_seg_endpos_prop
+    \prop_gclear:N \g__tf_seg_startline_prop
     \int_gset:Nn \g__tf_pos_int { 0 }
     \int_gset:Nn \g__tf_seg_int { 0 }
     \bool_gset_false:N \g__tf_seg_changed_bool
@@ -1123,25 +1135,6 @@
     \prop_gput:Nee \g__tf_seg_endpos_prop
       { \int_use:N \g__tf_seg_int } { \int_use:N \g__tf_pos_int }
     \int_gset_eq:NN \g__tf_seg_last_int \g__tf_seg_int
-
-    % Pass B2: line-count pass (mode 6). Runs only when the algpseudocodex
-    % line counter ALG@line exists. Executes the current game's full source in
-    % a discarded box -- emitting \tfonly content (unlike the mode-5 scan) so
-    % ALG@line steps for every numbered line -- and records each segment's
-    % absolute starting line number at its opening boundary
-    % (\g__tf_seg_startline_prop). \g__tf_seg_int is reused (Pass B already
-    % saved \g__tf_seg_last_int). LaTeX counters are global, so the recorded
-    % values survive the box; \begin{algorithmic} in Pass C's segment 0 resets
-    % ALG@line before the real render.
-    \prop_gclear:N \g__tf_seg_startline_prop
-    \cs_if_exist:cT { c@ALG@line }
-      {
-        \int_gset:Nn \g__tf_seg_int { 0 }
-        \int_gset:Nn \g__tf_mode_int { 6 }
-        \tl_gset:Nn \g__tf_current_game_tl { #2 }
-        \vbox_set:Nn \g__tf_scratch_box { \tl_use:c { g__tf_source_ #1 _tl } }
-        \box_gclear:N \g__tf_scratch_box
-      }
 
     % Split the source into per-segment token lists (Pass B established
     % the same numbering via \tfsegment execution order).
