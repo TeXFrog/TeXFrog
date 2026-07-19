@@ -436,6 +436,10 @@
   {
     \tl_gclear_new:c { g__tf_source_ #1 _tl }
     \tl_gset:cn { g__tf_source_ #1 _tl } { #2 }
+    % A re-captured body invalidates any cached segment split of the
+    % previous capture (see \__tf_split_source_segments:n).
+    \bool_if_exist:cT { g__tf_segcache_ #1 _valid_bool }
+      { \bool_gset_false:c { g__tf_segcache_ #1 _valid_bool } }
   }
 
 % ======================================================================
@@ -1012,7 +1016,34 @@
 % never nested inside a \tfonly{...} brace group (design constraint), so a
 % plain regex match against the raw token list cannot mistake anything
 % else for a marker.
+% Caching: the regex split below walks the full stored source token list
+% twice (\regex_split + \regex_extract_all) and its cost dominates a
+% cropped render as the source grows -- yet the input is identical for
+% every render of the same source. Split once per source and reuse the
+% per-segment sequences; the cache is invalidated when tfsource
+% re-captures the body (see the environment's end code).
 \cs_new_protected:Nn \__tf_split_source_segments:n
+  {
+    \bool_lazy_and:nnTF
+      { \bool_if_exist_p:c { g__tf_segcache_ #1 _valid_bool } }
+      { \bool_if_p:c { g__tf_segcache_ #1 _valid_bool } }
+      {
+        \seq_gset_eq:Nc \g__tf_seg_bodies_seq { g__tf_segcache_ #1 _bodies_seq }
+        \seq_gset_eq:Nc \g__tf_seg_caps_seq { g__tf_segcache_ #1 _caps_seq }
+      }
+      {
+        \__tf_split_source_segments_do:n { #1 }
+        \seq_gclear_new:c { g__tf_segcache_ #1 _bodies_seq }
+        \seq_gclear_new:c { g__tf_segcache_ #1 _caps_seq }
+        \seq_gset_eq:cN { g__tf_segcache_ #1 _bodies_seq } \g__tf_seg_bodies_seq
+        \seq_gset_eq:cN { g__tf_segcache_ #1 _caps_seq } \g__tf_seg_caps_seq
+        \bool_if_exist:cF { g__tf_segcache_ #1 _valid_bool }
+          { \bool_new:c { g__tf_segcache_ #1 _valid_bool } }
+        \bool_gset_true:c { g__tf_segcache_ #1 _valid_bool }
+      }
+  }
+
+\cs_new_protected:Nn \__tf_split_source_segments_do:n
   {
     \tl_set_eq:Nc \l__tf_seg_split_input_tl { g__tf_source_ #1 _tl }
     \seq_gclear:N \g__tf_seg_bodies_seq
