@@ -101,6 +101,18 @@
 % Scratch variables for the split itself.
 \tl_new:N   \l__tf_seg_split_input_tl
 \seq_new:N  \l__tf_seg_matches_seq
+% Final-segment closer handling (see \__tf_peel_final_closer:). The final
+% segment normally carries the source's environment closer (\end{algorithmic}
+% etc.); we peel that closer off so the segment's leading content can crop like
+% any interior segment while the closer is always re-emitted. The closer is
+% matched by ENVIRONMENT NAME (the outer \begin{...} from segment 0), never a
+% bare \end{...}, so an inner \end{align}/\end{cases} in a math line is safe.
+\tl_new:N   \l__tf_seg_final_body_tl
+\tl_new:N   \l__tf_seg_content_tl
+\tl_new:N   \l__tf_outer_env_tl
+\tl_new:N   \g__tf_seg_closer_tl
+\bool_new:N \g__tf_final_croppable_bool
+\regex_new:N \l__tf_seg_closer_regex
 % Precompiled matchers for a \tfsegment{caption} marker. Braces are matched
 % via the escaped-character-literal form (\{ / \}) so they need no manual
 % balancing in this source file, and match the caption text regardless of
@@ -129,6 +141,10 @@
 \regex_set:Nn \g__tf_seg_marker_regex { \c{tfsegment} \{ [^\{\}]* \} }
 \regex_new:N \g__tf_seg_caption_regex
 \regex_set:Nn \g__tf_seg_caption_regex { \c{tfsegment} \{ ( [^\{\}]* ) \} }
+% Captures the environment name of each \begin{name} (used to find segment 0's
+% outer environment, whose matching \end{name} is the final segment's closer).
+\regex_new:N \g__tf_begin_name_regex
+\regex_set:Nn \g__tf_begin_name_regex { \c{begin} \s* \{ ( [^\{\}]* ) \} }
 
 % ----------------------------------------------------------------------
 % Package options (processed via \usepackage[package=...]{texfrog})
@@ -1002,12 +1018,13 @@
 % highlight logic (\__tf_only_render:nn) is reused UNCHANGED for whichever
 % segments ARE executed.
 %
-% Rule for the algorithmic opener/closer: segment 0 (which holds
-% \begin{algorithmic} or equivalent preamble) and the FINAL segment (which
-% holds \end{algorithmic}) are ALWAYS executed in full, regardless of
-% whether the scan pass found them changed. Only strictly interior
-% segments (index 1 .. last-1) are ever collapsed to a \tfsegmentstub. This
-% guarantees the emitted crop is always a balanced, compilable environment.
+% Rule for the environment opener/closer: segment 0 (which holds
+% \begin{algorithmic} or equivalent preamble) is ALWAYS executed in full. The
+% FINAL segment (which holds the matching \end{algorithmic}) has that trailing
+% closer peeled off (\__tf_peel_final_closer:) and always re-emitted, but its
+% leading content is collapsible to a \tfsegmentstub just like a strictly
+% interior segment. So every segment except the preamble and the bare closer
+% can crop, while the emitted result stays a balanced, compilable environment.
 
 % Split \g__tf_source_<name>_tl at \tfsegment{...} markers into
 % \g__tf_seg_bodies_seq (per-segment body token lists) and
@@ -1040,6 +1057,64 @@
         \bool_if_exist:cF { g__tf_segcache_ #1 _valid_bool }
           { \bool_new:c { g__tf_segcache_ #1 _valid_bool } }
         \bool_gset_true:c { g__tf_segcache_ #1 _valid_bool }
+      }
+    % Peel the final segment's trailing environment closer into
+    % \g__tf_seg_closer_tl (leaving its content in the last body item). Runs on
+    % the freshly-populated working \g__tf_seg_bodies_seq -- whether it came
+    % from the split or from cache -- so the cached (unpeeled) copy is
+    % untouched and every render re-peels identically.
+    \__tf_peel_final_closer:
+  }
+
+% Split the final segment's body into leading content (left in the last item of
+% \g__tf_seg_bodies_seq) and a trailing environment closer (stored in
+% \g__tf_seg_closer_tl). \g__tf_final_croppable_bool is set true iff there IS a
+% separable closer AND non-blank content before it -- i.e. the final segment's
+% content may be collapsed to a stub with the closer still re-emitted. Matches
+% the Python filter's crop_to_active_segments / _split_trailing_closer.
+\cs_new_protected:Nn \__tf_peel_final_closer:
+  {
+    \tl_gclear:N \g__tf_seg_closer_tl
+    \bool_gset_false:N \g__tf_final_croppable_bool
+    % Need a preamble (seg 0) plus at least one further segment.
+    \int_compare:nNnT { \seq_count:N \g__tf_seg_bodies_seq } > { 1 }
+      {
+        % 1) Outer environment = last \begin{name} in segment 0 (leftmost body).
+        \seq_get_left:NN \g__tf_seg_bodies_seq \l__tf_seg_content_tl
+        \tl_clear:N \l__tf_outer_env_tl
+        \regex_extract_all:NVN \g__tf_begin_name_regex
+          \l__tf_seg_content_tl \l__tf_seg_matches_seq
+        % Matches are (full_1, name_1, full_2, name_2, ...); take the last name.
+        \int_compare:nNnT { \seq_count:N \l__tf_seg_matches_seq } > { 0 }
+          {
+            \seq_get_right:NN \l__tf_seg_matches_seq \l__tf_outer_env_tl
+          }
+        \tl_if_empty:NF \l__tf_outer_env_tl
+          {
+            % 2) Closer = trailing run of \end{<outer env>} (never a bare \end,
+            % so an inner \end{align} in a math line is not matched).
+            \regex_set:Nn \l__tf_seg_closer_regex
+              { ( \s* \c{end} \s* \{ \u{l__tf_outer_env_tl} \} )+ \s* \Z }
+            \seq_get_right:NN \g__tf_seg_bodies_seq \l__tf_seg_final_body_tl
+            \regex_extract_once:NVNTF \l__tf_seg_closer_regex
+              \l__tf_seg_final_body_tl \l__tf_seg_matches_seq
+              {
+                % item 1 = full match (the closer); keep it UNEXPANDED.
+                \seq_pop_left:NN \l__tf_seg_matches_seq \l_tmpa_tl
+                \tl_gset_eq:NN \g__tf_seg_closer_tl \l_tmpa_tl
+                % content := final body with that trailing closer removed.
+                \tl_set_eq:NN \l__tf_seg_content_tl \l__tf_seg_final_body_tl
+                \regex_replace_once:NnN \l__tf_seg_closer_regex { }
+                  \l__tf_seg_content_tl
+                % Replace the last body item with content; mark croppable iff
+                % that content is non-blank.
+                \seq_gpop_right:NN \g__tf_seg_bodies_seq \l_tmpb_tl
+                \seq_gput_right:NV \g__tf_seg_bodies_seq \l__tf_seg_content_tl
+                \tl_if_blank:VF \l__tf_seg_content_tl
+                  { \bool_gset_true:N \g__tf_final_croppable_bool }
+              }
+              { } % no matching closer: leave body whole, closer empty.
+          }
       }
   }
 
@@ -1086,40 +1161,64 @@
     \tfsegmentstub { #1 }
   }
 
-% Render (or stub) segment #1 (a plain integer, 0-based). Segment 0 and the
-% final segment (\g__tf_seg_last_int) are always executed verbatim so the
-% source's opener/closer stay balanced; other segments are executed if the
-% scan pass marked them active, else collapsed into the pending stub run
-% (with \g__tf_pos_int jumped forward to the segment's recorded end
-% position, so \tfonly position-counting for later, executed segments
-% stays aligned with the record pass -- see \g__tf_seg_endpos_prop).
+% Render (or stub) segment #1 (a plain integer, 0-based).
+%
+% * Segment 0 (the preamble, holding \begin{...}) is always executed verbatim.
+% * The final segment (\g__tf_seg_last_int) keeps its trailing environment
+%   closer (\g__tf_seg_closer_tl, peeled in \__tf_peel_final_closer:) no matter
+%   what, but its leading content is croppable: stubbed when inactive, executed
+%   when active -- exactly like an interior segment. When there is no separable
+%   closer, or nothing but a closer (\g__tf_final_croppable_bool false), the
+%   whole final body is executed followed by the (possibly empty) closer.
+% * Every other (interior) segment is executed if the scan pass marked it
+%   active, else collapsed into the pending stub run (with \g__tf_pos_int
+%   jumped forward to the segment's recorded end position, so \tfonly
+%   position-counting for later executed segments stays aligned with the
+%   record pass -- see \g__tf_seg_endpos_prop).
+%
+% \exp_args:Ne below fully expands \seq_item:Nn's result (the caption's actual
+% characters) BEFORE it is passed to \__tf_seg_emit_stub:n -- otherwise #1
+% inside that macro would be the literal, unexpanded call rather than the
+% caption text.
 \cs_new_protected:Nn \__tf_seg_render_one:n
   {
-    \bool_lazy_or:nnTF
-      { \int_compare_p:nNn { #1 } = { 0 } }
-      { \int_compare_p:nNn { #1 } = { \g__tf_seg_last_int } }
+    \int_compare:nNnTF { #1 } = { 0 }
       {
         \__tf_seg_setline:n { #1 }
         \seq_item:Nn \g__tf_seg_bodies_seq { #1 + 1 }
       }
       {
-        \prop_if_in:NnTF \g__tf_active_seg_prop { #1 }
+        \int_compare:nNnTF { #1 } = { \g__tf_seg_last_int }
           {
-            \__tf_seg_setline:n { #1 }
-            \seq_item:Nn \g__tf_seg_bodies_seq { #1 + 1 }
+            \bool_lazy_and:nnTF
+              { \bool_if_p:N \g__tf_final_croppable_bool }
+              { ! \prop_if_in_p:Nn \g__tf_active_seg_prop { #1 } }
+              {
+                % inactive + croppable: stub the content, keep the closer.
+                \exp_args:Ne \__tf_seg_emit_stub:n
+                  { \seq_item:Nn \g__tf_seg_caps_seq { #1 } }
+                \tl_use:N \g__tf_seg_closer_tl
+              }
+              {
+                % active, or nothing safely croppable: content then closer.
+                \__tf_seg_setline:n { #1 }
+                \seq_item:Nn \g__tf_seg_bodies_seq { #1 + 1 }
+                \tl_use:N \g__tf_seg_closer_tl
+              }
           }
           {
-            % \exp_args:Ne fully expands \seq_item:Nn's result (the
-            % caption's actual characters) BEFORE it is passed to
-            % \__tf_seg_emit_stub:n. Without this, #1 inside that macro
-            % would be the literal, unexpanded call
-            % "\seq_item:Nn \g__tf_seg_caps_seq {...}" rather than the
-            % caption's characters.
-            \exp_args:Ne \__tf_seg_emit_stub:n
-              { \seq_item:Nn \g__tf_seg_caps_seq { #1 } }
-            \prop_get:NnNTF \g__tf_seg_endpos_prop { #1 } \l_tmpa_tl
-              { \int_gset:Nn \g__tf_pos_int { \l_tmpa_tl } }
-              { } % should not happen: every segment gets an endpos in Pass B
+            \prop_if_in:NnTF \g__tf_active_seg_prop { #1 }
+              {
+                \__tf_seg_setline:n { #1 }
+                \seq_item:Nn \g__tf_seg_bodies_seq { #1 + 1 }
+              }
+              {
+                \exp_args:Ne \__tf_seg_emit_stub:n
+                  { \seq_item:Nn \g__tf_seg_caps_seq { #1 } }
+                \prop_get:NnNTF \g__tf_seg_endpos_prop { #1 } \l_tmpa_tl
+                  { \int_gset:Nn \g__tf_pos_int { \l_tmpa_tl } }
+                  { } % should not happen: every segment gets an endpos in Pass B
+              }
           }
       }
   }

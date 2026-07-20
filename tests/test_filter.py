@@ -406,14 +406,17 @@ def test_crop_keeps_active_and_stubs_inactive():
     assert idx_map == [0, -1, 4, 5]
 
 
-def test_crop_keeps_final_segment_even_if_inactive():
-    """Regression test: the final segment must never be stubbed.
+def test_crop_final_segment_content_stubs_but_closer_survives():
+    """The final segment's leading content crops like any interior segment,
+    while its trailing ``\\end{...}`` closer is always kept for environment
+    balance.
 
-    Segment 0 (preamble, holding \\begin{...}) and the final segment
-    (holding \\end{...}) are always kept verbatim, matching the LaTeX
-    macro. Previously only segment 0 was force-kept, so when the final
-    segment had no changes it was folded into the trailing stub run and
-    its \\end{algorithmic} line was lost, producing malformed output.
+    Segment 0 (preamble, holding ``\\begin{...}``) is kept verbatim. The final
+    ``Resp`` segment carries real content (``\\State b``) ahead of its
+    ``\\end{algorithmic}`` closer: when it is inactive the content collapses to
+    a stub but ``\\end{algorithmic}`` must survive. (Earlier the whole final
+    segment was force-kept, so unchanged final-segment content — e.g. a
+    responder's KEYMAT step — printed on every hop instead of cropping.)
     """
     lines = [
         r"\begin{algorithmic}",
@@ -423,9 +426,31 @@ def test_crop_keeps_final_segment_even_if_inactive():
         r"\State b",
         r"\end{algorithmic}",
     ]
-    # No segments are active: Init (interior) must stub, but Resp (final)
-    # must still be kept verbatim -- including \end{algorithmic}.
+    # No segments active: Init (interior) stubs; Resp (final) content stubs too,
+    # but \end{algorithmic} is kept.
     new_lines, idx_map = crop_to_active_segments(lines, active=set())
+    assert new_lines == [
+        r"\begin{algorithmic}",
+        r"\tfsegmentstub{Init}",
+        r"\tfsegmentstub{Resp}",
+        r"\end{algorithmic}",
+    ]
+    assert idx_map == [0, -1, -1, 5]
+
+
+def test_crop_final_segment_content_kept_when_active():
+    """When the final segment is active, its content is kept (with the closer
+    still following)."""
+    lines = [
+        r"\begin{algorithmic}",
+        r"\tfsegment{Init}",
+        r"\State a",
+        r"\tfsegment{Resp}",
+        r"\State b",
+        r"\end{algorithmic}",
+    ]
+    # Resp (final, index 2) active -> content kept, closer kept; Init stubs.
+    new_lines, idx_map = crop_to_active_segments(lines, active={2})
     assert new_lines == [
         r"\begin{algorithmic}",
         r"\tfsegmentstub{Init}",
@@ -435,11 +460,52 @@ def test_crop_keeps_final_segment_even_if_inactive():
     assert idx_map == [0, -1, 4, 5]
 
 
+def test_crop_final_segment_inner_end_not_mistaken_for_closer():
+    """An ``\\end{align}`` inside the final segment's content must not be
+    peeled as the environment closer: only ``\\end{<outer env>}`` (here
+    ``algorithmic``, opened in segment 0) is the closer."""
+    lines = [
+        r"\begin{algorithmic}",
+        r"\tfsegment{Init}",
+        r"\State a",
+        r"\tfsegment{Resp}",
+        r"\State \begin{align} x &= y \end{align}",
+        r"\end{algorithmic}",
+    ]
+    # Resp (final) inactive: its content — including the balanced align block —
+    # collapses to a single stub; only \end{algorithmic} survives.
+    new_lines, _ = crop_to_active_segments(lines, active=set())
+    assert new_lines == [
+        r"\begin{algorithmic}",
+        r"\tfsegmentstub{Init}",
+        r"\tfsegmentstub{Resp}",
+        r"\end{algorithmic}",
+    ]
+
+
+def test_crop_final_segment_closer_only_kept_verbatim():
+    """A final segment that is nothing but the ``\\end{...}`` closer is kept
+    verbatim (no spurious stub), whether or not it is active."""
+    lines = [
+        r"\begin{algorithmic}",
+        r"\tfsegment{Init}",
+        r"\State a",
+        r"\tfsegment{End}",
+        r"\end{algorithmic}",
+    ]
+    new_lines, idx_map = crop_to_active_segments(lines, active=set())
+    assert new_lines == [
+        r"\begin{algorithmic}",
+        r"\tfsegmentstub{Init}",
+        r"\end{algorithmic}",
+    ]
+    assert idx_map == [0, -1, 4]
+
+
 def test_crop_stubs_each_interior_segment_on_its_own_line():
     """Each strictly-interior inactive segment gets its own stub line
-    (no coalescing of a run into one comma-joined stub), while the final
-    segment (also inactive here) is kept verbatim rather than being
-    absorbed into a trailing stub."""
+    (no coalescing of a run into one comma-joined stub); the final segment's
+    content stubs too, but its ``\\end{...}`` closer survives."""
     lines = [
         r"\begin{algorithmic}",
         r"\tfsegment{A}",
@@ -453,18 +519,19 @@ def test_crop_stubs_each_interior_segment_on_its_own_line():
         r"\end{algorithmic}",
     ]
     # segments: 0=preamble, 1=A (active), 2=B (inactive), 3=C (inactive),
-    # 4=D (last, inactive). B and C are strictly interior -> one stub each,
-    # on separate lines. D is the final segment -> always kept, even inactive.
+    # 4=D (last, inactive). B and C are strictly interior -> one stub each. D
+    # is the final segment: its content (\State d) stubs, \end{algorithmic}
+    # is kept.
     new_lines, idx_map = crop_to_active_segments(lines, active={1})
     assert new_lines == [
         r"\begin{algorithmic}",
         r"\State a",
         r"\tfsegmentstub{B}",
         r"\tfsegmentstub{C}",
-        r"\State d",
+        r"\tfsegmentstub{D}",
         r"\end{algorithmic}",
     ]
-    assert idx_map == [0, 2, -1, -1, 8, 9]
+    assert idx_map == [0, 2, -1, -1, -1, 9]
 
 
 def test_crop_injects_absolute_line_counter_resets():
@@ -484,11 +551,12 @@ def test_crop_injects_absolute_line_counter_resets():
         r"\State g",
         r"\end{algorithmic}",
     ]
-    # Full numbering: a1=1 a2=2 b1=3 b2=4 g=5. Keep seg0 + final (Gamma);
-    # Alpha and Beta stubbed. Gamma (index 3) starts after 4 numbered lines,
-    # so its \State g must resume at absolute line 5 -> \setcounter{..}{4}.
+    # Full numbering: a1=1 a2=2 b1=3 b2=4 g=5. Keep seg0 + final (Gamma, whose
+    # content is active here); Alpha and Beta stubbed. Gamma (index 3) starts
+    # after 4 numbered lines, so its \State g must resume at absolute line 5
+    # -> \setcounter{..}{4}.
     new_lines, idx_map = crop_to_active_segments(
-        lines, active=set(), line_counter="ALG@line",
+        lines, active={3}, line_counter="ALG@line",
     )
     assert new_lines == [
         r"\begin{algorithmic}[1]",

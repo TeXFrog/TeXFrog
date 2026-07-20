@@ -47,6 +47,14 @@ _NUMBERED_LINE_RE = re.compile(
 _SEGMENT_RE = re.compile(r"^\s*\\tfsegment\s*\{(?P<caption>[^{}]*)\}\s*$")
 SEGMENT_RE = _SEGMENT_RE
 
+# \begin{name} / \end{name} environment delimiter, used to peel the final
+# segment's trailing closer off from its content (see below). Lowercase
+# ``begin``/``end`` only, so algpseudocodex block openers/closers like
+# ``\If``/``\EndIf`` are NOT treated as environment delimiters.
+_ENV_DELIM_RE = re.compile(r"\\(begin|end)\s*\{([^{}]*)\}")
+# A line that is (starts as) ``\end{name}``.
+_END_ENV_RE = re.compile(r"^\s*\\end\s*\{([^{}]*)\}")
+
 
 @dataclass
 class Segment:
@@ -321,6 +329,52 @@ def compute_active_segments(
     return active
 
 
+def _outer_open_env(preamble_lines: list[str]) -> str | None:
+    """The innermost environment left open by the preamble (segment 0), if any.
+
+    Segment 0 holds the source's opening ``\\begin{...}`` (e.g. ``algorithmic``
+    or ``pcvstack``); the final segment closes it with the matching
+    ``\\end{...}``. Returns that environment's name so the closer peel matches
+    *only* it — never an inner ``\\end{align}`` / ``\\end{cases}`` sitting in a
+    math line of the final segment's content.
+    """
+    stack: list[str] = []
+    for ln in preamble_lines:
+        for m in _ENV_DELIM_RE.finditer(ln):
+            if m.group(1) == "begin":
+                stack.append(m.group(2))
+            elif stack and stack[-1] == m.group(2):
+                stack.pop()
+    return stack[-1] if stack else None
+
+
+def _split_trailing_closer(
+    lines: list[str], env: str | None
+) -> tuple[list[str], list[str]]:
+    """Split ``lines`` into ``(content, closer)`` at the trailing env closer.
+
+    ``closer`` is the maximal trailing run of blank lines and ``\\end{env}``
+    lines — where ``env`` is the outer environment from :func:`_outer_open_env`;
+    ``content`` is everything before it. Returns ``(lines, [])`` (nothing to
+    peel) when ``env`` is ``None`` or the tail is not ``\\end{env}``, signalling
+    the caller it cannot safely crop this segment.
+    """
+    if env is None:
+        return lines, []
+    i = len(lines)
+    while i > 0:
+        ln = lines[i - 1]
+        if not ln.strip():
+            i -= 1
+            continue
+        m = _END_ENV_RE.match(ln)
+        if m and m.group(1) == env:
+            i -= 1
+            continue
+        break
+    return lines[:i], lines[i:]
+
+
 def crop_to_active_segments(
     lines: list[str],
     active: set[int],
@@ -329,12 +383,15 @@ def crop_to_active_segments(
 ) -> tuple[list[str], list[int]]:
     """Rebuild ``lines`` keeping active segments, stubbing inactive ones.
 
-    Segment 0 (preamble) and the final segment are always kept verbatim,
-    matching the LaTeX macro ``\\__tf_seg_render_one:n`` in ``texfrog.sty``:
-    the preamble typically holds an opening ``\\begin{...}`` and the final
-    segment typically holds the matching ``\\end{...}``, so both must survive
-    cropping regardless of whether they changed. Each strictly-interior
-    inactive segment (index in ``1..len(segs) - 2``) collapses to its own
+    Segment 0 (preamble, typically the opening ``\\begin{...}``) is always kept
+    verbatim. The final segment is split at its trailing environment closer
+    (:func:`_split_trailing_closer`): the ``\\end{...}`` run is always kept so
+    the environment stays balanced, but the final segment's leading *content*
+    crops like any interior segment — stubbed when inactive, kept when active.
+    This matches the LaTeX macro ``\\__tf_seg_render_one:n`` in ``texfrog.sty``.
+    (If the final segment has no separable ``\\end{...}`` tail, it is kept
+    verbatim as a safe fallback.) Each strictly-interior inactive segment
+    (index in ``1..len(segs) - 2``) collapses to its own
     ``\\tfsegmentstub{caption}`` line — one stub per segment, each on its own
     line, so a run of several unchanged segments produces several stub lines
     rather than a single comma-joined one (a blank/None caption yields an
@@ -382,18 +439,46 @@ def crop_to_active_segments(
     new_lines: list[str] = []
     idx_map: list[int] = []
 
+    def emit_setcounter(i: int) -> None:
+        if line_counter is not None:
+            new_lines.append(f"\\setcounter{{{line_counter}}}{{{start_line[i]}}}")
+            idx_map.append(-1)
+
+    def emit_lines(seg_lines: list[str], idxs: list[int]) -> None:
+        for ln, oi in zip(seg_lines, idxs):
+            new_lines.append(ln)
+            idx_map.append(oi)
+
+    outer_env = _outer_open_env(segs[0].lines) if segs else None
+
     last = len(segs) - 1
     for i, seg in enumerate(segs):
-        keep = (i == 0) or (i == last) or (i in active)
-        if keep:
-            if line_counter is not None and i > 0:
-                new_lines.append(
-                    f"\\setcounter{{{line_counter}}}{{{start_line[i]}}}"
-                )
+        if i == last and last != 0:
+            # Final segment: keep its trailing \end{<outer_env>} closer no
+            # matter what (environment balance), but crop the leading content
+            # like any interior segment.
+            content, closer = _split_trailing_closer(seg.lines, outer_env)
+            if not closer or not content:
+                # No separable closer, or nothing but a closer: keep verbatim.
+                emit_setcounter(i)
+                emit_lines(seg.lines, orig_index[i])
+                continue
+            content_idx = orig_index[i][: len(content)]
+            closer_idx = orig_index[i][len(content) :]
+            if i in active:
+                emit_setcounter(i)
+                emit_lines(content, content_idx)
+            else:
+                new_lines.append(f"{stub_macro}{{{seg.caption or ''}}}")
                 idx_map.append(-1)
-            for ln, oi in zip(seg.lines, orig_index[i]):
-                new_lines.append(ln)
-                idx_map.append(oi)
+            emit_lines(closer, closer_idx)
+            continue
+
+        keep = (i == 0) or (i in active)
+        if keep:
+            if i > 0:
+                emit_setcounter(i)
+            emit_lines(seg.lines, orig_index[i])
         else:
             new_lines.append(f"{stub_macro}{{{seg.caption or ''}}}")
             idx_map.append(-1)
