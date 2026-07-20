@@ -194,6 +194,7 @@ def _pdfcrop(pdf_path: Path) -> Path:
     cropped = pdf_path.with_name(pdf_path.stem + "-crop.pdf")
     result = subprocess.run(
         ["pdfcrop", str(pdf_path), str(cropped)],
+        cwd=pdf_path.parent,
         capture_output=True,
         text=True,
         timeout=120,
