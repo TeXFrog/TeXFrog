@@ -381,8 +381,17 @@ def _check_single_page(pdf_path: Path, game_label: str) -> None:
 # ---------------------------------------------------------------------------
 
 
+# \ensuremath is valid in real LaTeX (used e.g. by the LaTeX-side
+# \tfgamename definition in _pdf_to_svg's wrapper), but MathJax's TeX input
+# processor has no built-in \ensuremath. Without this, a \tfdescription or
+# game name containing \ensuremath{...} renders as an "undefined control
+# sequence" error in the browser. Since MathJax content is always inside
+# math delimiters already, \ensuremath can just emit its argument as-is.
+_BUILTIN_MATHJAX_MACROS = r"\providecommand{\ensuremath}[1]{#1}"
+
+
 def _extract_mathjax_macros(macro_paths: list[str], proof_dir: Path) -> str:
-    """Extract LaTeX macro definitions from user macro files for MathJax.
+    """Build the MathJax macro block: built-ins plus harvested user macros.
 
     Collects lines that start with ``\\newcommand``, ``\\renewcommand``,
     ``\\providecommand``, ``\\DeclareMathOperator``, or ``\\def`` so that
@@ -401,7 +410,7 @@ def _extract_mathjax_macros(macro_paths: list[str], proof_dir: Path) -> str:
         "\\newcommand", "\\renewcommand", "\\providecommand",
         "\\DeclareMathOperator", "\\def",
     )
-    collected: list[str] = []
+    collected: list[str] = [_BUILTIN_MATHJAX_MACROS]
     for rel_path in macro_paths:
         src = (proof_dir / rel_path).resolve()
         try:
