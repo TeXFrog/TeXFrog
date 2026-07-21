@@ -282,6 +282,9 @@ When generating the LaTeX output, TeXFrog wraps changed lines in `\tfchanged{}` 
 
 For proofs with many hops, a diffed render of a later game can end up mostly repeating lines carried over unchanged from earlier games. Segment cropping lets you mark boundaries in the source so that a diffed `\tfrendergame` shows only the segments that actually changed, collapsing everything else into a single placeholder line.
 
+> [!TIP]
+> For a complete worked example, see [tutorial-crop/](../examples/tutorial-crop/): a five-step IND-CPA proof where each hop changes one line in one segment, so the cropped renders visibly collapse the rest.
+
 ### `\tfsegment{Caption}`
 
 Marks a boundary between two segments inside a `tfsource` body. It never produces visible output itself in a full (uncropped) render — it is a pure boundary marker, invisible in every mode except a cropped render, where it decides where one segment ends and the next begins.
