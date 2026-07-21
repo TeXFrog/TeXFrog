@@ -1,0 +1,9 @@
+\textbf{Claim.}
+  Games \tfgamename{kemdem}{G0} and \tfgamename{kemdem}{G1} are computationally
+  indistinguishable assuming the KEM is $\INDCPA$-secure.
+
+We replace the encapsulated key $K$ with a uniformly random key drawn from
+$\mathcal{K}$, independent of the KEM ciphertext $c_1$. A distinguisher between
+the two games yields a KEM $\INDCPA$ adversary of the same advantage. Only the
+\emph{Encapsulation} segment changes, so the cropped render collapses the
+\emph{Setup} and \emph{Key derivation} segments.

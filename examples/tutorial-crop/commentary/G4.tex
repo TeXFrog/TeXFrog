@@ -1,0 +1,9 @@
+\textbf{Claim.}
+  Games \tfgamename{kemdem}{G3} and \tfgamename{kemdem}{G4} are identically
+  distributed.
+
+With $\mathit{pad}$ uniform and independent of everything else, $c_2 \gets
+\mathit{pad} \oplus m_b$ is itself uniform and independent of the challenge bit
+$b$. We may therefore sample $c_2$ directly. The adversary's view is now
+independent of $b$, so its advantage is zero. Only the final DEM step changes,
+so all three interior segments collapse to stubs.

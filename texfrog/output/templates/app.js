@@ -146,11 +146,13 @@ function showGame(idx) {
   if (g.reduction && g.related_games && g.related_games.length > 0) {
     // Reduction with related games: show clean game(s) alongside highlighted reduction
     if (g.related_games.length === 1) {
-      // 2-panel: clean game on left, highlighted reduction on right
+      // 2-panel: clean game on left, highlighted reduction on right.
+      // Clean panels are cropped per-reduction, so the file is keyed by
+      // {reduction}-{related} (see generate_html).
       const rg = findGame(g.related_games[0]);
       if (rg) {
         container.appendChild(
-          makePanel(rg.label, rg.latex_name, `games/${rg.label}-clean.svg`)
+          makePanel(rg.label, rg.latex_name, `games/${g.label}-${rg.label}-clean.svg`)
         );
       }
       container.appendChild(
@@ -161,7 +163,7 @@ function showGame(idx) {
       const rg0 = findGame(g.related_games[0]);
       if (rg0) {
         container.appendChild(
-          makePanel(rg0.label, rg0.latex_name, `games/${rg0.label}-clean.svg`)
+          makePanel(rg0.label, rg0.latex_name, `games/${g.label}-${rg0.label}-clean.svg`)
         );
       }
       container.appendChild(
@@ -170,7 +172,7 @@ function showGame(idx) {
       const rg1 = findGame(g.related_games[1]);
       if (rg1) {
         container.appendChild(
-          makePanel(rg1.label, rg1.latex_name, `games/${rg1.label}-clean.svg`)
+          makePanel(rg1.label, rg1.latex_name, `games/${g.label}-${rg1.label}-clean.svg`)
         );
       }
     }
@@ -283,14 +285,14 @@ function renderAllForPrint() {
     if (g.reduction && g.related_games && g.related_games.length > 0) {
       if (g.related_games.length === 1) {
         const rg = findGame(g.related_games[0]);
-        if (rg) panels.appendChild(makePrintPanel(rg.label, rg.latex_name, `games/${rg.label}-clean.svg`));
+        if (rg) panels.appendChild(makePrintPanel(rg.label, rg.latex_name, `games/${g.label}-${rg.label}-clean.svg`));
         panels.appendChild(makePrintPanel(g.label, g.latex_name, `games/${g.label}.svg`));
       } else {
         const rg0 = findGame(g.related_games[0]);
-        if (rg0) panels.appendChild(makePrintPanel(rg0.label, rg0.latex_name, `games/${rg0.label}-clean.svg`));
+        if (rg0) panels.appendChild(makePrintPanel(rg0.label, rg0.latex_name, `games/${g.label}-${rg0.label}-clean.svg`));
         panels.appendChild(makePrintPanel(g.label, g.latex_name, `games/${g.label}.svg`));
         const rg1 = findGame(g.related_games[1]);
-        if (rg1) panels.appendChild(makePrintPanel(rg1.label, rg1.latex_name, `games/${rg1.label}-clean.svg`));
+        if (rg1) panels.appendChild(makePrintPanel(rg1.label, rg1.latex_name, `games/${g.label}-${rg1.label}-clean.svg`));
       }
     } else if (idx > 0 && !g.reduction) {
       let prev = null;

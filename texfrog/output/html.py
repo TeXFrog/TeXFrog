@@ -34,8 +34,11 @@ from typing import Optional
 from jinja2 import Environment, PackageLoader
 
 from ..filter import (
+    SEGMENT_RE,
+    compute_active_segments,
     compute_changed_lines,
     compute_removed_lines,
+    crop_to_active_segments,
     wrap_changed_line,
 )
 from ..model import Proof
@@ -48,6 +51,95 @@ _CHANGED_MACRO = r"\tfchanged"
 # ---------------------------------------------------------------------------
 # Per-game LaTeX file writers
 # ---------------------------------------------------------------------------
+
+
+def _crop_with_active(
+    curr_lines: list[str],
+    active: set[int],
+    changed: set[int],
+    line_counter: str | None = None,
+) -> tuple[list[str], set[int]]:
+    """Crop ``curr_lines`` to an explicit active-segment set and remap indices.
+
+    Args:
+        curr_lines: Filtered lines for the current game (with markers).
+        active: Segment indices to keep (segment 0 and the final segment are
+            always kept regardless).
+        changed: 0-based changed indices into ``curr_lines``.
+        line_counter: LaTeX line-number counter for absolute numbering, or
+            ``None``. Passed through to :func:`crop_to_active_segments`.
+
+    Returns:
+        ``(cropped_lines, remapped_changed)``.
+    """
+    cropped, idx_map = crop_to_active_segments(
+        curr_lines, active, line_counter=line_counter,
+    )
+    remapped = {k for k, orig in enumerate(idx_map) if orig in changed}
+    return cropped, remapped
+
+
+def _apply_crop(
+    curr_lines: list[str],
+    prev_lines: list[str],
+    changed: set[int],
+    line_counter: str | None = None,
+) -> tuple[list[str], set[int]]:
+    """Crop ``curr_lines`` to changed segments and remap ``changed`` indices.
+
+    Args:
+        curr_lines: Filtered lines for the current game (with markers).
+        prev_lines: Filtered lines for the diff-target game (with markers).
+        changed: 0-based changed indices into ``curr_lines``.
+        line_counter: LaTeX line-number counter for absolute numbering, or
+            ``None``. Passed through to :func:`crop_to_active_segments`.
+
+    Returns:
+        ``(cropped_lines, remapped_changed)``.
+    """
+    active = compute_active_segments(prev_lines, curr_lines)
+    return _crop_with_active(curr_lines, active, changed, line_counter)
+
+
+def _reduction_active_segments(
+    reduction_label: str,
+    related_labels: list[str],
+    prev_label: str | None,
+    filter_fn: Callable[[str], list[str]],
+) -> set[int]:
+    """Union of segment indices that differ across a reduction's panels.
+
+    A reduction is shown as a row of panels: each related game plus the
+    reduction itself. To keep the panels aligned, all of them are cropped to
+    the *same* segment set — the union of every segment where any two of those
+    panels (and the reduction's diff target) differ. This is generally wider
+    than the reduction's own diff-vs-target set: two related games can differ
+    in a segment the reduction leaves untouched, and that segment is exactly
+    the hop the reduction justifies, so it must stay visible in every panel.
+
+    Args:
+        reduction_label: The reduction's game label.
+        related_labels: The reduction's ``related_games`` labels.
+        prev_label: The reduction's HTML diff target (its predecessor entry),
+            or ``None``.
+        filter_fn: Maps a game label to its filtered lines (with markers).
+
+    Returns:
+        Set of 0-based active segment indices (excluding segments 0/final,
+        which are always kept by the cropper anyway).
+    """
+    panels = list(related_labels) + [reduction_label]
+    ref = panels[0]
+    ref_lines = filter_fn(ref)
+    active: set[int] = set()
+    for other in panels[1:]:
+        active |= compute_active_segments(ref_lines, filter_fn(other))
+    # Also keep every segment the reduction changes relative to its diff
+    # target, so its highlighted lines are never cropped away even if the
+    # diff target is not among the related games.
+    if prev_label is not None:
+        active |= compute_active_segments(filter_fn(prev_label), filter_fn(reduction_label))
+    return active
 
 
 def _write_game_file(
@@ -75,6 +167,19 @@ def _write_game_file(
         # cause LaTeX dimension errors inside pseudocode environments
         # (e.g. varwidth used internally by cryptocode's pcvstack).
         if not line.strip():
+            continue
+        # Skip \tfsegment{...} marker lines. These are only meaningful to
+        # crop_to_active_segments(); when cropping is off (or for the -clean/
+        # -removed variants, which never crop), the marker would otherwise
+        # reach the per-game .tex file verbatim. The HTML wrapper doesn't
+        # define \tfsegment, so pdflatex would hit "Undefined control
+        # sequence" and the caption would render as a stray line in the SVG.
+        # Skipping via `continue` (without renumbering `i`) preserves the
+        # `changed_indices` alignment exactly like the blank-line skip above:
+        # `i` still walks the original 0-based index space of `current_lines`,
+        # so `i in changed_indices` checks below remain correct for every
+        # subsequent (non-skipped) line.
+        if SEGMENT_RE.match(line):
             continue
         if i in changed_indices:
             parts.append(
@@ -150,6 +255,12 @@ def _build_wrapper_template(
             profile.html_tfchanged().replace("{", "{{").replace("}", "}}"),
             profile.html_tfremoved().replace("{", "{{").replace("}", "}}"),
             profile.html_tfgamelabel().replace("{", "{{").replace("}", "}}"),
+            profile.html_tfsegmentstub().replace("{", "{{").replace("}", "}}"),
+            # Defense-in-depth no-op: \tfsegment marker lines are stripped in
+            # _write_game_file(), but define it anyway in case a marker ever
+            # reaches the wrapper (e.g. a future writer that forgets to
+            # filter, or -commentary/-clean paths added later).
+            r"\newcommand{{\tfsegment}}[1]{{}}",
         ]
         proc_hdr_def = profile.procedure_header_def()
         if proc_hdr_def:
@@ -536,6 +647,10 @@ def generate_html(
         proof.package, user_preamble, commentary=True,
     )
 
+    # Line-number counter for absolute numbering across crops (algpseudocodex
+    # only; None for packages that don't number lines).
+    line_counter = profile.line_counter_name
+
     # Step 1: generate per-game LaTeX files in a temp directory.
     with contextlib.ExitStack() as stack:
         if keep_tmp:
@@ -558,6 +673,12 @@ def generate_html(
                 strip_star=True,
             )
 
+        # For each reduction shown with related games, remember the segment
+        # set all of its panels (related games + the reduction) are cropped
+        # to, so the flanking related-game panels align with the reduction
+        # (and are not left as full, uncropped listings).
+        reduction_active: dict[str, set[int]] = {}
+
         # Build filtered lines per game, compute diffs, and write .tex files.
         for i, game in enumerate(proof.games):
             label = game.label
@@ -569,6 +690,7 @@ def generate_html(
             # Non-reduction games diff against the previous non-reduction game
             # (skipping intervening reductions); reductions diff against the
             # immediately preceding entry.
+            prev_label = None
             if i == 0:
                 changed: set[int] = set()
             else:
@@ -586,6 +708,24 @@ def generate_html(
                     changed = compute_changed_lines(
                         _filter_game_for_diff(prev_label),
                         _filter_game_for_diff(label),
+                    )
+
+            if proof.crop_default and i > 0 and prev_label is not None:
+                if game.reduction and game.related_games:
+                    # Crop the reduction to the union set shared by all its
+                    # panels, so the middle (reduction) panel shows the same
+                    # segments as the flanking related-game panels.
+                    active = _reduction_active_segments(
+                        label, game.related_games, prev_label, _filter_game,
+                    )
+                    reduction_active[label] = active
+                    game_lines, changed = _crop_with_active(
+                        game_lines, active, changed, line_counter
+                    )
+                else:
+                    game_lines, changed = _apply_crop(
+                        game_lines, _filter_game(prev_label), changed,
+                        line_counter,
                     )
 
             _write_game_file(
@@ -614,25 +754,45 @@ def generate_html(
             prev_diff = _filter_game_for_diff(game.label)
             next_diff = _filter_game_for_diff(next_game.label)
             removed_indices = compute_removed_lines(prev_diff, next_diff)
+            out_prev_lines = prev_lines
+            if proof.crop_default:
+                active = compute_active_segments(next_lines, prev_lines)
+                out_prev_lines, idx_map = crop_to_active_segments(
+                    prev_lines, active, line_counter=line_counter,
+                )
+                removed_indices = {
+                    k for k, orig in enumerate(idx_map) if orig in removed_indices
+                }
             _write_game_file(
-                game.label, prev_lines, removed_indices,
+                game.label, out_prev_lines, removed_indices,
                 latex_dir / f"{game.label}-removed.tex",
                 macro=r"\tfremoved",
                 procedure_header_cmd=proc_hdr_cmd,
             )
 
-        # Generate clean (no-highlight) .tex files for related_games references.
-        clean_labels: set[str] = set()
+        # Generate clean (no-highlight) .tex files for related_games panels,
+        # one per (reduction, related-game) pair so each can be cropped to
+        # that reduction's shared segment set. A game related to two
+        # reductions therefore gets two distinct clean files (different
+        # crops). When cropping is off, the file holds the full listing.
+        # The naming ({reduction}-{related}-clean) matches app.js.
+        clean_pairs: list[tuple[str, str]] = []
         for game in proof.games:
-            if game.related_games:
-                clean_labels.update(game.related_games)
-        for label in clean_labels:
-            clean_lines = _filter_game(label)
-            _write_game_file(
-                label, clean_lines, set(),
-                latex_dir / f"{label}-clean.tex",
-                procedure_header_cmd=proc_hdr_cmd,
-            )
+            if not game.related_games:
+                continue
+            active = reduction_active.get(game.label)
+            for rg_label in game.related_games:
+                rg_lines = _filter_game(rg_label)
+                if active is not None:
+                    rg_lines, _ = _crop_with_active(
+                        rg_lines, active, set(), line_counter,
+                    )
+                _write_game_file(
+                    rg_label, rg_lines, set(),
+                    latex_dir / f"{game.label}-{rg_label}-clean.tex",
+                    procedure_header_cmd=proc_hdr_cmd,
+                )
+                clean_pairs.append((game.label, rg_label))
 
         # Step 2: compile all games to SVG in parallel.
         _placeholder_svg = (
@@ -665,15 +825,6 @@ def generate_html(
                     game_names,
                     wrapper_template,
                 ))
-            # Clean (no-highlight) version — needed for related_games display.
-            if label in clean_labels:
-                tasks.append((
-                    f"{label}-clean",
-                    (latex_dir / f"{label}-clean.tex").resolve(),
-                    games_dir / f"{label}-clean.svg",
-                    game_names,
-                    wrapper_template,
-                ))
             # Commentary
             commentary = proof.commentary.get(label, "")
             if commentary.strip():
@@ -684,6 +835,16 @@ def generate_html(
                     game_names,
                     commentary_wrapper_template,
                 ))
+
+        # Clean (no-highlight) panels — one per (reduction, related-game) pair.
+        for red_label, rg_label in clean_pairs:
+            tasks.append((
+                f"{red_label}-{rg_label}-clean",
+                (latex_dir / f"{red_label}-{rg_label}-clean.tex").resolve(),
+                games_dir / f"{red_label}-{rg_label}-clean.svg",
+                game_names,
+                wrapper_template,
+            ))
 
         def _compile_task(
             task: tuple[str, Path, Path, dict[str, str] | None, str],

@@ -606,3 +606,32 @@ class TestParseTexProofsMulti:
         assert len(by_name["p2"].figures) == 1
         assert by_name["p2"].figures[0].label == "fig2"
         assert by_name["p2"].figures[0].procedure_name == "My Title"
+
+    def test_crop_default_off_by_default(self, tmp_path):
+        tex = tmp_path / "proof.tex"
+        tex.write_text(
+            r"\tfgames{s}{G0, G1}" + "\n"
+            r"\tfgamename{s}{G0}{G_0}" + "\n"
+            r"\tfgamename{s}{G1}{G_1}" + "\n"
+            r"\begin{tfsource}{s}" + "\n"
+            r"\State x" + "\n"
+            r"\end{tfsource}" + "\n",
+            encoding="utf-8",
+        )
+        proof = parse_tex_proofs(tex)[0]
+        assert proof.crop_default is False
+
+    def test_crop_default_on(self, tmp_path):
+        tex = tmp_path / "proof.tex"
+        tex.write_text(
+            r"\tfcropdefault{on}" + "\n"
+            r"\tfgames{s}{G0, G1}" + "\n"
+            r"\tfgamename{s}{G0}{G_0}" + "\n"
+            r"\tfgamename{s}{G1}{G_1}" + "\n"
+            r"\begin{tfsource}{s}" + "\n"
+            r"\State x" + "\n"
+            r"\end{tfsource}" + "\n",
+            encoding="utf-8",
+        )
+        proof = parse_tex_proofs(tex)[0]
+        assert proof.crop_default is True

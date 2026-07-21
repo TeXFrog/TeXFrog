@@ -1,0 +1,4 @@
+The starting game is the real $\INDCPA$ experiment for the hybrid scheme.
+The challenger encapsulates a key $K$, derives a one-time pad
+$\mathit{pad} \gets \mathrm{PRF}(K, r)$ for a fresh nonce $r$, and returns the
+KEM ciphertext $c_1$ together with $c_2 \gets \mathit{pad} \oplus m_b$.

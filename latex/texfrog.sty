@@ -38,6 +38,7 @@
 %   2 = render (render with highlighting)
 %   3 = clean (render without highlighting)
 %   4 = figure
+%   5 = scan (segment-cropping pre-pass; determines which segments changed)
 \int_new:N \g__tf_mode_int
 
 % Current game label being rendered
@@ -61,6 +62,89 @@
 
 % Game label comment command (e.g., \pccomment for cryptocode)
 \tl_new:N \g__tf_gamelabel_cmd_tl
+
+% Segment cropping state
+\bool_new:N \g__tf_crop_default_bool
+\bool_new:N \g__tf_crop_active_bool      % effective crop for current render
+\int_new:N  \g__tf_seg_int               % current segment index during a pass
+\prop_new:N \g__tf_active_seg_prop       % active segment indices (scan result)
+\bool_new:N \g__tf_seg_changed_bool      % did current segment change? (scan)
+
+% --- Task 6: token-split crop-render state ---
+% \g__tf_seg_endpos_prop maps segment index -> the \g__tf_pos_int value
+% recorded at that segment's boundary during the scan pass (mode 5). This
+% lets the crop-render pass jump \g__tf_pos_int forward across a skipped
+% (stubbed) segment without executing its content, keeping \tfonly position
+% counting aligned with the record pass (Pass A) for every segment that IS
+% rendered afterwards.
+\prop_new:N \g__tf_seg_endpos_prop
+% \g__tf_seg_startline_prop maps segment index -> the algpseudocodex line
+% counter (ALG@line) value recorded at that segment's opening boundary during
+% the scan pass (mode 5). Used to restore ABSOLUTE line numbers in a
+% cropped render: before each kept segment the counter is set to this value,
+% so kept lines keep the numbers they would have in the full listing (numbers
+% jump across a stub instead of renumbering contiguously). Populated only when
+% the ALG@line counter exists (algpseudocodex); empty otherwise, in which case
+% the setline step is a no-op.
+\prop_new:N \g__tf_seg_startline_prop
+% Index of the final segment (computed once the scan pass has walked the
+% whole source; no trailing \tfsegment closes the last segment, so this is
+% captured explicitly rather than via a boundary call).
+\int_new:N  \g__tf_seg_last_int
+% \g__tf_seg_bodies_seq / \g__tf_seg_caps_seq: the source token list split at
+% \tfsegment{...} markers (see \__tf_split_source_segments:n below). Item
+% (i+1) of \g__tf_seg_bodies_seq is segment i's body; \g__tf_seg_caps_seq
+% has one fewer item (segment 0, the implicit preamble, has no caption) --
+% item i of \g__tf_seg_caps_seq is segment i's caption, i >= 1.
+\seq_new:N  \g__tf_seg_bodies_seq
+\seq_new:N  \g__tf_seg_caps_seq
+% Scratch variables for the split itself.
+\tl_new:N   \l__tf_seg_split_input_tl
+\seq_new:N  \l__tf_seg_matches_seq
+% Final-segment closer handling (see \__tf_peel_final_closer:). The final
+% segment normally carries the source's environment closer (\end{algorithmic}
+% etc.); we peel that closer off so the segment's leading content can crop like
+% any interior segment while the closer is always re-emitted. The closer is
+% matched by ENVIRONMENT NAME (the outer \begin{...} from segment 0), never a
+% bare \end{...}, so an inner \end{align}/\end{cases} in a math line is safe.
+\tl_new:N   \l__tf_seg_final_body_tl
+\tl_new:N   \l__tf_seg_content_tl
+\tl_new:N   \l__tf_outer_env_tl
+\tl_new:N   \g__tf_seg_closer_tl
+\bool_new:N \g__tf_final_croppable_bool
+\regex_new:N \l__tf_seg_closer_regex
+% Precompiled matchers for a \tfsegment{caption} marker. Braces are matched
+% via the escaped-character-literal form (\{ / \}) so they need no manual
+% balancing in this source file, and match the caption text regardless of
+% its tokens' actual category codes.
+%
+% NOTE 1: the \c{...} csname-regex argument must be the BARE name with no
+% leading backslash (mirroring the docs' own \c{begin} example matching
+% \begin) -- \c{\tfsegment} would be wrong: inside \c{...}, "\t" is itself
+% a recognized regex escape (horizontal tab), so \c{\tfsegment} silently
+% matches a control sequence whose name starts with a TAB character, never
+% \tfsegment. (Verified empirically against l3regex; some other \c{...}
+% uses elsewhere in this file, e.g. \c{\item}/\c{\State}, happen to still
+% work despite the leading backslash -- \i and \S are not recognized
+% single-character escapes the same way \t is -- but the bare form used
+% here is the only form actually documented to be correct.)
+%
+% NOTE 2: two SEPARATE regexes are used -- one with no capturing group for
+% \regex_split:NVN, one with a capturing group for \regex_extract_all:NVN
+% -- rather than sharing a single capturing-group regex for both. Verified
+% empirically that \regex_split:nnN/NVN on a regex WITH a capturing group
+% interleaves the captured text as EXTRA items in the split result (each
+% match contributes both its capture and the following "between" text as
+% separate sequence items), not just the between-match bodies. Reusing one
+% regex for both operations silently produced misaligned segment bodies.
+\regex_new:N \g__tf_seg_marker_regex
+\regex_set:Nn \g__tf_seg_marker_regex { \c{tfsegment} \{ [^\{\}]* \} }
+\regex_new:N \g__tf_seg_caption_regex
+\regex_set:Nn \g__tf_seg_caption_regex { \c{tfsegment} \{ ( [^\{\}]* ) \} }
+% Captures the environment name of each \begin{name} (used to find segment 0's
+% outer environment, whose matching \end{name} is the final segment's closer).
+\regex_new:N \g__tf_begin_name_regex
+\regex_set:Nn \g__tf_begin_name_regex { \c{begin} \s* \{ ( [^\{\}]* ) \} }
 
 % ----------------------------------------------------------------------
 % Package options (processed via \usepackage[package=...]{texfrog})
@@ -368,6 +452,10 @@
   {
     \tl_gclear_new:c { g__tf_source_ #1 _tl }
     \tl_gset:cn { g__tf_source_ #1 _tl } { #2 }
+    % A re-captured body invalidates any cached segment split of the
+    % previous capture (see \__tf_split_source_segments:n).
+    \bool_if_exist:cT { g__tf_segcache_ #1 _valid_bool }
+      { \bool_gset_false:c { g__tf_segcache_ #1 _valid_bool } }
   }
 
 % ======================================================================
@@ -391,6 +479,7 @@
                    { \int_gincr:N \g__tf_pos_int } % star: suppress in figures
                    { \__tf_only_figure:nn { #2 } { #3 } }
                }
+        { 5 } { \__tf_only_scan:nn { #2 } { #3 } }
       }
       { } % unknown mode: do nothing
   }
@@ -400,6 +489,141 @@
   {
     \int_compare:nNnT \g__tf_mode_int = { 4 }
       { #1 }
+  }
+
+% ======================================================================
+% \tfsegment — segment-cropping boundary marker
+% ======================================================================
+%
+% Marks the boundary between two "segments" of a proof for the crop
+% feature (Task 6 renders only the segments that changed vs. the diff
+% target, collapsing unchanged ones to a \tfsegmentstub). In every mode
+% except the scan pre-pass and an active crop render, this is a pure
+% no-op: it must not alter output in any existing mode (0/1/3/4), and
+% the mode-2 (render) branch stays dormant until Task 6 sets
+% \g__tf_crop_active_bool true (nothing does so yet in this task).
+\NewDocumentCommand{\tfsegment}{ m }
+  {
+    \int_case:nnF { \g__tf_mode_int }
+      {
+        { 5 } { \__tf_seg_boundary_scan: }
+        { 2 } { \bool_if:NT \g__tf_crop_active_bool { \__tf_seg_boundary_render:n { #1 } } }
+      }
+      { } % all other modes: pure no-op (invisible)
+  }
+
+% Scan: close the previous segment (commit its changed flag and its ending
+% \tfonly position -- see \g__tf_seg_endpos_prop -- for Task 6's crop-render
+% pass), open the next.
+\cs_new_protected:Nn \__tf_seg_boundary_scan:
+  {
+    \bool_if:NT \g__tf_seg_changed_bool
+      { \prop_gput:Nen \g__tf_active_seg_prop { \int_use:N \g__tf_seg_int } { 1 } }
+    % NOTE: value must be "e" (expanded), not "n" -- \int_use:N
+    % \g__tf_pos_int is a deferred macro call, not a constant like the
+    % active-seg prop's "1" above. Storing it with "n" (as
+    % \prop_gput:Nen previously did) keeps the unexpanded tokens
+    % "\int_use:N \g__tf_pos_int" as the stored value, so every key
+    % lazily re-evaluates to whatever \g__tf_pos_int happens to be at
+    % READ time (i.e. all keys collapse to the same final position) --
+    % this was Task 6b's position-alignment bug.
+    \prop_gput:Nee \g__tf_seg_endpos_prop
+      { \int_use:N \g__tf_seg_int } { \int_use:N \g__tf_pos_int }
+    % Record the ABSOLUTE starting line number of the segment that begins at
+    % this boundary: the algpseudocodex line counter (ALG@line) reached so far
+    % is the number of numbered lines in all preceding segments. The scan pass
+    % now emits the current game's content (see \__tf_only_scan:nn), so the
+    % counter is accurate here. \g__tf_seg_int is the index of the segment
+    % that just ended, so the new segment's index is \g__tf_seg_int + 1.
+    % \arabic{ALG@line} fully expands to the counter's digits (the name's `@'
+    % is a plain character inside the braced argument, so no catcode juggling
+    % is needed under \ExplSyntaxOn). Guarded so it is a pure no-op for
+    % packages without a line counter (cryptocode/nicodemus). Segment 0 gets
+    % no entry; \begin{algorithmic} resets ALG@line to 0 for it.
+    \cs_if_exist:cT { c@ALG@line }
+      {
+        \prop_gput:Nee \g__tf_seg_startline_prop
+          { \int_eval:n { \g__tf_seg_int + 1 } } { \arabic { ALG@line } }
+      }
+    \int_gincr:N \g__tf_seg_int
+    \bool_gset_false:N \g__tf_seg_changed_bool
+  }
+
+% Before rendering a kept segment, restore its absolute line number by setting
+% ALG@line to the recorded value, so the segment's first numbered line resumes
+% at the number it holds in the full listing. A no-op for segment 0 (no
+% recorded entry) and for profiles without an ALG@line counter (the line-count
+% pass never runs, so \g__tf_seg_startline_prop is empty).
+\cs_new_protected:Nn \__tf_seg_setline:n
+  {
+    \prop_get:NnNT \g__tf_seg_startline_prop { #1 } \l_tmpa_tl
+      { \setcounter { ALG@line } { \l_tmpa_tl } }
+  }
+
+% Render-mode boundary handler: kept only so \tfsegment stays well-defined
+% and \g__tf_crop_active_bool retains its documented meaning. Task 6's
+% crop-render pass (\__tf_render_game_cropped:nnn) does NOT \tl_use the
+% stored source token list as a whole -- it splits it into per-segment
+% token lists at \tfsegment markers (\__tf_split_source_segments:n) and
+% executes only the kept segments' bodies directly, so the marker tokens
+% themselves (and hence this handler) are never encountered during a crop
+% render. It is unreachable in practice; left in place as an inert,
+% harmless fallback in case \tfsegment content is ever executed in mode 2
+% outside that pass.
+\cs_new_protected:Nn \__tf_seg_boundary_render:n
+  {
+    \int_gincr:N \g__tf_seg_int
+  }
+
+% \tfcropdefault{on|off} — sets the document-wide default for whether
+% \tfrendergame crops to changed segments (Task 6 consumes this; the
+% crop= key on \tfrendergame overrides it per call).
+\NewDocumentCommand{\tfcropdefault}{ m }
+  {
+    \str_if_eq:nnTF { #1 } { on }
+      { \bool_gset_true:N  \g__tf_crop_default_bool }
+      { \bool_gset_false:N \g__tf_crop_default_bool }
+  }
+
+% User-redefinable stub shown in place of an unchanged, cropped-out
+% segment (emitted once per collapsed segment). Base default targets
+% algorithmicx-family packages (algpseudocodex), via \Statex. cryptocode's
+% pchstack lines are math-mode and \\-separated; nicodemus's lines are
+% \item-prefixed list entries -- override for those profiles below,
+% mirroring \tfchanged's \providecommand-base-then-profile-override
+% pattern. \providecommand only sets the meaning if \tfsegmentstub is not
+% already defined, so the \cs_gset_protected:Npn overrides below (which
+% unconditionally redefine it) always win when their profile matches; for
+% algpseudocodex neither override block's condition matches, so this base
+% definition is what remains in effect.
+%
+% \algpx@endCodeCommand: algpseudocodex \pretocmd's this line-closing hook
+% onto \State/\If/\For/... but NOT onto \Statex (plain algorithmicx
+% \item[]). A stub is a \Statex directly after the preceding segment's
+% last \State, so without running the hook first that \State's code box is
+% never closed and its content is pushed onto the line below its own line
+% number. Run the hook (if algpseudocodex is loaded) before \Statex so the
+% preceding numbered line renders normally. \cs_if_exist_use:c is a no-op
+% under other profiles / plain algorithmicx.
+\providecommand{\tfsegmentstub}[1]
+  {\cs_if_exist_use:c { algpx@endCodeCommand }
+   \Statex{\color{black!55}\ensuremath{\cdots}~\textit{#1~(unchanged)}~\ensuremath{\cdots}}}
+
+\tl_if_eq:NnT \g__tf_package_tl { cryptocode }
+  {
+    \cs_gset_protected:Npn \tfsegmentstub #1
+      {
+        {\color{black!55}\ensuremath{\cdots}~\textit{#1~(unchanged)}~\ensuremath{\cdots}}
+        \\
+      }
+  }
+
+\tl_if_eq:NnT \g__tf_package_tl { nicodemus }
+  {
+    \cs_gset_protected:Npn \tfsegmentstub #1
+      {
+        \item {\color{black!55}\ensuremath{\cdots}~\textit{#1~(unchanged)}~\ensuremath{\cdots}}
+      }
   }
 
 % --- Record mode ---
@@ -446,6 +670,42 @@
   }
 
 \cs_generate_variant:Nn \prop_if_in:NnTF { NeTF }
+\cs_generate_variant:Nn \prop_if_in:NnT { NeT }
+\cs_generate_variant:Nn \prop_if_in:NnF { NeF }
+
+% --- Scan mode (mark segment changed if this \tfonly is add/remove) ---
+% Mirrors \__tf_only_render:nn but sets the segment-changed flag instead of
+% emitting content: used by the crop pre-pass (Task 6) to determine which
+% \tfsegment-delimited segments differ between the current game and the
+% diff target, so unchanged segments can be collapsed to a stub.
+\cs_new_protected:Nn \__tf_only_scan:nn
+  {
+    \int_gincr:N \g__tf_pos_int
+    \__tf_resolve_tags:n { #1 }
+    \__tf_game_in_tags:VTF \g__tf_current_game_tl
+      {
+        % active in current game: changed iff NOT recorded in target
+        \prop_if_in:NeF \g__tf_recorded_prop
+          { \int_use:N \g__tf_pos_int }
+          { \bool_gset_true:N \g__tf_seg_changed_bool }
+        % Emit the content (into the discarded scan vbox) so the line-number
+        % counter (ALG@line, algpseudocodex) steps for this game's \tfonly
+        % lines too -- untagged lines already execute normally in the scan
+        % pass. \__tf_seg_boundary_scan: reads \arabic{ALG@line} at each
+        % boundary to record absolute per-segment start lines, folding the
+        % old separate line-count pass into this one. Mirrors
+        % \__tf_only_record:nn, which likewise emits into its discarded vbox.
+        #2
+      }
+      {
+        % not in current: changed iff it WAS recorded in target (a removal).
+        % Do NOT emit -- this line is absent from the current game, so it must
+        % not advance the line counter.
+        \prop_if_in:NeT \g__tf_recorded_prop
+          { \int_use:N \g__tf_pos_int }
+          { \bool_gset_true:N \g__tf_seg_changed_bool }
+      }
+  }
 
 % --- Figure mode ---
 \cs_new_protected:Nn \__tf_only_figure:nn
@@ -655,25 +915,59 @@
 % ======================================================================
 
 \tl_new:N \l__tf_diff_tl
+\tl_new:N \l__tf_crop_key_tl
 \keys_define:nn { texfrog / rendergame }
   {
     diff .tl_set:N = \l__tf_diff_tl,
     diff .initial:n = {},
+    crop .tl_set:N = \l__tf_crop_key_tl,
+    crop .initial:n = { default },
+  }
+
+% Resolve the effective crop-active bool for the current \tfrendergame
+% call: crop=on/off (the key) wins; crop=default (the key's initial
+% value, i.e. the key was not passed) falls back to \tfcropdefault's
+% setting. \g__tf_crop_active_bool is consulted below in \tfrendergame's
+% body -- but only in the diff-present branch, since crop is only ever
+% effective when a diff= target exists (a no-diff clean render always
+% renders in full, matching the design spec).
+\cs_new_protected:Nn \__tf_resolve_crop_active:
+  {
+    \str_if_eq:VnTF \l__tf_crop_key_tl { on }
+      { \bool_gset_true:N \g__tf_crop_active_bool }
+      {
+        \str_if_eq:VnTF \l__tf_crop_key_tl { off }
+          { \bool_gset_false:N \g__tf_crop_active_bool }
+          { \bool_gset_eq:NN \g__tf_crop_active_bool \g__tf_crop_default_bool }
+      }
   }
 
 \NewDocumentCommand{\tfrendergame}{ O{} m m }
   {
     \group_begin:
     \keys_set:nn { texfrog / rendergame } { #1 }
+    \__tf_resolve_crop_active:
     \tl_if_empty:NTF \l__tf_diff_tl
       { \__tf_render_game_clean:nn { #2 } { #3 } }
-      { \__tf_render_game_highlighted:nnn { #2 } { #3 } { \l__tf_diff_tl } }
+      {
+        \bool_if:NTF \g__tf_crop_active_bool
+          { \__tf_render_game_cropped:nnn { #2 } { #3 } { \l__tf_diff_tl } }
+          { \__tf_render_game_highlighted:nnn { #2 } { #3 } { \l__tf_diff_tl } }
+      }
     \group_end:
   }
 
 % Clean rendering (no highlighting)
 \cs_new_protected:Nn \__tf_render_game_clean:nn
   {
+    % \__tf_resolve_crop_active: (called unconditionally in \tfrendergame
+    % before dispatch) may have just set \g__tf_crop_active_bool true even
+    % though this no-diff clean path never consults it -- reset it here so
+    % the global doesn't carry a stale "crop active" value past a clean
+    % render (harmless today since every \tfrendergame call re-resolves it
+    % anyway, but avoids the trap for any future code that reads the bool
+    % outside that call path).
+    \bool_gset_false:N \g__tf_crop_active_bool
     \__tf_activate_source:n { #1 }
     \tl_gset:Nn \g__tf_current_game_tl { #2 }
     \int_gset:Nn \g__tf_pos_int { 0 }
@@ -705,6 +999,289 @@
     \tl_gset:Nn \g__tf_current_game_tl { #2 }
     \tl_use:c { g__tf_source_ #1 _tl }
     \int_gset:Nn \g__tf_mode_int { 0 } % back to inactive
+  }
+
+% ======================================================================
+% Task 6: crop-aware render pass
+% ======================================================================
+%
+% Mechanism chosen: TOKEN-SPLIT, not box-capture. The stored source token
+% list is split at \tfsegment{...} markers (regex, see below) into an
+% ordered sequence of per-segment token lists, numbered identically to the
+% scan pass (segment 0 = content before the first \tfsegment). The
+% crop-render pass then simply does not \tl_use / execute a suppressed
+% segment's tokens at all -- this suppresses \tfonly-tagged content AND
+% untagged algpseudocodex lines (\State, \If, \LComment, ...) uniformly,
+% since neither ever runs. This sidesteps the harder box-capture approach
+% (redirecting typeset output to a discarded box) entirely: there is no
+% group-swallowing trick to get right, and the existing mode-2 \tfonly
+% highlight logic (\__tf_only_render:nn) is reused UNCHANGED for whichever
+% segments ARE executed.
+%
+% Rule for the environment opener/closer: segment 0 (which holds
+% \begin{algorithmic} or equivalent preamble) is ALWAYS executed in full. The
+% FINAL segment (which holds the matching \end{algorithmic}) has that trailing
+% closer peeled off (\__tf_peel_final_closer:) and always re-emitted, but its
+% leading content is collapsible to a \tfsegmentstub just like a strictly
+% interior segment. So every segment except the preamble and the bare closer
+% can crop, while the emitted result stays a balanced, compilable environment.
+
+% Split \g__tf_source_<name>_tl at \tfsegment{...} markers into
+% \g__tf_seg_bodies_seq (per-segment body token lists) and
+% \g__tf_seg_caps_seq (per-segment captions, segment 0 excluded). Safe
+% because \tfsegment{...} always sits at top level in the stored source,
+% never nested inside a \tfonly{...} brace group (design constraint), so a
+% plain regex match against the raw token list cannot mistake anything
+% else for a marker.
+% Caching: the regex split below walks the full stored source token list
+% twice (\regex_split + \regex_extract_all) and its cost dominates a
+% cropped render as the source grows -- yet the input is identical for
+% every render of the same source. Split once per source and reuse the
+% per-segment sequences; the cache is invalidated when tfsource
+% re-captures the body (see the environment's end code).
+\cs_new_protected:Nn \__tf_split_source_segments:n
+  {
+    \bool_lazy_and:nnTF
+      { \bool_if_exist_p:c { g__tf_segcache_ #1 _valid_bool } }
+      { \bool_if_p:c { g__tf_segcache_ #1 _valid_bool } }
+      {
+        \seq_gset_eq:Nc \g__tf_seg_bodies_seq { g__tf_segcache_ #1 _bodies_seq }
+        \seq_gset_eq:Nc \g__tf_seg_caps_seq { g__tf_segcache_ #1 _caps_seq }
+      }
+      {
+        \__tf_split_source_segments_do:n { #1 }
+        \seq_gclear_new:c { g__tf_segcache_ #1 _bodies_seq }
+        \seq_gclear_new:c { g__tf_segcache_ #1 _caps_seq }
+        \seq_gset_eq:cN { g__tf_segcache_ #1 _bodies_seq } \g__tf_seg_bodies_seq
+        \seq_gset_eq:cN { g__tf_segcache_ #1 _caps_seq } \g__tf_seg_caps_seq
+        \bool_if_exist:cF { g__tf_segcache_ #1 _valid_bool }
+          { \bool_new:c { g__tf_segcache_ #1 _valid_bool } }
+        \bool_gset_true:c { g__tf_segcache_ #1 _valid_bool }
+      }
+    % Peel the final segment's trailing environment closer into
+    % \g__tf_seg_closer_tl (leaving its content in the last body item). Runs on
+    % the freshly-populated working \g__tf_seg_bodies_seq -- whether it came
+    % from the split or from cache -- so the cached (unpeeled) copy is
+    % untouched and every render re-peels identically.
+    \__tf_peel_final_closer:
+  }
+
+% Split the final segment's body into leading content (left in the last item of
+% \g__tf_seg_bodies_seq) and a trailing environment closer (stored in
+% \g__tf_seg_closer_tl). \g__tf_final_croppable_bool is set true iff there IS a
+% separable closer AND non-blank content before it -- i.e. the final segment's
+% content may be collapsed to a stub with the closer still re-emitted. Matches
+% the Python filter's crop_to_active_segments / _split_trailing_closer.
+\cs_new_protected:Nn \__tf_peel_final_closer:
+  {
+    \tl_gclear:N \g__tf_seg_closer_tl
+    \bool_gset_false:N \g__tf_final_croppable_bool
+    % Need a preamble (seg 0) plus at least one further segment.
+    \int_compare:nNnT { \seq_count:N \g__tf_seg_bodies_seq } > { 1 }
+      {
+        % 1) Outer environment = last \begin{name} in segment 0 (leftmost body).
+        \seq_get_left:NN \g__tf_seg_bodies_seq \l__tf_seg_content_tl
+        \tl_clear:N \l__tf_outer_env_tl
+        \regex_extract_all:NVN \g__tf_begin_name_regex
+          \l__tf_seg_content_tl \l__tf_seg_matches_seq
+        % Matches are (full_1, name_1, full_2, name_2, ...); take the last name.
+        \int_compare:nNnT { \seq_count:N \l__tf_seg_matches_seq } > { 0 }
+          {
+            \seq_get_right:NN \l__tf_seg_matches_seq \l__tf_outer_env_tl
+          }
+        \tl_if_empty:NF \l__tf_outer_env_tl
+          {
+            % 2) Closer = trailing run of \end{<outer env>} (never a bare \end,
+            % so an inner \end{align} in a math line is not matched).
+            \regex_set:Nn \l__tf_seg_closer_regex
+              { ( \s* \c{end} \s* \{ \u{l__tf_outer_env_tl} \} )+ \s* \Z }
+            \seq_get_right:NN \g__tf_seg_bodies_seq \l__tf_seg_final_body_tl
+            \regex_extract_once:NVNTF \l__tf_seg_closer_regex
+              \l__tf_seg_final_body_tl \l__tf_seg_matches_seq
+              {
+                % item 1 = full match (the closer); keep it UNEXPANDED.
+                \seq_pop_left:NN \l__tf_seg_matches_seq \l_tmpa_tl
+                \tl_gset_eq:NN \g__tf_seg_closer_tl \l_tmpa_tl
+                % content := final body with that trailing closer removed.
+                \tl_set_eq:NN \l__tf_seg_content_tl \l__tf_seg_final_body_tl
+                \regex_replace_once:NnN \l__tf_seg_closer_regex { }
+                  \l__tf_seg_content_tl
+                % Replace the last body item with content; mark croppable iff
+                % that content is non-blank.
+                \seq_gpop_right:NN \g__tf_seg_bodies_seq \l_tmpb_tl
+                \seq_gput_right:NV \g__tf_seg_bodies_seq \l__tf_seg_content_tl
+                \tl_if_blank:VF \l__tf_seg_content_tl
+                  { \bool_gset_true:N \g__tf_final_croppable_bool }
+              }
+              { } % no matching closer: leave body whole, closer empty.
+          }
+      }
+  }
+
+\cs_new_protected:Nn \__tf_split_source_segments_do:n
+  {
+    \tl_set_eq:Nc \l__tf_seg_split_input_tl { g__tf_source_ #1 _tl }
+    \seq_gclear:N \g__tf_seg_bodies_seq
+    \seq_gclear:N \g__tf_seg_caps_seq
+    \regex_split:NVN \g__tf_seg_marker_regex
+      \l__tf_seg_split_input_tl \g__tf_seg_bodies_seq
+    % NOTE 3: this MUST use \g__tf_seg_caption_regex (the variant WITH a
+    % capturing group), not \g__tf_seg_marker_regex. \regex_extract_all
+    % concatenates the results of per-match \regex_extract_once calls, and
+    % \regex_extract_once stores [fullmatch, capture_1, capture_2, ...] --
+    % i.e. it needs an actual capturing group to produce anything beyond
+    % the full match. Passing the (group-less) marker regex here silently
+    % yields a flat sequence of ONLY full matches (fullmatch_1, fullmatch_2,
+    % ...), so the "even-indexed items are captions" logic below picked out
+    % fullmatch_2, fullmatch_4, ... instead of any caption text, and the
+    % emitted stub caption was empty. With the caption regex, each match
+    % contributes (fullmatch_i, caption_i), restoring the interleaving this
+    % code assumes.
+    \regex_extract_all:NVN \g__tf_seg_caption_regex
+      \l__tf_seg_split_input_tl \l__tf_seg_matches_seq
+    % \regex_extract_all stores, per match, the full match followed by its
+    % capture group (here: 1 group), concatenated into one flat sequence --
+    % i.e. (fullmatch_1, caption_1, fullmatch_2, caption_2, ...). Captions
+    % are therefore exactly the even-indexed items.
+    \int_zero:N \l_tmpa_int
+    \seq_map_inline:Nn \l__tf_seg_matches_seq
+      {
+        \int_incr:N \l_tmpa_int
+        \int_if_odd:nF { \l_tmpa_int }
+          { \seq_gput_right:Nn \g__tf_seg_caps_seq { ##1 } }
+      }
+  }
+
+% Emit a \tfsegmentstub for a single strictly-interior inactive segment.
+% One stub per collapsed segment (each on its own line), matching the Python
+% crop_to_active_segments: a run of several unchanged segments produces
+% several stub lines rather than one comma-joined line.
+\cs_new_protected:Nn \__tf_seg_emit_stub:n
+  {
+    \tfsegmentstub { #1 }
+  }
+
+% Render (or stub) segment #1 (a plain integer, 0-based).
+%
+% * Segment 0 (the preamble, holding \begin{...}) is always executed verbatim.
+% * The final segment (\g__tf_seg_last_int) keeps its trailing environment
+%   closer (\g__tf_seg_closer_tl, peeled in \__tf_peel_final_closer:) no matter
+%   what, but its leading content is croppable: stubbed when inactive, executed
+%   when active -- exactly like an interior segment. When there is no separable
+%   closer, or nothing but a closer (\g__tf_final_croppable_bool false), the
+%   whole final body is executed followed by the (possibly empty) closer.
+% * Every other (interior) segment is executed if the scan pass marked it
+%   active, else collapsed into the pending stub run (with \g__tf_pos_int
+%   jumped forward to the segment's recorded end position, so \tfonly
+%   position-counting for later executed segments stays aligned with the
+%   record pass -- see \g__tf_seg_endpos_prop).
+%
+% \exp_args:Ne below fully expands \seq_item:Nn's result (the caption's actual
+% characters) BEFORE it is passed to \__tf_seg_emit_stub:n -- otherwise #1
+% inside that macro would be the literal, unexpanded call rather than the
+% caption text.
+\cs_new_protected:Nn \__tf_seg_render_one:n
+  {
+    \int_compare:nNnTF { #1 } = { 0 }
+      {
+        \__tf_seg_setline:n { #1 }
+        \seq_item:Nn \g__tf_seg_bodies_seq { #1 + 1 }
+      }
+      {
+        \int_compare:nNnTF { #1 } = { \g__tf_seg_last_int }
+          {
+            \bool_lazy_and:nnTF
+              { \bool_if_p:N \g__tf_final_croppable_bool }
+              { ! \prop_if_in_p:Nn \g__tf_active_seg_prop { #1 } }
+              {
+                % inactive + croppable: stub the content, keep the closer.
+                \exp_args:Ne \__tf_seg_emit_stub:n
+                  { \seq_item:Nn \g__tf_seg_caps_seq { #1 } }
+                \tl_use:N \g__tf_seg_closer_tl
+              }
+              {
+                % active, or nothing safely croppable: content then closer.
+                \__tf_seg_setline:n { #1 }
+                \seq_item:Nn \g__tf_seg_bodies_seq { #1 + 1 }
+                \tl_use:N \g__tf_seg_closer_tl
+              }
+          }
+          {
+            \prop_if_in:NnTF \g__tf_active_seg_prop { #1 }
+              {
+                \__tf_seg_setline:n { #1 }
+                \seq_item:Nn \g__tf_seg_bodies_seq { #1 + 1 }
+              }
+              {
+                \exp_args:Ne \__tf_seg_emit_stub:n
+                  { \seq_item:Nn \g__tf_seg_caps_seq { #1 } }
+                \prop_get:NnNTF \g__tf_seg_endpos_prop { #1 } \l_tmpa_tl
+                  { \int_gset:Nn \g__tf_pos_int { \l_tmpa_tl } }
+                  { } % should not happen: every segment gets an endpos in Pass B
+              }
+          }
+      }
+  }
+
+% Cropped rendering (record -> scan -> split -> crop-render).
+% #1 = source name, #2 = current game label, #3 = diff target game label
+\cs_new_protected:Nn \__tf_render_game_cropped:nnn
+  {
+    \__tf_activate_source:n { #1 }
+
+    % Pass A: record target-active \tfonly positions (mode 1, identical to
+    % the non-cropped highlighted render).
+    \prop_gclear:N \g__tf_recorded_prop
+    \int_gset:Nn \g__tf_pos_int { 0 }
+    \int_gset:Nn \g__tf_mode_int { 1 }
+    \tl_gset:Ne \g__tf_current_game_tl { #3 }
+    \vbox_set:Nn \g__tf_scratch_box { \tl_use:c { g__tf_source_ #1 _tl } }
+    \box_gclear:N \g__tf_scratch_box
+
+    % Pass B: scan current game (mode 5), collecting active segment indices,
+    % each segment's ending \tfonly position, AND (when the algpseudocodex
+    % ALG@line counter exists) each segment's absolute starting line number.
+    % The scan pass emits the current game's content into its discarded vbox
+    % (see \__tf_only_scan:nn), so ALG@line steps correctly here -- no
+    % separate line-count pass is needed.
+    \prop_gclear:N \g__tf_active_seg_prop
+    \prop_gclear:N \g__tf_seg_endpos_prop
+    \prop_gclear:N \g__tf_seg_startline_prop
+    \int_gset:Nn \g__tf_pos_int { 0 }
+    \int_gset:Nn \g__tf_seg_int { 0 }
+    \bool_gset_false:N \g__tf_seg_changed_bool
+    \int_gset:Nn \g__tf_mode_int { 5 }
+    \tl_gset:Nn \g__tf_current_game_tl { #2 }
+    \vbox_set:Nn \g__tf_scratch_box { \tl_use:c { g__tf_source_ #1 _tl } }
+    \box_gclear:N \g__tf_scratch_box
+    % Commit the final segment's changed flag and ending position: no
+    % trailing \tfsegment closes it, so \__tf_seg_boundary_scan: never ran
+    % for it.
+    \bool_if:NT \g__tf_seg_changed_bool
+      { \prop_gput:Nen \g__tf_active_seg_prop { \int_use:N \g__tf_seg_int } { 1 } }
+    % See the matching note in \__tf_seg_boundary_scan: -- value must be
+    % "e" (expanded at PUT time), not "n" (which stores an unexpanded,
+    % lazily-re-evaluating macro call).
+    \prop_gput:Nee \g__tf_seg_endpos_prop
+      { \int_use:N \g__tf_seg_int } { \int_use:N \g__tf_pos_int }
+    \int_gset_eq:NN \g__tf_seg_last_int \g__tf_seg_int
+
+    % Split the source into per-segment token lists (Pass B established
+    % the same numbering via \tfsegment execution order).
+    \__tf_split_source_segments:n { #1 }
+
+    % Pass C: crop-render. Mode 2 is the existing highlighted-render mode;
+    % \__tf_only_render:nn is reused completely unchanged. Suppression of
+    % inactive interior segments happens here, at the segment-body level,
+    % not inside \tfonly's dispatch.
+    \bool_gset_true:N \g__tf_crop_active_bool
+    \int_gset:Nn \g__tf_pos_int { 0 }
+    \int_gset:Nn \g__tf_mode_int { 2 }
+    \tl_gset:Nn \g__tf_current_game_tl { #2 }
+    \int_step_inline:nnn { 0 } { \g__tf_seg_last_int }
+      { \__tf_seg_render_one:n { ##1 } }
+    \bool_gset_false:N \g__tf_crop_active_bool
+    \int_gset:Nn \g__tf_mode_int { 0 }
   }
 
 % ======================================================================

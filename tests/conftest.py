@@ -15,6 +15,8 @@ from pathlib import Path
 import pytest
 from jinja2 import Environment, PackageLoader
 
+from texfrog.model import Game, Proof
+
 # ---------------------------------------------------------------------------
 # Playwright availability check
 # ---------------------------------------------------------------------------
@@ -40,6 +42,53 @@ needs_playwright = pytest.mark.skipif(
     not _playwright_available(),
     reason="Playwright browsers not installed (run: playwright install chromium)",
 )
+
+# ---------------------------------------------------------------------------
+# Proof factory fixture for unit tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def minimal_proof_factory():
+    """Factory to create a minimal Proof with one game for testing.
+
+    Accepts kwargs: source_text, crop_default (and others like macros,
+    commentary, games, figures, package, preamble).
+    """
+    def _make(
+        *,
+        source_text="common line",
+        crop_default=False,
+        macros=None,
+        commentary=None,
+        games=None,
+        figures=None,
+        package="cryptocode",
+        preamble=None,
+    ):
+        if games is None:
+            games = [
+                Game(
+                    label="G0",
+                    latex_name="G_0",
+                    description="Game 0",
+                    reduction=False,
+                    related_games=[],
+                )
+            ]
+        return Proof(
+            source_name="test_proof",
+            macros=macros or [],
+            games=games,
+            source_text=source_text,
+            commentary=commentary or {},
+            figures=figures or [],
+            package=package,
+            preamble=preamble,
+            crop_default=crop_default,
+        )
+    return _make
+
 
 # ---------------------------------------------------------------------------
 # Synthetic HTML site fixture

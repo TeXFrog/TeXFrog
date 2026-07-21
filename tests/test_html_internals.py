@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import re
+import shutil
+import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -9,19 +12,304 @@ import pytest
 
 from texfrog.model import Game, Proof
 from texfrog.output.html import (
+    _apply_crop,
     _build_wrapper_template,
     _extract_mathjax_macros,
     _find_svg_converter,
     _load_template_resource,
     _pdf_to_svg,
+    _reduction_active_segments,
     _write_commentary_file,
+    generate_html,
     generate_index_page,
+)
+
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+_NICODEMUS_STY = _PROJECT_ROOT / "resources" / "nicodemus.sty"
+
+needs_pdflatex = pytest.mark.skipif(
+    shutil.which("pdflatex") is None,
+    reason="pdflatex not found on PATH",
+)
+
+needs_html_tools = pytest.mark.skipif(
+    shutil.which("pdflatex") is None or _find_svg_converter() is None,
+    reason="pdflatex and/or SVG converter (pdf2svg/pdftocairo) not on PATH",
 )
 
 
 # ---------------------------------------------------------------------------
 # _write_commentary_file
 # ---------------------------------------------------------------------------
+
+
+def test_apply_crop_remaps_changed_indices():
+    prev = [
+        r"\begin{algorithmic}",
+        r"\tfsegment{Init}",
+        r"\State a",
+        r"\tfsegment{Resp}",
+        r"\State b",
+        r"\end{algorithmic}",
+    ]
+    curr = [
+        r"\begin{algorithmic}",
+        r"\tfsegment{Init}",
+        r"\State a",
+        r"\tfsegment{Resp}",
+        r"\State b2",
+        r"\end{algorithmic}",
+    ]
+    # \State b2 is at original index 4 and changed
+    cropped, changed = _apply_crop(curr, prev, {4})
+    assert cropped == [
+        r"\begin{algorithmic}",
+        r"\tfsegmentstub{Init}",
+        r"\State b2",
+        r"\end{algorithmic}",
+    ]
+    assert changed == {2}  # \State b2 now at index 2
+
+
+def _seg_lines(seg_a: str, seg_b: str) -> list[str]:
+    """A 3-interior-segment algpseudocodex body: A, B, and final C."""
+    return [
+        r"\begin{algorithmic}",
+        r"\tfsegment{A}",
+        seg_a,
+        r"\tfsegment{B}",
+        seg_b,
+        r"\tfsegment{C}",
+        r"\State c",
+        r"\end{algorithmic}",
+    ]
+
+
+def test_reduction_active_includes_related_pair_diff():
+    """Regression for the reduction-panel crop bug: the related-game panels
+    must be cropped to a set that includes the segment where the two related
+    games differ (the hop), even when the reduction's own diff-vs-target set
+    does not touch that segment. Otherwise the flanking clean panels either
+    show a full listing or hide the hop."""
+    games = {
+        # G5 and G6 differ in segment A (index 1) -- the hop.
+        "G5": _seg_lines(r"\State a", r"\State b"),
+        "G6": _seg_lines(r"\State a2", r"\State b"),
+        # Red differs from its diff target G6 only in segment B (index 2).
+        "Red": _seg_lines(r"\State a2", r"\State b2"),
+    }
+    active = _reduction_active_segments(
+        "Red", ["G5", "G6"], "G6", games.__getitem__,
+    )
+    # Segment 1 (G5 vs G6 hop) AND segment 2 (Red's own change) must both be
+    # kept. The reduction's own diff-vs-G6 set alone would be just {2}.
+    assert active == {1, 2}
+
+
+def test_reduction_active_single_related_game():
+    games = {
+        "G4": _seg_lines(r"\State a", r"\State b"),
+        "Red": _seg_lines(r"\State a", r"\State b2"),
+    }
+    active = _reduction_active_segments(
+        "Red", ["G4"], "G4", games.__getitem__,
+    )
+    assert active == {2}
+
+
+def test_html_tfsegmentstub_defined_for_each_profile():
+    from texfrog.packages import get_profile
+    for name in ("cryptocode", "nicodemus", "algpseudocodex"):
+        assert r"\tfsegmentstub" in get_profile(name).html_tfsegmentstub()
+
+
+# ---------------------------------------------------------------------------
+# End-to-end compile of html_tfsegmentstub() inside each profile's env
+# ---------------------------------------------------------------------------
+
+# Each profile's minimal pseudocode environment, with a \tfsegmentstub{Foo}
+# line typeset the way the real HTML pipeline would emit it (as one filtered
+# content line, alongside one ordinary line). Regression coverage for the
+# nicodemus \Statex bug: nicodemus is an \item-based list environment
+# (enumitem via resources/nicodemus.sty) where \Statex is undefined, so the
+# pre-fix html_tfsegmentstub() (which used \Statex unconditionally for any
+# non-cryptocode profile) fails to compile here.
+_STUB_GAME_BODIES = {
+    "cryptocode": (
+        r"\begin{pchstack}[boxed]" "\n"
+        r"  \procedure{Test}{" "\n"
+        r"    \tfsegmentstub{Foo}" "\n"
+        r"    \pcreturn 1" "\n"
+        r"  }" "\n"
+        r"\end{pchstack}" "\n"
+    ),
+    "nicodemus": (
+        r"\begin{nicodemus}" "\n"
+        r"\tfsegmentstub{Foo}" "\n"
+        r"\item $x \gets 1$" "\n"
+        r"\end{nicodemus}" "\n"
+    ),
+    "algpseudocodex": (
+        r"\begin{algorithmic}" "\n"
+        r"\tfsegmentstub{Foo}" "\n"
+        r"\State $x \gets 1$" "\n"
+        r"\end{algorithmic}" "\n"
+    ),
+}
+
+
+def _compile_profile_stub(
+    tmp_path: Path, profile_name: str
+) -> subprocess.CompletedProcess[str]:
+    """Typeset ``\\tfsegmentstub{Foo}`` inside *profile_name*'s pseudocode
+    environment, using the exact wrapper the real HTML pipeline builds
+    (``_build_wrapper_template``), and compile it with pdflatex.
+    """
+    if profile_name == "nicodemus":
+        # nicodemus.sty is not on CTAN; supply it locally like other
+        # nicodemus-compiling tests do (see test_sty_compilation.py).
+        shutil.copy2(_NICODEMUS_STY, tmp_path / "nicodemus.sty")
+
+    wrapper_src = _build_wrapper_template(profile_name).format(
+        macro_inputs="", gamename_defs="", game_file="game.tex"
+    )
+    (tmp_path / "wrapper.tex").write_text(wrapper_src, encoding="utf-8")
+    (tmp_path / "game.tex").write_text(
+        _STUB_GAME_BODIES[profile_name], encoding="utf-8"
+    )
+
+    return subprocess.run(
+        ["pdflatex", "-interaction=nonstopmode", "-no-shell-escape", "wrapper.tex"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+
+
+@needs_pdflatex
+@pytest.mark.parametrize("profile_name", ["cryptocode", "nicodemus", "algpseudocodex"])
+def test_html_tfsegmentstub_compiles_per_profile(tmp_path, profile_name):
+    r"""\tfsegmentstub{...} from html_tfsegmentstub() must actually typeset
+    (no undefined-control-sequence errors) inside each profile's pseudocode
+    environment -- this is what the real HTML game-rendering pipeline
+    (_compile_game_to_svg) does. Regression test for the nicodemus \Statex
+    bug: \Statex is undefined in nicodemus's \item-based list environment.
+    """
+    result = _compile_profile_stub(tmp_path, profile_name)
+    pdf = tmp_path / "wrapper.pdf"
+    assert pdf.exists(), (
+        f"pdflatex failed for profile {profile_name!r}.\n"
+        f"Exit code: {result.returncode}\n"
+        f"Log tail:\n{result.stdout[-3000:]}"
+    )
+    assert "Undefined control sequence" not in result.stdout
+    assert "! " not in result.stdout, (
+        f"pdflatex reported an error for profile {profile_name!r}:\n"
+        f"{result.stdout[-3000:]}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# C1: \tfsegment markers must never leak into an UNCROPPED per-game render
+# ---------------------------------------------------------------------------
+#
+# \tfsegment marker lines are only removed by crop_to_active_segments(). Any
+# per-game .tex file that is NOT cropped -- crop off, game 0 (generate_html's
+# `i == 0` check always skips _apply_crop, even when crop_default is on),
+# and the -clean/-removed variants (never cropped) -- previously got the
+# literal marker line verbatim. The HTML wrapper defines \tfsegmentstub but
+# not \tfsegment, so pdflatex hit "Undefined control sequence" (still
+# emitting a PDF under -interaction=nonstopmode) and the caption text leaked
+# into the rendered SVG as a stray algorithm line.
+
+
+@needs_html_tools
+def test_generate_html_strips_tfsegment_markers_when_crop_off(tmp_path, capsys):
+    r"""Full generate_html() pipeline, crop OFF, on a segmented source: no
+    per-game .tex file may contain a literal \tfsegment marker, no compiled
+    PDF may show the marker captions as stray text, and no compile log may
+    report an undefined control sequence. Exercises game 0 specifically
+    (the `i == 0` case that always skips cropping) since that's the game
+    the underlying bug report called out."""
+    games = [
+        Game(label="G0", latex_name="G_0", description="Game 0",
+             reduction=False, related_games=[]),
+        Game(label="G1", latex_name="G_1", description="Game 1",
+             reduction=False, related_games=[]),
+    ]
+    source_text = (
+        r"\begin{algorithmic}[1]" "\n"
+        r"\tfsegment{Setup phase}" "\n"
+        r"\State $x \gets 0$" "\n"
+        r"\tfsegment{Body phase}" "\n"
+        r"\tfonly{G0}{\State $y \gets 0$}" "\n"
+        r"\tfonly{G1}{\State $y \gets 1$}" "\n"
+        r"\end{algorithmic}" "\n"
+    )
+    proof = Proof(
+        source_name="test",
+        macros=[],
+        games=games,
+        source_text=source_text,
+        commentary={},
+        figures=[],
+        package="algpseudocodex",
+        preamble=None,
+        crop_default=False,  # crop OFF
+    )
+
+    out_dir = tmp_path / "html_out"
+    generate_html(proof, tmp_path, out_dir, keep_tmp=True)
+
+    captured = capsys.readouterr()
+    m = re.search(r"Keeping intermediate files in (\S+)", captured.err)
+    assert m, f"Could not find kept-tmp-dir path in stderr:\n{captured.err}"
+    latex_dir = Path(m.group(1))
+
+    # No per-game .tex file should contain a literal \tfsegment marker.
+    for label in ("G0", "G1"):
+        game_tex = (latex_dir / f"{label}.tex").read_text(encoding="utf-8")
+        assert r"\tfsegment{" not in game_tex, (
+            f"{label}.tex still contains a literal \\tfsegment marker "
+            f"(crop is off, so it should have been stripped):\n{game_tex}"
+        )
+
+    # The compiled PDF (kept alongside the SVG under tmp_parent=latex_dir)
+    # must show neither stray caption text nor an undefined-control-sequence
+    # error -- game 0 in particular, since generate_html's `i == 0` check
+    # always skips _apply_crop regardless of crop_default.
+    for label in ("G0", "G1"):
+        wrapper_pdf = latex_dir / label / "wrapper.pdf"
+        assert wrapper_pdf.exists(), f"No compiled PDF kept for {label}"
+        pdf_text = subprocess.run(
+            ["pdftotext", str(wrapper_pdf), "-"],
+            capture_output=True, text=True, timeout=30,
+        ).stdout
+        assert "Setup phase" not in pdf_text, (
+            f"{label}'s compiled PDF leaks the \\tfsegment caption "
+            f"'Setup phase' as stray text:\n{pdf_text}"
+        )
+        assert "Body phase" not in pdf_text, (
+            f"{label}'s compiled PDF leaks the \\tfsegment caption "
+            f"'Body phase' as stray text:\n{pdf_text}"
+        )
+        log_path = latex_dir / label / "wrapper.log"
+        if log_path.exists():
+            log_text = log_path.read_text(encoding="utf-8", errors="replace")
+            assert "Undefined control sequence" not in log_text, (
+                f"pdflatex reported an undefined control sequence for "
+                f"{label} (likely \\tfsegment leaking to the wrapper):\n"
+                f"{log_text[-3000:]}"
+            )
+
+    # The SVG must be a real render, not the build's error placeholder.
+    svg_g0 = out_dir / "games" / "G0.svg"
+    assert svg_g0.exists()
+    svg_text = svg_g0.read_text(encoding="utf-8")
+    assert "render failed" not in svg_text, (
+        f"G0.svg is a render-failure placeholder:\n{svg_text}"
+    )
 
 
 class TestWriteCommentaryFile:

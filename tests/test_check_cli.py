@@ -145,3 +145,16 @@ class TestCheckCommand:
         assert result.exit_code == 0, result.output
         assert "[indcpa]" in result.output
         assert "[intctxt]" in result.output
+
+    def test_tutorial_crop_strict(self):
+        """The segment-cropping tutorial should pass in strict mode.
+
+        It uses \\tfcropdefault{on} with \\tfsegment markers, so a clean strict
+        run also exercises the crop-placement validation warnings staying silent.
+        """
+        tutorial = REPO_ROOT / "examples" / "tutorial-crop" / "main.tex"
+        if not tutorial.exists():
+            pytest.skip("examples/tutorial-crop not found")
+        runner = CliRunner()
+        result = runner.invoke(main, ["check", "--strict", str(tutorial)])
+        assert result.exit_code == 0, result.output

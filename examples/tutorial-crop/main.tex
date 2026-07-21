@@ -1,0 +1,195 @@
+\documentclass{article}
+
+\usepackage[margin=1in,letterpaper]{geometry}
+\usepackage{amsfonts,amsmath,amsthm}
+\usepackage{xcolor}
+\usepackage{algpseudocodex}
+\usepackage[package=algpseudocodex]{texfrog}
+
+\input{macros.tex}
+
+\newtheorem{theorem}{Theorem}
+
+%%% Game registration
+\tfgames{kemdem}{G0, G1, G2, G3, G4}
+\tfgamename{kemdem}{G0}{G_0}
+\tfgamename{kemdem}{G1}{G_1}
+\tfgamename{kemdem}{G2}{G_2}
+\tfgamename{kemdem}{G3}{G_3}
+\tfgamename{kemdem}{G4}{G_4}
+
+\tfdescription{kemdem}{G0}{$\INDCPA$ game for the KEM/DEM hybrid: encapsulate, derive a pad with the PRF, and one-time-pad the challenge message.}
+\tfdescription{kemdem}{G1}{Replace the encapsulated key $K$ with a uniformly random key (KEM $\INDCPA$).}
+\tfdescription{kemdem}{G2}{Replace $\mathrm{PRF}(K,\cdot)$ with a truly random function $\RF$.}
+\tfdescription{kemdem}{G3}{Replace $\RF(r)$ with an independently sampled uniform pad.}
+\tfdescription{kemdem}{G4}{Sample the ciphertext body $c_2$ uniformly, independent of $m_b$.}
+
+\tfmacrofile{macros.tex}
+
+\tfcommentary{kemdem}{G0}{commentary/G0.tex}
+\tfcommentary{kemdem}{G1}{commentary/G1.tex}
+\tfcommentary{kemdem}{G2}{commentary/G2.tex}
+\tfcommentary{kemdem}{G3}{commentary/G3.tex}
+\tfcommentary{kemdem}{G4}{commentary/G4.tex}
+
+%%% Turn on segment cropping document-wide: every diffed \tfrendergame below
+%%% collapses the segments that did not change into a single stub line.
+\tfcropdefault{on}
+
+\tffigure{kemdem}[Games $\tfgamename{kemdem}{G0}$--$\tfgamename{kemdem}{G4}$]{all_games}{G0,G1,G2,G3,G4}
+
+%%% Proof source.
+%%%
+%%% The game is written as a flat sequence of \State lines (no \Procedure
+%%% wrapper), so every \tfsegment marker sits at block depth 0 --- the
+%%% placement cropping requires. Four \tfsegment markers cut the body into
+%%% these pieces:
+%%%   * segment 0: the \begin{algorithmic} opener + game header  (always kept)
+%%%   * Setup, Encapsulation, Key derivation, DEM+output  (interior --- each
+%%%     collapses to a stub in any diffed render where it is unchanged)
+%%%   * the bare \end{algorithmic} closer  (final segment --- always kept)
+%%% Only the opener and the closer are pinned; every content segment can crop.
+\begin{tfsource}{kemdem}
+\begin{algorithmic}[1]
+\State \textbf{Game} $\tfgamename{G0}$: \quad $b \getsr \{0,1\}$;\enspace receive $(m_0, m_1)$ from $\Adversary$
+\tfsegment{Setup}
+\State $(\pk, \sk) \gets \KeyGen()$
+\tfsegment{Encapsulation}
+\tfonly{G0,G2-G4}{\State $(c_1, K) \gets \Encaps(\pk)$}
+\tfonly{G1}{\State $(c_1, \hat{K}) \gets \Encaps(\pk)$}
+\tfonly{G1}{\State $K \getsr \mathcal{K}$}
+\tfsegment{Key derivation}
+\State $r \getsr \{0,1\}^\lambda$
+\tfonly{G0,G1}{\State $\mathit{pad} \gets \mathrm{PRF}(K, r)$}
+\tfonly{G2}{\State $\mathit{pad} \gets \RF(r)$}
+\tfonly{G3,G4}{\State $\mathit{pad} \getsr \{0,1\}^{\ell}$}
+\tfsegment{DEM}
+\tfonly{G0-G3}{\State $c_2 \gets \mathit{pad} \oplus m_b$}
+\tfonly{G4}{\State $c_2 \getsr \{0,1\}^{\ell}$}
+\State \Return $(c_1, c_2)$ to $\Adversary$
+\end{algorithmic}
+\end{tfsource}
+
+\title{Segment Cropping in TeXFrog\\
+{\large A tutorial: IND-CPA of a KEM/DEM hybrid (using the \texttt{algpseudocodex} package)}}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{What this example demonstrates}
+
+Each game hop below changes exactly one line, in one segment, of an otherwise
+unchanging listing. With \verb|\tfcropdefault{on}| set in the preamble, every
+diffed \verb|\tfrendergame| crops away the segments that did not change,
+collapsing each of them into a single \verb|\tfsegmentstub| line such as
+\textcolor{gray}{[Setup unchanged]}. Only the parts that anchor a balanced,
+compilable listing are pinned: segment~0 (the \verb|algorithmic| opener and the
+game header) and the final segment (the bare \verb|\end{algorithmic}| closer).
+Every content segment in between---\emph{Setup}, \emph{Encapsulation},
+\emph{Key derivation}, and \emph{DEM}---collapses whenever the hop leaves it
+unchanged.
+
+Compare Game~$\tfgamename{kemdem}{G4}$ below (three collapsed stubs) against the
+same render forced to a full listing with the PDF-only \verb|crop=off| key.
+
+\section{Construction}
+
+Let $(\KeyGen, \Encaps, \mathsf{Decaps})$ be a KEM with key space $\mathcal{K}$
+and let $\mathrm{PRF}\colon \mathcal{K} \times \{0,1\}^\lambda \to \{0,1\}^{\ell}$
+be a pseudorandom function. The hybrid encryption of a message $m$ encapsulates
+a key $K$, derives a one-time pad $\mathit{pad} \gets \mathrm{PRF}(K, r)$ for a
+fresh nonce $r$, and sends $(c_1, r, \mathit{pad} \oplus m)$.
+
+\section{Security}
+
+\begin{theorem}
+If the KEM is $\INDCPA$-secure and $\mathrm{PRF}$ is a secure pseudorandom
+function, then the hybrid scheme is $\INDCPA$-secure.
+\end{theorem}
+
+\noindent\textit{Proof.}\quad
+We proceed via a sequence of games. Figure~\ref{fig:all-games} shows the full
+listing of every game side by side; the individual figures that follow are
+cropped to the changed segment of each hop.
+
+\begin{figure}[ht]
+\centering
+\tfrenderfigure{kemdem}{G0,G1,G2,G3,G4}
+\caption{Consolidated (uncropped) figure showing games
+$\tfgamename{kemdem}{G0}$--$\tfgamename{kemdem}{G4}$.}
+\label{fig:all-games}
+\end{figure}
+
+\paragraph{Game~$\tfgamename{kemdem}{G0}$.}
+\input{commentary/G0.tex}
+
+\begin{figure}[ht]
+\centering
+\tfrendergame{kemdem}{G0}
+\caption{Game~$\tfgamename{kemdem}{G0}$: the real $\INDCPA$ game. A clean
+(no-\texttt{diff}) render is never cropped, so the full listing appears.}
+\label{fig:G0}
+\end{figure}
+
+\paragraph{Game~$\tfgamename{kemdem}{G1}$.}
+\input{commentary/G1.tex}
+
+\begin{figure}[ht]
+\centering
+\tfrendergame[diff=G0]{kemdem}{G1}
+\caption{Game~$\tfgamename{kemdem}{G1}$: only the \emph{Encapsulation} segment
+changes; \emph{Setup} and \emph{Key derivation} collapse to stubs.}
+\label{fig:G1}
+\end{figure}
+
+\paragraph{Game~$\tfgamename{kemdem}{G2}$.}
+\input{commentary/G2.tex}
+
+\begin{figure}[ht]
+\centering
+\tfrendergame[diff=G1]{kemdem}{G2}
+\caption{Game~$\tfgamename{kemdem}{G2}$: only the \emph{Key derivation} segment
+changes.}
+\label{fig:G2}
+\end{figure}
+
+\paragraph{Game~$\tfgamename{kemdem}{G3}$.}
+\input{commentary/G3.tex}
+
+\begin{figure}[ht]
+\centering
+\tfrendergame[diff=G2]{kemdem}{G3}
+\caption{Game~$\tfgamename{kemdem}{G3}$: again only \emph{Key derivation}
+changes.}
+\label{fig:G3}
+\end{figure}
+
+\paragraph{Game~$\tfgamename{kemdem}{G4}$.}
+\input{commentary/G4.tex}
+
+\begin{figure}[ht]
+\centering
+\tfrendergame[diff=G3]{kemdem}{G4}
+\caption{Game~$\tfgamename{kemdem}{G4}$: only the DEM step changes, so the other
+three content segments (\emph{Setup}, \emph{Encapsulation}, \emph{Key
+derivation}) collapse to stubs.}
+\label{fig:G4}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\tfrendergame[diff=G3, crop=off]{kemdem}{G4}
+\caption{The same hop as Figure~\ref{fig:G4}, forced to a full listing with the
+PDF-only \texttt{crop=off} key. (The HTML viewer ignores per-call
+\texttt{crop=}; it is governed solely by \texttt{\textbackslash tfcropdefault}.)}
+\label{fig:G4-full}
+\end{figure}
+
+\noindent
+Summing the advantage gaps across the four hops bounds the adversary's
+$\INDCPA$ advantage against the hybrid scheme, completing the proof.\hfill$\square$
+
+\end{document}

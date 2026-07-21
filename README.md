@@ -46,6 +46,17 @@ When you want to include game figures in a certain spot in your paper:
 \tfrendergame[diff=G1]{myproof}{G2}
 ```
 
+## Cropping Long Listings
+
+For proofs with many hops, a diffed render can end up mostly showing lines carried over unchanged from earlier games. Mark segment boundaries in the source with `\tfsegment{Caption}`, then opt in to cropping:
+
+```latex
+\tfcropdefault{on}                              % crop every diffed render by default
+\tfrendergame[diff=G3, crop=off]{myproof}{G4}   % force a full listing for this one call
+```
+
+A cropped render keeps only the segments that changed relative to the diff target (plus the always-kept opening and closing segments), collapsing runs of unchanged segments into a single elision line produced by the redefinable `\tfsegmentstub{captions}` macro. `\tfsegment` markers must sit at block depth 0 (never inside an `\If`/`\For`/`\While`), and the `crop=` key is PDF-only --- the HTML viewer follows only `\tfcropdefault`. See [Writing a proof](https://github.com/TeXFrog/TeXFrog/blob/main/docs/writing-proofs.md#cropping-long-listings) for the full reference.
+
 ## Installation
 
 TeXFrog has two components. Most users only need the LaTeX package.
