@@ -4,6 +4,17 @@
 
 ### New features
 
+- **Segment cropping of diffed renders.** `\tfsegment{Caption}` markers split a
+  `tfsource` body into segments, and with `\tfcropdefault{on}` (or a per-call
+  `crop=on`, PDF only) a diffed `\tfrendergame` shows only the segments that
+  changed, collapsing each unchanged interior segment into a redefinable
+  `\tfsegmentstub{caption}` line. The opener (segment 0) and the environment
+  closer are always kept so the emitted listing stays balanced. `texfrog check`
+  warns on misplaced markers (nonzero block depth, empty captions,
+  braces-in-caption, `crop`-without-segments). Best used with the line-based
+  `algpseudocodex`/`nicodemus` profiles; see the new
+  [tutorial-crop/](examples/tutorial-crop/) worked example.
+
 - **`algpseudocodex` package profile.** `\usepackage[package=algpseudocodex]{texfrog}`
   and `texfrog init --package algpseudocodex` scaffold proofs using the `algpseudocodex`
   package's `\State`/`\Statex`-based pseudocode, alongside the existing `cryptocode` and

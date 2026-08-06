@@ -20,3 +20,6 @@ uv.lock
 # Claude Code
 .claude/settings.local.json
 .claude/worktrees/**
+
+# Superpowers
+docs/superpowers

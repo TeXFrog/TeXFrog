@@ -49,6 +49,17 @@ class PackageProfile:
     uses structural braces (``endswith("{")``) to mark headers instead.
     """
 
+    line_counter_name: str | None = None
+    """Name of the LaTeX counter this package uses for line numbers, or
+    ``None`` if the package does not number lines.
+
+    When set (``"ALG@line"`` for algpseudocodex), a cropped HTML render
+    injects ``\\setcounter{<name>}{N}`` before each kept segment so the kept
+    lines keep their ABSOLUTE numbers from the full listing (numbers jump
+    across a stub instead of renumbering contiguously), matching the LaTeX
+    crop-render's line-count pass in ``texfrog.sty``.
+    """
+
     # -- Derived macro definitions ------------------------------------------
 
     def html_tfchanged(self) -> str:
@@ -113,6 +124,42 @@ class PackageProfile:
             r"\providecommand{\tfgamelabel}[2]{#2 \tfniccodecomment{#1}}"
         )
 
+    def html_tfsegmentstub(self) -> str:
+        r"""Return the \tfsegmentstub definition for the HTML wrapper.
+
+        Mirrors the three ``\tfsegmentstub`` definitions in ``latex/texfrog.sty``
+        exactly, so the HTML output matches the PDF:
+
+        - cryptocode (``has_line_separators``): math content terminated by
+          ``\\`` (cryptocode's pchstack lines are ``\\``-separated).
+        - nicodemus (``gamelabel_comment_cmd is None``): ``\item``-prefixed,
+          since nicodemus is an ``\item``-based list environment where
+          ``\Statex`` is undefined.
+        - algpseudocodex (otherwise): ``\Statex``-prefixed unnumbered
+          continuation line.
+
+        ``\ensuremath`` (not literal ``$...$``) is required for ``\cdots``:
+        cryptocode's procedure body is already in implicit math mode, so a
+        literal ``$`` would toggle back out to text mode mid-line.
+        """
+        body = r"{\color{black!55}\ensuremath{\cdots}~\textit{#1~(unchanged)}~\ensuremath{\cdots}}"
+        if self.has_line_separators:  # cryptocode: math + \\ separated lines
+            return r"\newcommand{\tfsegmentstub}[1]{" + body + r" \\}"
+        if self.gamelabel_comment_cmd is None:  # nicodemus: \item-based list env
+            return r"\newcommand{\tfsegmentstub}[1]{\item " + body + r"}"
+        # algpseudocodex: unnumbered continuation line. algpseudocodex
+        # \pretocmd's its line-closing hook \algpx@endCodeCommand onto
+        # \State/\If/... but NOT onto \Statex, so a stub directly after a
+        # \State would push that \State's content below its own line number.
+        # Run the hook first (guarded, catcode-agnostic via \csname since the
+        # HTML preamble has no \makeatletter) so the preceding line renders
+        # normally. Mirrors the base \tfsegmentstub in latex/texfrog.sty.
+        hook = (
+            r"\ifcsname algpx@endCodeCommand\endcsname"
+            r"\csname algpx@endCodeCommand\endcsname\fi"
+        )
+        return r"\newcommand{\tfsegmentstub}[1]{" + hook + r"\Statex " + body + r"}"
+
     def procedure_header_def(self) -> str | None:
         r"""``\providecommand`` definition for the procedure header command.
 
@@ -164,6 +211,7 @@ BUILTIN_PROFILES: dict[str, PackageProfile] = {
         # \providecommand is a no-op here (already defined) — this name only
         # drives wrap_changed_line()'s header-skip detection.
         procedure_header_cmd="Procedure",
+        line_counter_name="ALG@line",
     ),
 }
 

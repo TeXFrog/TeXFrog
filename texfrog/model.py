@@ -35,4 +35,5 @@ class Proof:
     figures: list[Figure]           # Consolidated figure specs
     package: str = "cryptocode"     # Package profile name (see packages.py)
     preamble: Optional[str] = None  # Path to extra preamble .tex file (relative to input dir)
+    crop_default: bool = False      # True when \tfcropdefault{on} is present
     commentary_files: dict[str, str] = field(default_factory=dict)  # game_label -> relative file path
