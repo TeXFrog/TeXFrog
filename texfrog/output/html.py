@@ -689,22 +689,32 @@ def generate_html(
         # (and are not left as full, uncropped listings).
         reduction_active: dict[str, set[int]] = {}
 
+        # Diff target actually used per game (after resolving \tfrendergame
+        # diff= overrides), so the removed-panel step below can reuse it
+        # instead of re-deriving list-order predecessors.
+        prev_label_by_game: dict[str, Optional[str]] = {}
+
         # Build filtered lines per game, compute diffs, and write .tex files.
         for i, game in enumerate(proof.games):
             label = game.label
             game_lines = _filter_game(label)
 
-            # Compute changed lines relative to previous game.
+            # Compute changed lines relative to the diff target.
             # Use diff lines (with \tfonly* stripped) so that per-game headers
             # (which change between every game) are not highlighted.
-            # Non-reduction games diff against the previous non-reduction game
-            # (skipping intervening reductions); reductions diff against the
-            # immediately preceding entry.
+            # An explicit \tfrendergame[diff=X] target wins; otherwise
+            # non-reduction games diff against the previous non-reduction
+            # game (skipping intervening reductions), and reductions diff
+            # against the immediately preceding entry. This mirrors the PDF
+            # renderer so branching game families (case splits) don't show
+            # spurious rollback diffs in the HTML viewer (see issue #17).
             prev_label = None
             if i == 0:
                 changed: set[int] = set()
             else:
-                if game.reduction:
+                if game.diff_target is not None:
+                    prev_label = game.diff_target
+                elif game.reduction:
                     prev_label = ordered_labels[i - 1]
                 else:
                     prev_label = None
@@ -719,6 +729,7 @@ def generate_html(
                         _filter_game_for_diff(prev_label),
                         _filter_game_for_diff(label),
                     )
+            prev_label_by_game[label] = prev_label
 
             if proof.crop_default and i > 0 and prev_label is not None:
                 if game.reduction and game.related_games:
@@ -751,18 +762,26 @@ def generate_html(
                 )
 
         # Generate removed-highlight .tex files for the side-by-side view.
-        # Each non-reduction game (except the last one) may appear as the
-        # "previous" panel, with red strikethrough on lines removed/changed
-        # in the next non-reduction game.  Reductions are skipped since they
-        # use the related_games display instead.
+        # Each non-reduction game with a diff target (its \tfrendergame
+        # diff= override, or by default the previous non-reduction game) gets
+        # a "prev" panel showing that target's code with red strikethrough on
+        # lines removed/changed in this game. Reductions are skipped since
+        # they use the related_games display instead.
+        #
+        # Keyed by the *following* game (the one being displayed), not the
+        # target: a branch point can be the diff target of several
+        # successors, each needing its own removed-set/crop, so a single
+        # {target}-removed file would collide (issue #17).
         non_red_games = [g for g in proof.games if not g.reduction]
-        for i, game in enumerate(non_red_games[:-1]):
-            prev_lines = _filter_game(game.label)
-            next_game = non_red_games[i + 1]
-            next_lines = _filter_game(next_game.label)
+        for game in non_red_games:
+            prev_label = prev_label_by_game.get(game.label)
+            if prev_label is None:
+                continue
+            prev_lines = _filter_game(prev_label)
+            next_lines = _filter_game(game.label)
             # Use diff lines (with \tfonly* stripped) for change detection
-            prev_diff = _filter_game_for_diff(game.label)
-            next_diff = _filter_game_for_diff(next_game.label)
+            prev_diff = _filter_game_for_diff(prev_label)
+            next_diff = _filter_game_for_diff(game.label)
             removed_indices = compute_removed_lines(prev_diff, next_diff)
             out_prev_lines = prev_lines
             if proof.crop_default:
@@ -774,8 +793,8 @@ def generate_html(
                     k for k, orig in enumerate(idx_map) if orig in removed_indices
                 }
             _write_game_file(
-                game.label, out_prev_lines, removed_indices,
-                latex_dir / f"{game.label}-removed.tex",
+                prev_label, out_prev_lines, removed_indices,
+                latex_dir / f"{game.label}-prev-removed.tex",
                 macro=r"\tfremoved",
                 procedure_header_cmd=proc_hdr_cmd,
             )
@@ -826,12 +845,12 @@ def generate_html(
                 wrapper_template,
             ))
             # Removed (red strikethrough) version — needed for non-reduction
-            # games that have a successor non-reduction game.
-            if not game.reduction and game in non_red_games[:-1]:
+            # games that have a diff target (see prev_label_by_game above).
+            if not game.reduction and prev_label_by_game.get(label) is not None:
                 tasks.append((
-                    f"{label}-removed",
-                    (latex_dir / f"{label}-removed.tex").resolve(),
-                    games_dir / f"{label}-removed.svg",
+                    f"{label}-prev-removed",
+                    (latex_dir / f"{label}-prev-removed.tex").resolve(),
+                    games_dir / f"{label}-prev-removed.svg",
                     game_names,
                     wrapper_template,
                 ))
@@ -891,6 +910,7 @@ def generate_html(
             "description": _expand_tfgamename(game.description, game_names),
             "has_commentary": bool(proof.commentary.get(game.label, "").strip()),
             "reduction": game.reduction,
+            "diff_target": prev_label_by_game.get(game.label),
             "related_games": game.related_games,
         })
 

@@ -332,27 +332,52 @@ output_dir/
 ├── app.js           # showGame(), navigate(), keyboard nav (arrow keys)
 └── games/
     ├── G0.svg               # highlighted version (blue on new/changed lines)
-    ├── G0-removed.svg       # removed version (red strikethrough on deleted/changed lines)
     ├── G0_commentary.svg    # rendered commentary (only if commentary was provided)
     ├── G1.svg
-    ├── G1-removed.svg
+    ├── G1-prev-removed.svg  # G1's diff target's code, red strikethrough on lines
+    │                        # removed/changed going into G1
     ├── G1_commentary.svg
     ├── Red1-G0-clean.svg    # clean panel for reduction Red1's related game G0
     ├── Red1-G1-clean.svg    # clean panel for reduction Red1's related game G1
     └── ...
 ```
 
-Each game is compiled twice: once with `\tfchanged` highlighting (blue, for the
-current-game panel) and once with `\tfremoved` highlighting (red strikethrough, for
-the previous-game panel in side-by-side view showing lines that will be removed or
-changed in the next game). The last game does not need a removed SVG since it never
-appears as a "previous" game. A reduction's `related_games` panels get a third
-"clean" compilation with no highlighting — one **per (reduction, related-game)
-pair**, named `{reduction}-{related}-clean.svg`. When cropping is on, all panels of
-a reduction (both related games *and* the reduction itself) are cropped to the same
-segment set, so the flanking clean panels line up with the reduction rather than
-showing a full listing (see below). A game related to two reductions therefore gets
-two distinct clean files (different crops).
+Each non-first game is compiled twice: once with `\tfchanged` highlighting (blue,
+for the current-game panel) and once with `\tfremoved` highlighting (red
+strikethrough, for the diff target's panel in side-by-side view showing lines that
+are removed or changed going into this game). The diff target is the game's
+`\tfrendergame[diff=X]` override (`Game.diff_target`) if set, otherwise the previous
+non-reduction game in `\tfgames` order — see "Diff Target Resolution" below. The
+removed file is keyed by the **successor**, not the target
+(`{label}-prev-removed.svg`, not `{target}-removed.svg`): a branch point can be the
+diff target of several later games, and keying by the target would make each new
+successor's file clobber the last one's (issue #17). A game with no diff target
+(the very first game in a family) gets no removed panel. A reduction's
+`related_games` panels get a third "clean" compilation with no highlighting — one
+**per (reduction, related-game) pair**, named `{reduction}-{related}-clean.svg`.
+When cropping is on, all panels of a reduction (both related games *and* the
+reduction itself) are cropped to the same segment set, so the flanking clean panels
+line up with the reduction rather than showing a full listing (see below). A game
+related to two reductions therefore gets two distinct clean files (different crops).
+
+### Diff Target Resolution
+
+`\tfrendergame[diff=X]{source}{game}` (parsed in `tex_parser.py` via
+`_extract_opt_two_args` + `diff=` key lookup) sets `Game.diff_target`, validated
+against the source's `\tfgames` list (unknown label or self-reference raise
+`ValueError`; conflicting `diff=` values for the same game across multiple
+`\tfrendergame` calls also raise). In `html.py`'s `generate_html`, each game's
+effective diff target (`prev_label_by_game`) is: `game.diff_target` if set,
+otherwise `ordered_labels[i-1]` for reductions, otherwise the previous
+non-reduction game (skipping reductions) for regular games. This mirrors the PDF
+renderer, which already honors `diff=` — before this resolution existed, the HTML
+viewer always used the list-order predecessor, so a branching game family (case
+splits) showed spurious "rollback" diffs at every branch head whenever a later
+game's list predecessor wasn't its actual diff target (issue #17). The resolved
+target also drives crop computation (`_apply_crop`/`_reduction_active_segments`
+already crop relative to `prev_label`, so they inherit the fix automatically) and
+is exposed per-game in the HTML manifest (`games_data[i]["diff_target"]`) so
+`app.js` picks the same target instead of re-deriving list order client-side.
 
 HTML features: MathJax for LaTeX names and descriptions, URL hash navigation (`#G1`),
 keyboard arrows, commentary rendered as SVG via the LaTeX pipeline, prev/next buttons,
@@ -360,9 +385,12 @@ side-by-side game comparison.
 
 ### Side-by-Side Display
 
-After the first game, the HTML viewer shows the previous game (with red strikethrough
-on lines that are removed or changed) next to the current game (with blue highlights
-on new/changed lines), making it easy to see what changed between game transitions.
+After the first game, the HTML viewer shows the game's diff target (with red
+strikethrough on lines that are removed or changed) next to the current game (with
+blue highlights on new/changed lines), making it easy to see what changed between
+game transitions. `app.js` picks the target from the manifest's `diff_target` field
+rather than assuming the previous game in the list, so branching game families
+(case splits) show the correct diff at every branch head.
 
 Reductions support a `related_games` field listing zero, one, or two game labels:
 - **0 related games**: the reduction is shown alone (legacy behaviour).

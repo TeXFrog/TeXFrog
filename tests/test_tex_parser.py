@@ -440,6 +440,79 @@ class TestParseTexProof:
         with pytest.raises(ValueError, match="unknown related game"):
             parse_tex_proof(tex)
 
+    def test_tfrendergame_diff_target_parsed(self, tmp_path):
+        tex = tmp_path / "diff.tex"
+        tex.write_text(
+            "\\tfgames{s}{G0, G1a, G1b}\n"
+            "\\begin{tfsource}{s}body\\end{tfsource}\n"
+            "\\tfrendergame{s}{G0}\n"
+            "\\tfrendergame[diff=G0]{s}{G1a}\n"
+            "\\tfrendergame[diff=G0]{s}{G1b}\n",
+            encoding="utf-8",
+        )
+        proof = parse_tex_proof(tex)
+        by_label = {g.label: g for g in proof.games}
+        assert by_label["G0"].diff_target is None
+        assert by_label["G1a"].diff_target == "G0"
+        assert by_label["G1b"].diff_target == "G0"
+
+    def test_tfrendergame_without_diff_key_ignored(self, tmp_path):
+        tex = tmp_path / "diff.tex"
+        tex.write_text(
+            "\\tfgames{s}{G0, G1}\n"
+            "\\begin{tfsource}{s}body\\end{tfsource}\n"
+            "\\tfrendergame[crop=off]{s}{G1}\n",
+            encoding="utf-8",
+        )
+        proof = parse_tex_proof(tex)
+        by_label = {g.label: g for g in proof.games}
+        assert by_label["G1"].diff_target is None
+
+    def test_tfrendergame_diff_target_unknown_label_raises(self, tmp_path):
+        tex = tmp_path / "bad.tex"
+        tex.write_text(
+            "\\tfgames{s}{G0, G1}\n"
+            "\\begin{tfsource}{s}body\\end{tfsource}\n"
+            "\\tfrendergame[diff=G99]{s}{G1}\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(ValueError, match="is not in"):
+            parse_tex_proof(tex)
+
+    def test_tfrendergame_diff_target_self_reference_raises(self, tmp_path):
+        tex = tmp_path / "bad.tex"
+        tex.write_text(
+            "\\tfgames{s}{G0, G1}\n"
+            "\\begin{tfsource}{s}body\\end{tfsource}\n"
+            "\\tfrendergame[diff=G1]{s}{G1}\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(ValueError, match="cannot use itself"):
+            parse_tex_proof(tex)
+
+    def test_tfrendergame_diff_target_on_first_game_raises(self, tmp_path):
+        tex = tmp_path / "bad.tex"
+        tex.write_text(
+            "\\tfgames{s}{G0, G1}\n"
+            "\\begin{tfsource}{s}body\\end{tfsource}\n"
+            "\\tfrendergame[diff=G1]{s}{G0}\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(ValueError, match="first entry"):
+            parse_tex_proof(tex)
+
+    def test_tfrendergame_conflicting_diff_targets_raises(self, tmp_path):
+        tex = tmp_path / "bad.tex"
+        tex.write_text(
+            "\\tfgames{s}{G0, G1, G2}\n"
+            "\\begin{tfsource}{s}body\\end{tfsource}\n"
+            "\\tfrendergame[diff=G0]{s}{G2}\n"
+            "\\tfrendergame[diff=G1]{s}{G2}\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(ValueError, match="conflicting"):
+            parse_tex_proof(tex)
+
     def test_multiple_tfsource_raises(self, tmp_path):
         tex = tmp_path / "multi.tex"
         tex.write_text(

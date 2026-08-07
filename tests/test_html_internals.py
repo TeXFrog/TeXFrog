@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
 import subprocess
@@ -311,6 +312,177 @@ def test_generate_html_strips_tfsegment_markers_when_crop_off(tmp_path, capsys):
     assert "render failed" not in svg_text, (
         f"G0.svg is a render-failure placeholder:\n{svg_text}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Issue #17: \tfrendergame diff= target must be honored in the HTML viewer,
+# and the removed-panel file must be keyed by the successor (not the diff
+# target), so a branch point that is the diff target of several games
+# doesn't collide on a single "{target}-removed.svg" file.
+# ---------------------------------------------------------------------------
+
+
+@needs_html_tools
+def test_generate_html_honors_branching_diff_target(tmp_path, capsys):
+    r"""Family {G0, G1a, G1b} where both G1a and G1b branch off G0 (both set
+    \tfrendergame[diff=G0]). Regression test for issue #17: without honoring
+    diff_target, G1b's HTML diff target would default to its list
+    predecessor G1a, and without keying removed-panel files by the
+    successor, G1a's and G1b's "prev" panels would collide on a single
+    G0-removed file."""
+    games = [
+        Game(label="G0", latex_name="G_0", description="Game 0",
+             reduction=False, related_games=[]),
+        Game(label="G1a", latex_name="G_{1a}", description="Branch A",
+             reduction=False, related_games=[], diff_target="G0"),
+        Game(label="G1b", latex_name="G_{1b}", description="Branch B",
+             reduction=False, related_games=[], diff_target="G0"),
+    ]
+    source_text = (
+        r"\begin{pcvstack}" "\n"
+        r"common line \\" "\n"
+        r"\tfonly{G0}{val-G0-only} \\" "\n"
+        r"\tfonly{G1a}{val-G1a-only} \\" "\n"
+        r"\tfonly{G1b}{val-G1b-only} \\" "\n"
+        r"\end{pcvstack}" "\n"
+    )
+    proof = Proof(
+        source_name="test",
+        macros=[],
+        games=games,
+        source_text=source_text,
+        commentary={},
+        figures=[],
+        package="cryptocode",
+        preamble=None,
+        crop_default=False,
+    )
+
+    out_dir = tmp_path / "html_out"
+    generate_html(proof, tmp_path, out_dir, keep_tmp=True)
+
+    captured = capsys.readouterr()
+    m = re.search(r"Keeping intermediate files in (\S+)", captured.err)
+    assert m, f"Could not find kept-tmp-dir path in stderr:\n{captured.err}"
+    latex_dir = Path(m.group(1))
+
+    # Both branches must get their own "prev" removed-highlight file, keyed
+    # by the successor (G1a/G1b), not the shared diff target (G0) --
+    # otherwise the second write silently clobbers the first.
+    g1a_prev = (latex_dir / "G1a-prev-removed.tex").read_text(encoding="utf-8")
+    g1b_prev = (latex_dir / "G1b-prev-removed.tex").read_text(encoding="utf-8")
+
+    # Both panels show G0's content (the actual diff target), not G1a's --
+    # the bug this regresses against would make G1b's panel show G1a's
+    # content (its list predecessor) instead.
+    for content, label in [(g1a_prev, "G1a"), (g1b_prev, "G1b")]:
+        assert "val-G0-only" in content, (
+            f"{label}-prev-removed.tex should show G0's content (the "
+            f"explicit diff= target), got:\n{content}"
+        )
+        assert "val-G1a-only" not in content, (
+            f"{label}-prev-removed.tex incorrectly shows G1a's content "
+            f"instead of the diff target G0's:\n{content}"
+        )
+        assert "val-G1b-only" not in content, (
+            f"{label}-prev-removed.tex incorrectly shows G1b's content "
+            f"instead of the diff target G0's:\n{content}"
+        )
+
+    # Both compiled SVGs must exist as real renders (not error placeholders
+    # and not one overwriting the other).
+    for label in ("G1a", "G1b"):
+        svg = out_dir / "games" / f"{label}-prev-removed.svg"
+        assert svg.exists(), f"Missing {svg.name}"
+        assert "render failed" not in svg.read_text(encoding="utf-8")
+
+    # The manifest embedded in index.html must expose diff_target so app.js
+    # can pick the correct panel instead of assuming list order.
+    index_html = (out_dir / "index.html").read_text(encoding="utf-8")
+    m_manifest = re.search(r"const GAMES = (\[.*?\]);", index_html, re.DOTALL)
+    assert m_manifest, "Could not find GAMES manifest in index.html"
+    manifest = json.loads(m_manifest.group(1))
+    by_label = {g["label"]: g for g in manifest}
+    assert by_label["G1a"]["diff_target"] == "G0"
+    assert by_label["G1b"]["diff_target"] == "G0"
+
+
+@needs_html_tools
+def test_generate_html_crop_follows_diff_target_not_list_order(tmp_path, capsys):
+    r"""Segment cropping must key off the resolved diff target, not list
+    order. Family {G0, G1a, G1b}, both explicitly diff=G0, crop_default=True.
+    G1a differs from G0 in the middle segment; G1b is textually identical to
+    G0 everywhere. Cropped against the correct target (G0), G1b's changed
+    segment is empty, so its only content-bearing segment gets stubbed away
+    entirely. Cropped against the buggy list-order fallback (G1a, since G1a
+    is G1b's immediate predecessor in \tfgames order), that segment would be
+    (spuriously) marked active because G1a's own content differs from G1b's
+    there -- the exact "rollback" failure mode from issue #17."""
+    games = [
+        Game(label="G0", latex_name="G_0", description="Game 0",
+             reduction=False, related_games=[]),
+        Game(label="G1a", latex_name="G_{1a}", description="Branch A",
+             reduction=False, related_games=[], diff_target="G0"),
+        Game(label="G1b", latex_name="G_{1b}", description="Branch B",
+             reduction=False, related_games=[], diff_target="G0"),
+    ]
+    source_text = (
+        r"\begin{algorithmic}[1]" "\n"
+        r"\State opener-line" "\n"
+        r"\tfsegment{Middle}" "\n"
+        r"\tfonly{G0}{\State base-content}" "\n"
+        r"\tfonly{G1a}{\State changed-content}" "\n"
+        r"\tfonly{G1b}{\State base-content}" "\n"
+        r"\tfsegment{Filler}" "\n"
+        r"\State filler-content" "\n"
+        r"\tfsegment{Closer}" "\n"
+        r"\State closer-line" "\n"
+        r"\end{algorithmic}" "\n"
+    )
+    proof = Proof(
+        source_name="test",
+        macros=[],
+        games=games,
+        source_text=source_text,
+        commentary={},
+        figures=[],
+        package="algpseudocodex",
+        preamble=None,
+        crop_default=True,
+    )
+
+    out_dir = tmp_path / "html_out"
+    generate_html(proof, tmp_path, out_dir, keep_tmp=True)
+
+    captured = capsys.readouterr()
+    m = re.search(r"Keeping intermediate files in (\S+)", captured.err)
+    assert m, f"Could not find kept-tmp-dir path in stderr:\n{captured.err}"
+    latex_dir = Path(m.group(1))
+
+    g1a_tex = (latex_dir / "G1a.tex").read_text(encoding="utf-8")
+    g1b_tex = (latex_dir / "G1b.tex").read_text(encoding="utf-8")
+
+    # G1a truly differs from its target G0 in "Middle" -- that segment stays.
+    assert "changed-content" in g1a_tex
+
+    # G1b is textually identical to its target G0 everywhere, so "Middle"
+    # (and "Filler") must be cropped away entirely -- if G1b's diff target
+    # had fallen back to list order (G1a) instead of honoring diff=G0, this
+    # segment would be spuriously kept/marked changed since G1a's content
+    # differs from G1b's here.
+    assert "base-content" not in g1b_tex, (
+        f"G1b.tex should have cropped away its unchanged-vs-G0 'Middle' "
+        f"segment, but found 'base-content' (spurious diff vs list "
+        f"predecessor G1a instead of the real target G0):\n{g1b_tex}"
+    )
+    assert "filler-content" not in g1b_tex
+
+    # The "prev" panel mirrors this: G1a's shows G0's real diff (kept),
+    # G1b's shows no diff at all (stubbed).
+    g1a_prev = (latex_dir / "G1a-prev-removed.tex").read_text(encoding="utf-8")
+    g1b_prev = (latex_dir / "G1b-prev-removed.tex").read_text(encoding="utf-8")
+    assert "base-content" in g1a_prev
+    assert "base-content" not in g1b_prev
 
 
 class TestWriteCommentaryFile:

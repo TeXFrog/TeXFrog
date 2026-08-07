@@ -146,6 +146,23 @@ def _skip_whitespace(text: str, pos: int) -> int:
     return pos
 
 
+def _parse_key_equals_value(opt: str) -> dict[str, str]:
+    r"""Parse a comma-separated ``key=value`` option string.
+
+    Used for the ``[...]`` argument of commands like ``\tfrendergame``,
+    e.g. ``"diff=G0"`` -> ``{"diff": "G0"}``. Tokens without ``=`` are
+    ignored (e.g. bare flags this parser doesn't need).
+    """
+    result: dict[str, str] = {}
+    for token in opt.split(","):
+        token = token.strip()
+        if not token or "=" not in token:
+            continue
+        key, _, value = token.partition("=")
+        result[key.strip()] = value.strip()
+    return result
+
+
 # -----------------------------------------------------------------------
 # Command extraction helpers
 # -----------------------------------------------------------------------
@@ -488,6 +505,26 @@ def parse_tex_proofs(tex_path: Path) -> list[Proof]:
             g.strip() for g in games_str.split(",") if g.strip()
         ]
 
+    # --- diff targets (per-source): \tfrendergame[diff=X]{source}{game} ---
+    diff_by_source: dict[str, dict[str, str]] = {}
+    for opt, source, label in _extract_opt_two_args(text, "tfrendergame"):
+        if not opt:
+            continue
+        diff_label = _parse_key_equals_value(opt).get("diff")
+        if diff_label is None:
+            continue
+        source = source.strip()
+        label = label.strip()
+        diff_label = diff_label.strip()
+        existing = diff_by_source.setdefault(source, {})
+        if label in existing and existing[label] != diff_label:
+            raise ValueError(
+                f"Game '{label}' in source '{source}' has conflicting "
+                f"\\tfrendergame diff= targets: '{existing[label]}' and "
+                f"'{diff_label}'."
+            )
+        existing[label] = diff_label
+
     # --- macros (global) ---
     macros: list[str] = _extract_one_arg(text, "tfmacrofile")
     for macro_rel in macros:
@@ -568,6 +605,7 @@ def parse_tex_proofs(tex_path: Path) -> list[Proof]:
         desc_map = descs_by_source.get(source_name, {})
         reduction_labels = reductions_by_source.get(source_name, set())
         related_map = related_by_source.get(source_name, {})
+        diff_map = diff_by_source.get(source_name, {})
 
         games: list[Game] = []
         for label in ordered_labels:
@@ -592,12 +630,36 @@ def parse_tex_proofs(tex_path: Path) -> list[Proof]:
                         f"references unknown related game '{ref}'. "
                         f"Available labels: {ordered_labels}"
                     )
+            diff_target = diff_map.get(label)
+            if diff_target is not None:
+                if diff_target == label:
+                    raise ValueError(
+                        f"Game '{label}' in source '{source_name}' cannot "
+                        f"use itself as its own \\tfrendergame diff= target."
+                    )
+                if diff_target not in ordered_labels:
+                    raise ValueError(
+                        f"Game '{label}' in source '{source_name}' has "
+                        f"\\tfrendergame diff='{diff_target}' but "
+                        f"'{diff_target}' is not in "
+                        f"\\tfgames{{{source_name}}}{{...}}. "
+                        f"Available labels: {ordered_labels}"
+                    )
+                if label == ordered_labels[0]:
+                    raise ValueError(
+                        f"Game '{label}' in source '{source_name}' is the "
+                        f"first entry in \\tfgames{{{source_name}}}{{...}} "
+                        f"and cannot use \\tfrendergame diff='{diff_target}': "
+                        f"the HTML viewer never diffs the first game, so this "
+                        f"would render differently from the PDF."
+                    )
             games.append(Game(
                 label=label,
                 latex_name=latex_name,
                 description=description,
                 reduction=is_reduction,
                 related_games=related,
+                diff_target=diff_target,
             ))
 
         proofs.append(Proof(

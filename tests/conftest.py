@@ -102,6 +102,7 @@ GAMES_DATA = [
         "has_commentary": False,
         "reduction": False,
         "related_games": [],
+        "diff_target": None,
     },
     {
         "label": "G1",
@@ -110,6 +111,7 @@ GAMES_DATA = [
         "has_commentary": True,
         "reduction": False,
         "related_games": [],
+        "diff_target": "G0",
     },
     {
         "label": "Red1",
@@ -118,6 +120,7 @@ GAMES_DATA = [
         "has_commentary": False,
         "reduction": True,
         "related_games": ["G0", "G1"],
+        "diff_target": "G1",
     },
     {
         "label": "G2",
@@ -126,6 +129,7 @@ GAMES_DATA = [
         "has_commentary": False,
         "reduction": False,
         "related_games": [],
+        "diff_target": "G1",
     },
     {
         "label": "G3",
@@ -134,6 +138,7 @@ GAMES_DATA = [
         "has_commentary": True,
         "reduction": False,
         "related_games": [],
+        "diff_target": "G2",
     },
 ]
 
@@ -173,10 +178,10 @@ def html_site_dir(tmp_path_factory):
         (games_dir / f"{label}-clean.svg").write_text(
             _make_placeholder_svg(f"{label}-clean"), encoding="utf-8"
         )
-        # Removed variant (for side-by-side with next game)
-        if not g["reduction"]:
-            (games_dir / f"{label}-removed.svg").write_text(
-                _make_placeholder_svg(f"{label}-removed"), encoding="utf-8"
+        # Removed variant (for side-by-side with the diff target's code)
+        if not g["reduction"] and g["diff_target"]:
+            (games_dir / f"{label}-prev-removed.svg").write_text(
+                _make_placeholder_svg(f"{label}-prev-removed"), encoding="utf-8"
             )
         # Commentary SVG
         if g["has_commentary"]:

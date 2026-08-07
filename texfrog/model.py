@@ -14,6 +14,7 @@ class Game:
     description: str  # One-sentence LaTeX description
     reduction: bool = False  # True for reductions (shown alone, not side-by-side)
     related_games: list[str] = field(default_factory=list)  # 0–2 game labels shown alongside this reduction
+    diff_target: Optional[str] = None  # \tfrendergame[diff=X] override; None = default linear-order predecessor
 
 
 @dataclass

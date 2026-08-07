@@ -177,15 +177,15 @@ function showGame(idx) {
       }
     }
   } else if (idx > 0 && !g.reduction) {
-    // Regular game transition: show previous non-reduction game with removed
-    // highlights alongside the current highlighted game.
-    let prev = null;
-    for (let j = idx - 1; j >= 0; j--) {
-      if (!games[j].reduction) { prev = games[j]; break; }
-    }
+    // Regular game transition: show the diff target (g.diff_target — either
+    // an explicit \tfrendergame[diff=X] override or the default previous
+    // non-reduction game) with removed highlights alongside the current
+    // highlighted game. Keyed by g.label, not the target: a branch point
+    // can be the diff target of several successors (see issue #17).
+    const prev = g.diff_target ? findGame(g.diff_target) : null;
     if (prev) {
       container.appendChild(
-        makePanel(prev.label, prev.latex_name, `games/${prev.label}-removed.svg`)
+        makePanel(prev.label, prev.latex_name, `games/${g.label}-prev-removed.svg`)
       );
     }
     container.appendChild(
@@ -295,11 +295,8 @@ function renderAllForPrint() {
         if (rg1) panels.appendChild(makePrintPanel(rg1.label, rg1.latex_name, `games/${g.label}-${rg1.label}-clean.svg`));
       }
     } else if (idx > 0 && !g.reduction) {
-      let prev = null;
-      for (let j = idx - 1; j >= 0; j--) {
-        if (!games[j].reduction) { prev = games[j]; break; }
-      }
-      if (prev) panels.appendChild(makePrintPanel(prev.label, prev.latex_name, `games/${prev.label}-removed.svg`));
+      const prev = g.diff_target ? findGame(g.diff_target) : null;
+      if (prev) panels.appendChild(makePrintPanel(prev.label, prev.latex_name, `games/${g.label}-prev-removed.svg`));
       panels.appendChild(makePrintPanel(g.label, g.latex_name, `games/${g.label}.svg`));
     } else {
       panels.appendChild(makePrintPanel(g.label, g.latex_name, `games/${g.label}.svg`));
