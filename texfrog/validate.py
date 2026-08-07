@@ -34,8 +34,40 @@ def validate_proof(proof: Proof, base_dir: Path) -> list[str]:
     Returns:
         A list of warning strings, one per issue found.
     """
-    warnings: list[str] = []
+    warnings: list[str] = list(proof.parse_warnings)
     ordered_labels = [g.label for g in proof.games]
+
+    # \tfrendergame diff= targets the HTML viewer can't use. The viewer walks
+    # \tfgames forwards and shows each game against a baseline, so the baseline
+    # must be an earlier entry. A target that isn't (the first game, which has
+    # no predecessor; a forward reference; a game naming itself) is still valid
+    # LaTeX and renders as written in the PDF -- the viewer just falls back to
+    # its default baseline, so the two outputs diverge for that game.
+    position = {label: i for i, label in enumerate(ordered_labels)}
+    for i, game in enumerate(proof.games):
+        target = game.diff_target
+        if target is None or target not in position:
+            continue
+        if position[target] >= i:
+            if i == 0:
+                why = (
+                    f"'{game.label}' is the first entry in \\tfgames, so it "
+                    f"has no earlier game to diff against"
+                )
+                fallback = "the viewer shows it undiffed"
+            else:
+                why = (
+                    f"'{game.label}' names itself"
+                    if target == game.label
+                    else f"'{target}' comes after '{game.label}' in \\tfgames"
+                )
+                fallback = "the viewer falls back to the preceding game"
+            warnings.append(
+                f"{proof.source_name}: \\tfrendergame diff='{target}' on game "
+                f"'{game.label}' is ignored by the HTML viewer because {why}. "
+                f"The PDF renders it as written and {fallback}, so the two "
+                f"will differ for this game."
+            )
 
     # Macro file existence
     for macro_rel in proof.macros:

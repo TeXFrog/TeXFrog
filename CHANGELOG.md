@@ -52,6 +52,29 @@
 - **`\tfrendergame[diff=...]` highlighting was broken.** Two bugs in `texfrog.sty` made diff rendering mark every `\tfonly` line as changed and (with `algpseudocodex`) render changed lines as empty highlight boxes:
   - The diff target game label was stored as the unexpanded `\l__tf_diff_tl` token, so the recording pass never matched any tags and the recorded-positions property list stayed empty.
   - The highlight wrapper emitted its prefix (`\State`) before reading its local content variable. In `algpseudocodex`, `\State` closes the `varwidth` group of the previous line, reverting the local assignments and emptying the content. The wrapper output is now assembled in a global token list and emitted in a single expansion.
+- **The HTML viewer now honors `\tfrendergame[diff=...]`.** Previously the HTML export
+  never parsed the `diff=` option and always diffed a game against its list-order
+  predecessor in `\tfgames`, while the PDF render honored `diff=` correctly. For a
+  branching game family (case splits), this made the HTML viewer show large spurious
+  "rollback" diffs at every branch head — a later branch's diff target is not
+  necessarily its list predecessor. `diff=` is now parsed into `Game.diff_target` and
+  used as the HTML diff target when set (falling back to the previous behavior
+  otherwise); the removed-highlight panel file is now keyed by the successor game
+  rather than the diff target, since a branch point can be the diff target of several
+  later games.
+
+  The HTML viewer shows one rendering per game and walks the games forwards, so it can
+  only use a `diff=` target that appears earlier in `\tfgames`. `texfrog check` now
+  warns — rather than failing the build — when a `diff=` target is the first game, a
+  later game, the game itself, or when one game is rendered twice with different
+  `diff=` values (the last call wins). All of these are valid LaTeX that `pdflatex`
+  renders as written, so only a target absent from `\tfgames` entirely is an error.
+  A commented-out or `verbatim`-quoted `\tfrendergame` no longer contributes a
+  `diff=` target, and `diff={G0}` brace-wrapped keyval syntax is now accepted.
+
+  `texfrog html build` also clears the `games/` directory before rebuilding, so
+  rebuilding a site in place no longer leaves the previous version's per-game SVGs
+  behind alongside the current ones.
 ## v0.0.2
 
 ### Breaking changes

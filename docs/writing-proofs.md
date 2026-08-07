@@ -252,6 +252,41 @@ Use these commands in the document body to render games and figures.
 \tfrenderfigure{indcpa}{G0,G1,G2,G3}          % consolidated figure
 ```
 
+#### Choosing a diff target
+
+`diff=` matters most for **branching game families**. When a proof splits into
+cases, the game that a hop should be compared against is often not the one
+before it in `\tfgames`:
+
+```latex
+\tfgames{fam}{G0, G1, G2, A1, A2, B1, B2}
+...
+\tfrendergame[diff=G2]{fam}{A1}   % case A branches off G2
+\tfrendergame[diff=G2]{fam}{B1}   % case B branches off G2 as well
+```
+
+Without `diff=G2` on `B1`, it would be compared against `A2` — the tail of the
+*other* branch — and every change made along case A would show up as a deletion.
+A branch point can be the diff target of any number of successors.
+
+The HTML viewer honors `diff=` too, but it shows one rendering per game and
+walks the games forwards, so the target must be a game that appears **earlier**
+in `\tfgames`. `texfrog check` warns when that isn't the case, and the viewer
+falls back to the preceding game:
+
+| Situation | PDF | HTML viewer |
+|---|---|---|
+| `diff=` naming an earlier game | as written | as written |
+| `diff=` on the first `\tfgames` entry | as written | no diff (nothing precedes it) |
+| `diff=` naming a later game, or the game itself | as written | falls back to the preceding game |
+| the same game rendered twice with different `diff=` values | each call as written | uses the last call's target |
+| `diff=` naming a game not in `\tfgames` | — | error: dangling reference |
+
+Only the last row is an error — the rest are valid LaTeX that compiles, so
+`texfrog` builds the site and warns about the divergence rather than refusing.
+This mirrors how the `crop=` key behaves (see
+[Cropping Long Listings](#cropping-long-listings) below).
+
 ### Lines That Are Not Wrapped in `\tfchanged`
 
 When generating the LaTeX output, TeXFrog wraps changed lines in `\tfchanged{}` to highlight them. Two kinds of lines are never wrapped, even if they changed:

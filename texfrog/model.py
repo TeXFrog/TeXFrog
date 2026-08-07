@@ -14,6 +14,7 @@ class Game:
     description: str  # One-sentence LaTeX description
     reduction: bool = False  # True for reductions (shown alone, not side-by-side)
     related_games: list[str] = field(default_factory=list)  # 0–2 game labels shown alongside this reduction
+    diff_target: Optional[str] = None  # \tfrendergame[diff=X] override; None = default linear-order predecessor
 
 
 @dataclass
@@ -37,3 +38,4 @@ class Proof:
     preamble: Optional[str] = None  # Path to extra preamble .tex file (relative to input dir)
     crop_default: bool = False      # True when \tfcropdefault{on} is present
     commentary_files: dict[str, str] = field(default_factory=dict)  # game_label -> relative file path
+    parse_warnings: list[str] = field(default_factory=list)  # non-fatal issues found while parsing; surfaced by validate_proof()

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import shutil
 import subprocess
@@ -24,6 +25,7 @@ from texfrog.output.html import (
     _write_commentary_file,
     generate_html,
     generate_index_page,
+    resolve_prev_labels,
 )
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -41,6 +43,31 @@ needs_html_tools = pytest.mark.skipif(
     shutil.which("pdflatex") is None or _find_svg_converter() is None,
     reason="pdflatex and/or SVG converter (pdf2svg/pdftocairo) not on PATH",
 )
+
+
+@pytest.fixture
+def kept_latex_dir(capsys):
+    """Return the intermediate LaTeX dir from a keep_tmp=True build.
+
+    generate_html(keep_tmp=True) mkdtemp()s outside pytest's tmp_path and
+    deliberately never removes it, so tests that inspect the intermediate
+    .tex files must clean up themselves or leave a /tmp/texfrog_* tree behind
+    on every run.
+    """
+    created: list[Path] = []
+
+    def _capture() -> Path:
+        captured = capsys.readouterr()
+        m = re.search(r"Keeping intermediate files in (\S+)", captured.err)
+        assert m, f"Could not find kept-tmp-dir path in stderr:\n{captured.err}"
+        path = Path(m.group(1))
+        created.append(path)
+        return path
+
+    yield _capture
+
+    for path in created:
+        shutil.rmtree(path, ignore_errors=True)
 
 
 # ---------------------------------------------------------------------------
@@ -232,7 +259,9 @@ def test_html_tfsegmentstub_compiles_per_profile(tmp_path, profile_name):
 
 
 @needs_html_tools
-def test_generate_html_strips_tfsegment_markers_when_crop_off(tmp_path, capsys):
+def test_generate_html_strips_tfsegment_markers_when_crop_off(
+    tmp_path, kept_latex_dir,
+):
     r"""Full generate_html() pipeline, crop OFF, on a segmented source: no
     per-game .tex file may contain a literal \tfsegment marker, no compiled
     PDF may show the marker captions as stray text, and no compile log may
@@ -269,10 +298,7 @@ def test_generate_html_strips_tfsegment_markers_when_crop_off(tmp_path, capsys):
     out_dir = tmp_path / "html_out"
     generate_html(proof, tmp_path, out_dir, keep_tmp=True)
 
-    captured = capsys.readouterr()
-    m = re.search(r"Keeping intermediate files in (\S+)", captured.err)
-    assert m, f"Could not find kept-tmp-dir path in stderr:\n{captured.err}"
-    latex_dir = Path(m.group(1))
+    latex_dir = kept_latex_dir()
 
     # No per-game .tex file should contain a literal \tfsegment marker.
     for label in ("G0", "G1"):
@@ -317,6 +343,171 @@ def test_generate_html_strips_tfsegment_markers_when_crop_off(tmp_path, capsys):
     assert "render failed" not in svg_text, (
         f"G0.svg is a render-failure placeholder:\n{svg_text}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Issue #17: \tfrendergame diff= target must be honored in the HTML viewer,
+# and the removed-panel file must be keyed by the successor (not the diff
+# target), so a branch point that is the diff target of several games
+# doesn't collide on a single "{target}-removed.svg" file.
+# ---------------------------------------------------------------------------
+
+
+@needs_html_tools
+def test_generate_html_honors_branching_diff_target(tmp_path, kept_latex_dir):
+    r"""Family {G0, G1a, G1b} where both G1a and G1b branch off G0 (both set
+    \tfrendergame[diff=G0]). Regression test for issue #17: without honoring
+    diff_target, G1b's HTML diff target would default to its list
+    predecessor G1a, and without keying removed-panel files by the
+    successor, G1a's and G1b's "prev" panels would collide on a single
+    G0-removed file."""
+    games = [
+        Game(label="G0", latex_name="G_0", description="Game 0",
+             reduction=False, related_games=[]),
+        Game(label="G1a", latex_name="G_{1a}", description="Branch A",
+             reduction=False, related_games=[], diff_target="G0"),
+        Game(label="G1b", latex_name="G_{1b}", description="Branch B",
+             reduction=False, related_games=[], diff_target="G0"),
+    ]
+    source_text = (
+        r"\begin{pcvstack}" "\n"
+        r"common line \\" "\n"
+        r"\tfonly{G0}{val-G0-only} \\" "\n"
+        r"\tfonly{G1a}{val-G1a-only} \\" "\n"
+        r"\tfonly{G1b}{val-G1b-only} \\" "\n"
+        r"\end{pcvstack}" "\n"
+    )
+    proof = Proof(
+        source_name="test",
+        macros=[],
+        games=games,
+        source_text=source_text,
+        commentary={},
+        figures=[],
+        package="cryptocode",
+        preamble=None,
+        crop_default=False,
+    )
+
+    out_dir = tmp_path / "html_out"
+    generate_html(proof, tmp_path, out_dir, keep_tmp=True)
+
+    latex_dir = kept_latex_dir()
+
+    # Both branches must get their own "prev" removed-highlight file, keyed
+    # by the successor (G1a/G1b), not the shared diff target (G0) --
+    # otherwise the second write silently clobbers the first.
+    g1a_prev = (latex_dir / "G1a-prev-removed.tex").read_text(encoding="utf-8")
+    g1b_prev = (latex_dir / "G1b-prev-removed.tex").read_text(encoding="utf-8")
+
+    # Both panels show G0's content (the actual diff target), not G1a's --
+    # the bug this regresses against would make G1b's panel show G1a's
+    # content (its list predecessor) instead.
+    for content, label in [(g1a_prev, "G1a"), (g1b_prev, "G1b")]:
+        assert "val-G0-only" in content, (
+            f"{label}-prev-removed.tex should show G0's content (the "
+            f"explicit diff= target), got:\n{content}"
+        )
+        assert "val-G1a-only" not in content, (
+            f"{label}-prev-removed.tex incorrectly shows G1a's content "
+            f"instead of the diff target G0's:\n{content}"
+        )
+        assert "val-G1b-only" not in content, (
+            f"{label}-prev-removed.tex incorrectly shows G1b's content "
+            f"instead of the diff target G0's:\n{content}"
+        )
+
+    # Both compiled SVGs must exist as real renders (not error placeholders
+    # and not one overwriting the other).
+    for label in ("G1a", "G1b"):
+        svg = out_dir / "games" / f"{label}-prev-removed.svg"
+        assert svg.exists(), f"Missing {svg.name}"
+        assert "render failed" not in svg.read_text(encoding="utf-8")
+
+    # The manifest embedded in index.html must expose the resolved baseline so
+    # app.js can pick the correct panel instead of assuming list order.
+    index_html = (out_dir / "index.html").read_text(encoding="utf-8")
+    m_manifest = re.search(r"const GAMES = (\[.*?\]);", index_html, re.DOTALL)
+    assert m_manifest, "Could not find GAMES manifest in index.html"
+    manifest = json.loads(m_manifest.group(1))
+    by_label = {g["label"]: g for g in manifest}
+    assert by_label["G1a"]["prev_label"] == "G0"
+    assert by_label["G1b"]["prev_label"] == "G0"
+
+
+@needs_html_tools
+def test_generate_html_crop_follows_diff_target_not_list_order(tmp_path, kept_latex_dir):
+    r"""Segment cropping must key off the resolved diff target, not list
+    order. Family {G0, G1a, G1b}, both explicitly diff=G0, crop_default=True.
+    G1a differs from G0 in the middle segment; G1b is textually identical to
+    G0 everywhere. Cropped against the correct target (G0), G1b's changed
+    segment is empty, so its only content-bearing segment gets stubbed away
+    entirely. Cropped against the buggy list-order fallback (G1a, since G1a
+    is G1b's immediate predecessor in \tfgames order), that segment would be
+    (spuriously) marked active because G1a's own content differs from G1b's
+    there -- the exact "rollback" failure mode from issue #17."""
+    games = [
+        Game(label="G0", latex_name="G_0", description="Game 0",
+             reduction=False, related_games=[]),
+        Game(label="G1a", latex_name="G_{1a}", description="Branch A",
+             reduction=False, related_games=[], diff_target="G0"),
+        Game(label="G1b", latex_name="G_{1b}", description="Branch B",
+             reduction=False, related_games=[], diff_target="G0"),
+    ]
+    source_text = (
+        r"\begin{algorithmic}[1]" "\n"
+        r"\State opener-line" "\n"
+        r"\tfsegment{Middle}" "\n"
+        r"\tfonly{G0}{\State base-content}" "\n"
+        r"\tfonly{G1a}{\State changed-content}" "\n"
+        r"\tfonly{G1b}{\State base-content}" "\n"
+        r"\tfsegment{Filler}" "\n"
+        r"\State filler-content" "\n"
+        r"\tfsegment{Closer}" "\n"
+        r"\State closer-line" "\n"
+        r"\end{algorithmic}" "\n"
+    )
+    proof = Proof(
+        source_name="test",
+        macros=[],
+        games=games,
+        source_text=source_text,
+        commentary={},
+        figures=[],
+        package="algpseudocodex",
+        preamble=None,
+        crop_default=True,
+    )
+
+    out_dir = tmp_path / "html_out"
+    generate_html(proof, tmp_path, out_dir, keep_tmp=True)
+
+    latex_dir = kept_latex_dir()
+
+    g1a_tex = (latex_dir / "G1a.tex").read_text(encoding="utf-8")
+    g1b_tex = (latex_dir / "G1b.tex").read_text(encoding="utf-8")
+
+    # G1a truly differs from its target G0 in "Middle" -- that segment stays.
+    assert "changed-content" in g1a_tex
+
+    # G1b is textually identical to its target G0 everywhere, so "Middle"
+    # (and "Filler") must be cropped away entirely -- if G1b's diff target
+    # had fallen back to list order (G1a) instead of honoring diff=G0, this
+    # segment would be spuriously kept/marked changed since G1a's content
+    # differs from G1b's here.
+    assert "base-content" not in g1b_tex, (
+        f"G1b.tex should have cropped away its unchanged-vs-G0 'Middle' "
+        f"segment, but found 'base-content' (spurious diff vs list "
+        f"predecessor G1a instead of the real target G0):\n{g1b_tex}"
+    )
+    assert "filler-content" not in g1b_tex
+
+    # The "prev" panel mirrors this: G1a's shows G0's real diff (kept),
+    # G1b's shows no diff at all (stubbed).
+    g1a_prev = (latex_dir / "G1a-prev-removed.tex").read_text(encoding="utf-8")
+    g1b_prev = (latex_dir / "G1b-prev-removed.tex").read_text(encoding="utf-8")
+    assert "base-content" in g1a_prev
+    assert "base-content" not in g1b_prev
 
 
 class TestWriteCommentaryFile:
@@ -714,3 +905,161 @@ class TestGenerateIndexPage:
         assert "<html" in html
         assert "</html>" in html
         assert "TeXFrog" in html
+
+
+class TestResolvePrevLabels:
+    r"""Tests for resolve_prev_labels() -- baseline resolution per game.
+
+    A \tfrendergame[diff=X] override is honored only when X precedes the game
+    in \tfgames order, since the viewer walks the list forwards and a later
+    baseline would render the hop backwards. Otherwise the linear default
+    applies: reductions diff against the immediately preceding entry, other
+    games against the previous non-reduction game.
+    """
+
+    def _g(self, label, *, reduction=False, diff_target=None, related=None):
+        return Game(
+            label=label, latex_name=label, description=label,
+            reduction=reduction, related_games=related or [],
+            diff_target=diff_target,
+        )
+
+    def test_linear_default_without_overrides(self):
+        games = [self._g("G0"), self._g("G1"), self._g("G2")]
+        assert resolve_prev_labels(games) == {
+            "G0": None, "G1": "G0", "G2": "G1",
+        }
+
+    def test_explicit_backward_target_wins(self):
+        games = [self._g("G0"), self._g("G1"), self._g("G2", diff_target="G0")]
+        assert resolve_prev_labels(games)["G2"] == "G0"
+
+    def test_branching_family_shares_a_branch_point(self):
+        games = [
+            self._g("G0"),
+            self._g("G1a", diff_target="G0"),
+            self._g("G1b", diff_target="G0"),
+        ]
+        resolved = resolve_prev_labels(games)
+        assert resolved["G1a"] == "G0"
+        assert resolved["G1b"] == "G0"
+
+    def test_reduction_diffs_against_immediate_predecessor(self):
+        games = [self._g("G0"), self._g("G1"), self._g("R1", reduction=True)]
+        assert resolve_prev_labels(games)["R1"] == "G1"
+
+    def test_non_reduction_skips_intervening_reductions(self):
+        games = [
+            self._g("G0"), self._g("R1", reduction=True), self._g("G1"),
+        ]
+        assert resolve_prev_labels(games)["G1"] == "G0"
+
+    def test_first_game_has_no_baseline(self):
+        games = [self._g("G0"), self._g("G1")]
+        assert resolve_prev_labels(games)["G0"] is None
+
+    def test_diff_target_on_first_game_is_dropped(self):
+        """Nothing precedes the first game, so the override cannot apply."""
+        games = [self._g("G0", diff_target="G1"), self._g("G1")]
+        assert resolve_prev_labels(games)["G0"] is None
+
+    def test_forward_diff_target_falls_back_to_linear_default(self):
+        games = [self._g("G0"), self._g("G1", diff_target="G2"), self._g("G2")]
+        assert resolve_prev_labels(games)["G1"] == "G0"
+
+    def test_self_referential_diff_target_falls_back(self):
+        games = [self._g("G0"), self._g("G1", diff_target="G1")]
+        assert resolve_prev_labels(games)["G1"] == "G0"
+
+    def test_unknown_diff_target_falls_back(self):
+        """Defensive: parse_tex_proof rejects these, but the API allows them."""
+        games = [self._g("G0"), self._g("G1", diff_target="nope")]
+        assert resolve_prev_labels(games)["G1"] == "G0"
+
+    def test_cyclic_diff_targets_do_not_produce_a_cycle(self):
+        games = [
+            self._g("G0"),
+            self._g("G1", diff_target="G2"),
+            self._g("G2", diff_target="G1"),
+        ]
+        resolved = resolve_prev_labels(games)
+        assert resolved["G1"] == "G0"   # forward half dropped
+        assert resolved["G2"] == "G1"   # backward half honored
+
+
+@needs_html_tools
+def test_generate_html_manifest_uses_prev_label_key(tmp_path):
+    """The manifest exposes the *resolved* baseline under 'prev_label'.
+
+    Named to match the producing variable, and distinct from
+    Game.diff_target, which holds only the explicit \\tfrendergame override.
+    Most games have a baseline without carrying any override at all, so
+    reusing the 'diff_target' name here would misreport them as overridden.
+    """
+    games = [
+        Game(label="G0", latex_name="G_0", description="Game 0",
+             reduction=False, related_games=[]),
+        Game(label="G1", latex_name="G_1", description="Game 1",
+             reduction=False, related_games=[]),
+    ]
+    proof = Proof(
+        source_name="test", macros=[], games=games,
+        source_text=(
+            r"\begin{pcvstack}" "\n"
+            r"common line \\" "\n"
+            r"\tfonly{G0}{val-G0-only} \\" "\n"
+            r"\tfonly{G1}{val-G1-only} \\" "\n"
+            r"\end{pcvstack}" "\n"
+        ),
+        commentary={}, figures=[], package="cryptocode", preamble=None,
+        crop_default=False,
+    )
+    out_dir = tmp_path / "html_out"
+    generate_html(proof, tmp_path, out_dir)
+
+    html = (out_dir / "index.html").read_text(encoding="utf-8")
+    m = re.search(r"const GAMES = (\[.*?\]);", html, re.DOTALL)
+    assert m, "Could not find GAMES manifest in index.html"
+    by_label = {g["label"]: g for g in json.loads(m.group(1))}
+
+    assert by_label["G0"]["prev_label"] is None
+    assert by_label["G1"]["prev_label"] == "G0"
+    assert "diff_target" not in by_label["G1"]
+
+
+@needs_html_tools
+def test_generate_html_clears_stale_game_artifacts(tmp_path):
+    """Rebuilding into an existing site must not leave old artifacts behind.
+
+    The removed-panel files were renamed from {target}-removed.svg to
+    {label}-prev-removed.svg, so a site built by an older version and rebuilt
+    in place would otherwise ship both generations -- the stale one silently
+    contradicting the new panels.
+    """
+    games = [
+        Game(label="G0", latex_name="G_0", description="Game 0",
+             reduction=False, related_games=[]),
+        Game(label="G1", latex_name="G_1", description="Game 1",
+             reduction=False, related_games=[]),
+    ]
+    proof = Proof(
+        source_name="test", macros=[], games=games,
+        source_text=(
+            r"\begin{pcvstack}" "\n"
+            r"common line \\" "\n"
+            r"\tfonly{G0}{val-G0-only} \\" "\n"
+            r"\tfonly{G1}{val-G1-only} \\" "\n"
+            r"\end{pcvstack}" "\n"
+        ),
+        commentary={}, figures=[], package="cryptocode", preamble=None,
+        crop_default=False,
+    )
+    out_dir = tmp_path / "html_out"
+    stale = out_dir / "games" / "G0-removed.svg"
+    stale.parent.mkdir(parents=True)
+    stale.write_text("<svg>stale</svg>", encoding="utf-8")
+
+    generate_html(proof, tmp_path, out_dir)
+
+    assert not stale.exists(), "stale artifact from a previous build survived"
+    assert (out_dir / "games" / "G1-prev-removed.svg").exists()
