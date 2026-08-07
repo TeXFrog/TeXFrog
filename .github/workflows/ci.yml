@@ -97,6 +97,21 @@ jobs:
         working-directory: vscode-texfrog
         run: npm ci
 
+      - name: Compile
+        working-directory: vscode-texfrog
+        run: npm run compile
+
       - name: Run tests
         working-directory: vscode-texfrog
         run: npm test
+
+      - name: Package extension
+        working-directory: vscode-texfrog
+        run: npx --yes @vscode/vsce package
+
+      - name: Upload extension artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: texfrog-vscode-extension
+          path: vscode-texfrog/*.vsix
+          archive: false
