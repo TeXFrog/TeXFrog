@@ -202,3 +202,58 @@ class TestValidateProof:
         proof = minimal_proof_factory(source_text=src)
         warnings = validate_proof(proof, tmp_path)
         assert not any("not a plain marker" in w for w in warnings)
+
+
+class TestDiffTargetWarnings:
+    r"""Warnings for \tfrendergame[diff=...] targets the HTML viewer can't use.
+
+    These documents all compile under pdflatex; the diff target is simply
+    unusable by the HTML viewer, which shows each game against a baseline that
+    must come earlier in the \tfgames list. So they warn rather than raise.
+    """
+
+    def _games(self, *specs):
+        return [
+            Game(label=label, latex_name=label, description=label,
+                 reduction=False, related_games=[], diff_target=target)
+            for label, target in specs
+        ]
+
+    def test_no_warning_for_valid_backward_target(self, tmp_path):
+        proof = _make_proof(games=self._games(
+            ("G0", None), ("G1", None), ("G2", "G0"),
+        ))
+        warnings = validate_proof(proof, tmp_path)
+        assert not any("diff" in w for w in warnings)
+
+    def test_warns_diff_target_on_first_game(self, tmp_path):
+        proof = _make_proof(games=self._games(("G0", "G1"), ("G1", None)))
+        warnings = validate_proof(proof, tmp_path)
+        assert any("G0" in w and "diff" in w for w in warnings)
+
+    def test_warns_forward_diff_target(self, tmp_path):
+        proof = _make_proof(games=self._games(
+            ("G0", None), ("G1", "G2"), ("G2", None),
+        ))
+        warnings = validate_proof(proof, tmp_path)
+        assert any("G1" in w and "diff" in w for w in warnings)
+
+    def test_warns_self_referential_diff_target(self, tmp_path):
+        proof = _make_proof(games=self._games(("G0", None), ("G1", "G1")))
+        warnings = validate_proof(proof, tmp_path)
+        assert any("G1" in w and "diff" in w for w in warnings)
+
+    def test_warns_cyclic_diff_targets(self, tmp_path):
+        """G1 and G2 as each other's baseline: the forward half is caught."""
+        proof = _make_proof(games=self._games(
+            ("G0", None), ("G1", "G2"), ("G2", "G1"),
+        ))
+        warnings = validate_proof(proof, tmp_path)
+        assert any("G1" in w and "diff" in w for w in warnings)
+
+    def test_parse_warnings_are_surfaced(self, tmp_path):
+        r"""Warnings the parser found (e.g. conflicting diff=) reach the user."""
+        proof = _make_proof()
+        proof.parse_warnings = ["main: conflicting \\tfrendergame diff= targets"]
+        warnings = validate_proof(proof, tmp_path)
+        assert "main: conflicting \\tfrendergame diff= targets" in warnings

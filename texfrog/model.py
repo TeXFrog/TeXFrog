@@ -38,3 +38,4 @@ class Proof:
     preamble: Optional[str] = None  # Path to extra preamble .tex file (relative to input dir)
     crop_default: bool = False      # True when \tfcropdefault{on} is present
     commentary_files: dict[str, str] = field(default_factory=dict)  # game_label -> relative file path
+    parse_warnings: list[str] = field(default_factory=list)  # non-fatal issues found while parsing; surfaced by validate_proof()

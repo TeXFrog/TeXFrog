@@ -479,30 +479,64 @@ class TestParseTexProof:
         with pytest.raises(ValueError, match="is not in"):
             parse_tex_proof(tex)
 
-    def test_tfrendergame_diff_target_self_reference_raises(self, tmp_path):
-        tex = tmp_path / "bad.tex"
+    def test_tfrendergame_diff_target_self_reference_recorded_not_fatal(
+        self, tmp_path,
+    ):
+        r"""A self-referential diff= is valid LaTeX, so it must not abort parsing.
+
+        It is meaningless for the HTML viewer, but that is reported as a
+        warning by validate_proof() -- the parser records it faithfully.
+        """
+        tex = tmp_path / "self.tex"
         tex.write_text(
             "\\tfgames{s}{G0, G1}\n"
             "\\begin{tfsource}{s}body\\end{tfsource}\n"
             "\\tfrendergame[diff=G1]{s}{G1}\n",
             encoding="utf-8",
         )
-        with pytest.raises(ValueError, match="cannot use itself"):
-            parse_tex_proof(tex)
+        proof = parse_tex_proof(tex)
+        by_label = {g.label: g for g in proof.games}
+        assert by_label["G1"].diff_target == "G1"
 
-    def test_tfrendergame_diff_target_on_first_game_raises(self, tmp_path):
-        tex = tmp_path / "bad.tex"
+    def test_tfrendergame_diff_target_on_first_game_recorded_not_fatal(
+        self, tmp_path,
+    ):
+        r"""diff= on the first \tfgames entry compiles under pdflatex.
+
+        The HTML viewer cannot show it (nothing precedes the first game), but
+        that is an HTML limitation, not a malformed document.
+        """
+        tex = tmp_path / "first.tex"
         tex.write_text(
             "\\tfgames{s}{G0, G1}\n"
             "\\begin{tfsource}{s}body\\end{tfsource}\n"
             "\\tfrendergame[diff=G1]{s}{G0}\n",
             encoding="utf-8",
         )
-        with pytest.raises(ValueError, match="first entry"):
-            parse_tex_proof(tex)
+        proof = parse_tex_proof(tex)
+        by_label = {g.label: g for g in proof.games}
+        assert by_label["G0"].diff_target == "G1"
 
-    def test_tfrendergame_conflicting_diff_targets_raises(self, tmp_path):
-        tex = tmp_path / "bad.tex"
+    def test_tfrendergame_forward_diff_target_recorded_not_fatal(self, tmp_path):
+        """A forward (later-in-list) diff target parses without raising."""
+        tex = tmp_path / "forward.tex"
+        tex.write_text(
+            "\\tfgames{s}{G0, G1, G2}\n"
+            "\\begin{tfsource}{s}body\\end{tfsource}\n"
+            "\\tfrendergame[diff=G2]{s}{G1}\n",
+            encoding="utf-8",
+        )
+        proof = parse_tex_proof(tex)
+        by_label = {g.label: g for g in proof.games}
+        assert by_label["G1"].diff_target == "G2"
+
+    def test_tfrendergame_conflicting_diff_targets_last_wins(self, tmp_path):
+        r"""Two \tfrendergame calls with different diff= values must not abort.
+
+        Both render correctly in the PDF; HTML has one SVG per game and so can
+        only show one. The last call wins and validate_proof() warns.
+        """
+        tex = tmp_path / "conflict.tex"
         tex.write_text(
             "\\tfgames{s}{G0, G1, G2}\n"
             "\\begin{tfsource}{s}body\\end{tfsource}\n"
@@ -510,8 +544,71 @@ class TestParseTexProof:
             "\\tfrendergame[diff=G1]{s}{G2}\n",
             encoding="utf-8",
         )
-        with pytest.raises(ValueError, match="conflicting"):
-            parse_tex_proof(tex)
+        proof = parse_tex_proof(tex)
+        by_label = {g.label: g for g in proof.games}
+        assert by_label["G2"].diff_target == "G1"
+        assert any("conflicting" in w for w in proof.parse_warnings)
+
+    def test_tfrendergame_diff_in_comment_ignored(self, tmp_path):
+        r"""A commented-out \tfrendergame must not contribute a diff target.
+
+        pdflatex ignores everything after an unescaped %, so the parser must
+        too -- otherwise commenting out a render call changes the build.
+        """
+        tex = tmp_path / "comment.tex"
+        tex.write_text(
+            "\\tfgames{s}{G0, G1, G2}\n"
+            "\\begin{tfsource}{s}body\\end{tfsource}\n"
+            "% \\tfrendergame[diff=Gold]{s}{G1}\n"
+            "\\tfrendergame[diff=G0]{s}{G1}\n",
+            encoding="utf-8",
+        )
+        proof = parse_tex_proof(tex)
+        by_label = {g.label: g for g in proof.games}
+        assert by_label["G1"].diff_target == "G0"
+        assert proof.parse_warnings == []
+
+    def test_tfrendergame_diff_after_escaped_percent_still_seen(self, tmp_path):
+        r"""An escaped \% does not start a comment, so the call still counts."""
+        tex = tmp_path / "escaped.tex"
+        tex.write_text(
+            "\\tfgames{s}{G0, G1}\n"
+            "\\begin{tfsource}{s}body\\end{tfsource}\n"
+            "100\\% \\tfrendergame[diff=G0]{s}{G1}\n",
+            encoding="utf-8",
+        )
+        proof = parse_tex_proof(tex)
+        by_label = {g.label: g for g in proof.games}
+        assert by_label["G1"].diff_target == "G0"
+
+    def test_tfrendergame_diff_in_verbatim_ignored(self, tmp_path):
+        r"""A \tfrendergame inside verbatim is documentation, not a real call."""
+        tex = tmp_path / "verb.tex"
+        tex.write_text(
+            "\\tfgames{s}{G0, G1}\n"
+            "\\begin{tfsource}{s}body\\end{tfsource}\n"
+            "\\begin{verbatim}\n"
+            "\\tfrendergame[diff=Gxx]{s}{G1}\n"
+            "\\end{verbatim}\n"
+            "\\tfrendergame[diff=G0]{s}{G1}\n",
+            encoding="utf-8",
+        )
+        proof = parse_tex_proof(tex)
+        by_label = {g.label: g for g in proof.games}
+        assert by_label["G1"].diff_target == "G0"
+
+    def test_tfrendergame_diff_target_braced_value(self, tmp_path):
+        r"""diff={G0} is standard keyval syntax and texfrog.sty accepts it."""
+        tex = tmp_path / "braced.tex"
+        tex.write_text(
+            "\\tfgames{s}{G0, G1}\n"
+            "\\begin{tfsource}{s}body\\end{tfsource}\n"
+            "\\tfrendergame[diff={G0}]{s}{G1}\n",
+            encoding="utf-8",
+        )
+        proof = parse_tex_proof(tex)
+        by_label = {g.label: g for g in proof.games}
+        assert by_label["G1"].diff_target == "G0"
 
     def test_multiple_tfsource_raises(self, tmp_path):
         tex = tmp_path / "multi.tex"

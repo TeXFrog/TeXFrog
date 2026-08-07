@@ -53,6 +53,19 @@
   otherwise); the removed-highlight panel file is now keyed by the successor game
   rather than the diff target, since a branch point can be the diff target of several
   later games.
+
+  The HTML viewer shows one rendering per game and walks the games forwards, so it can
+  only use a `diff=` target that appears earlier in `\tfgames`. `texfrog check` now
+  warns — rather than failing the build — when a `diff=` target is the first game, a
+  later game, the game itself, or when one game is rendered twice with different
+  `diff=` values (the last call wins). All of these are valid LaTeX that `pdflatex`
+  renders as written, so only a target absent from `\tfgames` entirely is an error.
+  A commented-out or `verbatim`-quoted `\tfrendergame` no longer contributes a
+  `diff=` target, and `diff={G0}` brace-wrapped keyval syntax is now accepted.
+
+  `texfrog html build` also clears the `games/` directory before rebuilding, so
+  rebuilding a site in place no longer leaves the previous version's per-game SVGs
+  behind alongside the current ones.
 ## v0.0.2
 
 ### Breaking changes

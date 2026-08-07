@@ -281,7 +281,7 @@ def test_first_game_single_panel(page, html_server):
 
 @needs_playwright
 def test_regular_game_two_panels(page, html_server):
-    """G1 is a regular non-first game: shows G0-removed + G1 side-by-side."""
+    """G1 is a regular non-first game: G1-prev-removed + G1 side-by-side."""
     page.goto(f"{html_server}#G1")
     _wait_for_game(page, "G1")
     panels = page.locator("#game-svg-container .game-panel")

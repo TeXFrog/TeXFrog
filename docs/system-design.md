@@ -89,6 +89,7 @@ class Game:
     description: str  # One-sentence LaTeX description (shown in HTML sidebar)
     reduction: bool = False  # True for reductions (displayed alone in HTML, not side-by-side)
     related_games: list[str] = field(default_factory=list)  # 0–2 game labels shown alongside this reduction
+    diff_target: Optional[str] = None  # \tfrendergame[diff=X] override; None = default linear-order predecessor
 
 @dataclass
 class Figure:
@@ -106,7 +107,9 @@ class Proof:
     figures: list[Figure]          # Consolidated figure specs
     package: str = "cryptocode"    # Package profile name (see packages.py)
     preamble: Optional[str] = None # Path to extra preamble .tex (relative to input dir)
+    crop_default: bool = False     # True when \tfcropdefault{on} is present
     commentary_files: dict[str, str] = field(default_factory=dict)  # label → relative file path
+    parse_warnings: list[str] = field(default_factory=list)  # non-fatal issues found while parsing; surfaced by validate_proof()
 ```
 
 ---
@@ -362,22 +365,41 @@ related to two reductions therefore gets two distinct clean files (different cro
 
 ### Diff Target Resolution
 
-`\tfrendergame[diff=X]{source}{game}` (parsed in `tex_parser.py` via
-`_extract_opt_two_args` + `diff=` key lookup) sets `Game.diff_target`, validated
-against the source's `\tfgames` list (unknown label or self-reference raise
-`ValueError`; conflicting `diff=` values for the same game across multiple
-`\tfrendergame` calls also raise). In `html.py`'s `generate_html`, each game's
-effective diff target (`prev_label_by_game`) is: `game.diff_target` if set,
-otherwise `ordered_labels[i-1]` for reductions, otherwise the previous
-non-reduction game (skipping reductions) for regular games. This mirrors the PDF
-renderer, which already honors `diff=` — before this resolution existed, the HTML
-viewer always used the list-order predecessor, so a branching game family (case
-splits) showed spurious "rollback" diffs at every branch head whenever a later
-game's list predecessor wasn't its actual diff target (issue #17). The resolved
-target also drives crop computation (`_apply_crop`/`_reduction_active_segments`
-already crop relative to `prev_label`, so they inherit the fix automatically) and
-is exposed per-game in the HTML manifest (`games_data[i]["diff_target"]`) so
-`app.js` picks the same target instead of re-deriving list order client-side.
+`\tfrendergame[diff=X]{source}{game}` sets `Game.diff_target`. It is parsed in
+`tex_parser.py` via `_extract_opt_two_args` + `_parse_key_equals_value`, over a
+copy of the document produced by `_mask_inactive_regions()` — which blanks `%`
+comment bodies and verbatim environments (length- and line-preserving, so
+offsets stay valid). Without that mask the raw-regex command scan would read a
+commented-out or verbatim-quoted `\tfrendergame` as a live call.
+
+`html.py`'s `resolve_prev_labels(games)` maps each game to the baseline it is
+displayed against: `game.diff_target` if set, otherwise `ordered_labels[i-1]`
+for reductions, otherwise the previous non-reduction game (skipping reductions)
+for regular games. This mirrors the PDF renderer, which already honors `diff=` —
+before this resolution existed, the HTML viewer always used the list-order
+predecessor, so a branching game family (case splits) showed spurious
+"rollback" diffs at every branch head whenever a later game's list predecessor
+wasn't its actual diff target (issue #17). The resolved baseline also drives
+crop computation (`_apply_crop`/`_reduction_active_segments` already crop
+relative to `prev_label`, so they inherit the fix automatically) and is exposed
+per-game in the HTML manifest as `games_data[i]["prev_label"]` — named for the
+*resolved* baseline, distinct from `Game.diff_target`, which holds only the
+explicit override — so `app.js` picks the same baseline instead of re-deriving
+list order client-side.
+
+**Error vs. warning.** A `diff=` target that isn't in `\tfgames` at all is a
+dangling reference and raises `ValueError` (the same class as an unknown
+`\tfrelatedgames` reference). Everything else is valid LaTeX that `pdflatex`
+compiles, so it must not fail the build: the HTML viewer's constraint is that
+the baseline must appear *earlier* in the list (it walks the games forwards and
+renders one SVG per game), and `resolve_prev_labels` simply falls back to the
+default for a target that is the first game, a forward reference, or the game
+itself. Conflicting `diff=` values across multiple `\tfrendergame` calls for one
+game resolve last-wins, recorded in `Proof.parse_warnings`. All of these surface
+through `validate_proof()`, which is where PDF/HTML divergences already live
+(compare the `crop=` key, documented as a caveat rather than an error). Putting
+them in the parser instead would abort the whole document — including the games
+that were unambiguous — for source that renders correctly in the PDF.
 
 HTML features: MathJax for LaTeX names and descriptions, URL hash navigation (`#G1`),
 keyboard arrows, commentary rendered as SVG via the LaTeX pipeline, prev/next buttons,
@@ -388,9 +410,9 @@ side-by-side game comparison.
 After the first game, the HTML viewer shows the game's diff target (with red
 strikethrough on lines that are removed or changed) next to the current game (with
 blue highlights on new/changed lines), making it easy to see what changed between
-game transitions. `app.js` picks the target from the manifest's `diff_target` field
-rather than assuming the previous game in the list, so branching game families
-(case splits) show the correct diff at every branch head.
+game transitions. `app.js` picks the baseline from the manifest's `prev_label`
+field rather than assuming the previous game in the list, so branching game
+families (case splits) show the correct diff at every branch head.
 
 Reductions support a `related_games` field listing zero, one, or two game labels:
 - **0 related games**: the reduction is shown alone (legacy behaviour).

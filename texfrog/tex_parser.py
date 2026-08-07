@@ -146,20 +146,48 @@ def _skip_whitespace(text: str, pos: int) -> int:
     return pos
 
 
+def _split_top_level_commas(opt: str) -> list[str]:
+    """Split on commas that sit outside any brace group.
+
+    ``a=1,b={x,y}`` -> ``["a=1", "b={x,y}"]``. A naive ``str.split(",")``
+    would tear the braced value in half.
+    """
+    tokens: list[str] = []
+    depth = 0
+    start = 0
+    for i, ch in enumerate(opt):
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth = max(0, depth - 1)
+        elif ch == "," and depth == 0:
+            tokens.append(opt[start:i])
+            start = i + 1
+    tokens.append(opt[start:])
+    return tokens
+
+
 def _parse_key_equals_value(opt: str) -> dict[str, str]:
     r"""Parse a comma-separated ``key=value`` option string.
 
     Used for the ``[...]`` argument of commands like ``\tfrendergame``,
     e.g. ``"diff=G0"`` -> ``{"diff": "G0"}``. Tokens without ``=`` are
     ignored (e.g. bare flags this parser doesn't need).
+
+    One layer of braces is stripped from the value, matching how l3keys and
+    keyval treat ``diff={G0}``: braces group the value (so it may contain
+    commas or ``=``) and are not part of it.
     """
     result: dict[str, str] = {}
-    for token in opt.split(","):
+    for token in _split_top_level_commas(opt):
         token = token.strip()
         if not token or "=" not in token:
             continue
         key, _, value = token.partition("=")
-        result[key.strip()] = value.strip()
+        value = value.strip()
+        if len(value) >= 2 and value.startswith("{") and value.endswith("}"):
+            value = value[1:-1].strip()
+        result[key.strip()] = value
     return result
 
 
@@ -175,6 +203,67 @@ def _find_all_commands(text: str, cmd_name: str) -> list[int]:
     """Return starting positions of all occurrences of ``\\cmd_name``."""
     pattern = re.compile(r"\\" + re.escape(cmd_name) + r"(?![a-zA-Z])")
     return [m.start() for m in pattern.finditer(text)]
+
+
+# Environments whose bodies pdflatex does not interpret, so neither should we:
+# a \tfrendergame shown inside one is documentation, not a real call.
+_VERBATIM_RE = re.compile(
+    r"\\begin\{(verbatim|lstlisting|Verbatim|minted|alltt)\*?\}"
+    r"(?P<body>.*?)"
+    r"\\end\{\1\*?\}",
+    re.DOTALL,
+)
+
+
+def _blank(text: str) -> str:
+    """Replace every character except newlines with a space.
+
+    Length- and line-preserving, so byte offsets into the masked text stay
+    valid for the original.
+    """
+    return "".join(" " if ch != "\n" else ch for ch in text)
+
+
+def _mask_inactive_regions(text: str) -> str:
+    r"""Blank out regions pdflatex ignores: comments and verbatim bodies.
+
+    Returns a copy of *text* with the contents of ``%`` comments and verbatim
+    environments replaced by spaces. Newlines and total length are preserved,
+    so positions found in the result still index correctly into the original.
+
+    Command scans run over a raw regex with no notion of TeX syntax, so
+    without this a commented-out or merely-quoted command would be read as a
+    live one -- e.g. commenting out a ``\tfrendergame`` line would still
+    contribute its ``diff=`` target.
+    """
+    # Verbatim first: a % inside a verbatim body is not a comment, but since
+    # the whole body becomes spaces either way the order only matters for
+    # keeping the \begin/\end delimiters themselves intact.
+    def _blank_body(m: re.Match) -> str:
+        return (
+            m.group(0)[:m.start("body") - m.start()]
+            + _blank(m.group("body"))
+            + m.group(0)[m.end("body") - m.start():]
+        )
+
+    text = _VERBATIM_RE.sub(_blank_body, text)
+
+    out = list(text)
+    i, n = 0, len(text)
+    while i < n:
+        ch = text[i]
+        if ch == "\\":
+            # Skip the escaped character, so \% is not a comment start and
+            # the % after a \\ line break still is.
+            i += 2
+            continue
+        if ch == "%":
+            while i < n and text[i] != "\n":
+                out[i] = " "
+                i += 1
+            continue
+        i += 1
+    return "".join(out)
 
 
 def _extract_one_arg(text: str, cmd_name: str) -> list[str]:
@@ -506,8 +595,19 @@ def parse_tex_proofs(tex_path: Path) -> list[Proof]:
         ]
 
     # --- diff targets (per-source): \tfrendergame[diff=X]{source}{game} ---
+    # Scanned over a comment/verbatim-masked copy so a commented-out or
+    # quoted \tfrendergame doesn't contribute a target (pdflatex ignores it).
+    #
+    # A game may legitimately be rendered more than once with different
+    # baselines -- e.g. one hop in the body and a cumulative view in an
+    # appendix -- and the PDF shows each correctly. The HTML viewer has one
+    # SVG per game and so can only show one: the last call wins, and the
+    # divergence is reported as a warning rather than failing the build.
     diff_by_source: dict[str, dict[str, str]] = {}
-    for opt, source, label in _extract_opt_two_args(text, "tfrendergame"):
+    parse_warnings_by_source: dict[str, list[str]] = {}
+    for opt, source, label in _extract_opt_two_args(
+        _mask_inactive_regions(text), "tfrendergame",
+    ):
         if not opt:
             continue
         diff_label = _parse_key_equals_value(opt).get("diff")
@@ -518,10 +618,11 @@ def parse_tex_proofs(tex_path: Path) -> list[Proof]:
         diff_label = diff_label.strip()
         existing = diff_by_source.setdefault(source, {})
         if label in existing and existing[label] != diff_label:
-            raise ValueError(
-                f"Game '{label}' in source '{source}' has conflicting "
-                f"\\tfrendergame diff= targets: '{existing[label]}' and "
-                f"'{diff_label}'."
+            parse_warnings_by_source.setdefault(source, []).append(
+                f"{source}: game '{label}' has conflicting \\tfrendergame "
+                f"diff= targets ('{existing[label]}' and '{diff_label}'). "
+                f"The PDF renders each call as written; the HTML viewer has "
+                f"one rendering per game and will use '{diff_label}'."
             )
         existing[label] = diff_label
 
@@ -630,29 +731,21 @@ def parse_tex_proofs(tex_path: Path) -> list[Proof]:
                         f"references unknown related game '{ref}'. "
                         f"Available labels: {ordered_labels}"
                     )
+            # A diff target naming a game that doesn't exist is a dangling
+            # reference (the same class of error as an unknown related game),
+            # so it stays fatal. Targets that exist but that the HTML viewer
+            # can't use -- the first game, a forward reference, a
+            # self-reference -- are valid LaTeX and render fine in the PDF, so
+            # they are recorded here and reported by validate_proof().
             diff_target = diff_map.get(label)
-            if diff_target is not None:
-                if diff_target == label:
-                    raise ValueError(
-                        f"Game '{label}' in source '{source_name}' cannot "
-                        f"use itself as its own \\tfrendergame diff= target."
-                    )
-                if diff_target not in ordered_labels:
-                    raise ValueError(
-                        f"Game '{label}' in source '{source_name}' has "
-                        f"\\tfrendergame diff='{diff_target}' but "
-                        f"'{diff_target}' is not in "
-                        f"\\tfgames{{{source_name}}}{{...}}. "
-                        f"Available labels: {ordered_labels}"
-                    )
-                if label == ordered_labels[0]:
-                    raise ValueError(
-                        f"Game '{label}' in source '{source_name}' is the "
-                        f"first entry in \\tfgames{{{source_name}}}{{...}} "
-                        f"and cannot use \\tfrendergame diff='{diff_target}': "
-                        f"the HTML viewer never diffs the first game, so this "
-                        f"would render differently from the PDF."
-                    )
+            if diff_target is not None and diff_target not in ordered_labels:
+                raise ValueError(
+                    f"Game '{label}' in source '{source_name}' has "
+                    f"\\tfrendergame diff='{diff_target}' but "
+                    f"'{diff_target}' is not in "
+                    f"\\tfgames{{{source_name}}}{{...}}. "
+                    f"Available labels: {ordered_labels}"
+                )
             games.append(Game(
                 label=label,
                 latex_name=latex_name,
@@ -673,6 +766,7 @@ def parse_tex_proofs(tex_path: Path) -> list[Proof]:
             preamble=preamble_rel,
             crop_default=crop_default,
             commentary_files=commentary_files_by_source.get(source_name, {}),
+            parse_warnings=parse_warnings_by_source.get(source_name, []),
         ))
 
     return proofs

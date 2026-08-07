@@ -41,7 +41,7 @@ from ..filter import (
     crop_to_active_segments,
     wrap_changed_line,
 )
-from ..model import Proof
+from ..model import Game, Proof
 from ..packages import get_profile
 from ..tex_parser import filter_for_game_from_text
 
@@ -169,11 +169,11 @@ def _write_game_file(
         if not line.strip():
             continue
         # Skip \tfsegment{...} marker lines. These are only meaningful to
-        # crop_to_active_segments(); when cropping is off (or for the -clean/
-        # -removed variants, which never crop), the marker would otherwise
-        # reach the per-game .tex file verbatim. The HTML wrapper doesn't
-        # define \tfsegment, so pdflatex would hit "Undefined control
-        # sequence" and the caption would render as a stray line in the SVG.
+        # crop_to_active_segments(); when the caller doesn't crop, the marker
+        # would otherwise reach the per-game .tex file verbatim. The HTML
+        # wrapper doesn't define \tfsegment, so pdflatex would hit "Undefined
+        # control sequence" and the caption would render as a stray line in
+        # the SVG.
         # Skipping via `continue` (without renumbering `i`) preserves the
         # `changed_indices` alignment exactly like the blank-line skip above:
         # `i` still walks the original 0-based index space of `current_lines`,
@@ -614,6 +614,51 @@ def _expand_tfgamename(text: str, game_names: dict[str, str]) -> str:
     return "".join(parts)
 
 
+def resolve_prev_labels(games: list[Game]) -> dict[str, Optional[str]]:
+    r"""Map each game label to the label it is displayed against.
+
+    An explicit ``\tfrendergame[diff=X]`` override wins, so that branching
+    game families (case splits) don't show spurious rollback diffs against a
+    list-order neighbour on a different branch -- see issue #17. Otherwise the
+    default applies: reductions diff against the immediately preceding entry,
+    and other games against the previous non-reduction game (skipping
+    intervening reductions). This mirrors the PDF renderer.
+
+    An override is honored only when its target appears *earlier* in the list.
+    The viewer walks the games forwards and shows the baseline as the
+    left-hand panel, so a target that is the game itself, a later game, or
+    anything at all for the first game cannot be displayed that way; those
+    fall back to the default. ``validate_proof()`` warns when this happens, so
+    the divergence from the PDF is reported rather than silent. A target not
+    in the list at all is rejected by the parser, but is tolerated here since
+    a ``Proof`` can also be built directly through the API.
+
+    Returns:
+        ``{label: baseline_label_or_None}``, one entry per game.
+    """
+    ordered_labels = [g.label for g in games]
+    position = {label: i for i, label in enumerate(ordered_labels)}
+    resolved: dict[str, Optional[str]] = {}
+
+    for i, game in enumerate(games):
+        target = game.diff_target
+        if target is not None and position.get(target, i) < i:
+            resolved[game.label] = target
+            continue
+        if i == 0:
+            resolved[game.label] = None
+        elif game.reduction:
+            resolved[game.label] = ordered_labels[i - 1]
+        else:
+            prev = None
+            for j in range(i - 1, -1, -1):
+                if not games[j].reduction:
+                    prev = ordered_labels[j]
+                    break
+            resolved[game.label] = prev
+    return resolved
+
+
 def generate_html(
     proof: Proof,
     proof_dir: Path,
@@ -636,7 +681,12 @@ def generate_html(
     """
     output_dir.mkdir(parents=True, exist_ok=True)
     games_dir = output_dir / "games"
-    games_dir.mkdir(exist_ok=True)
+    # Every file here is regenerated below, so clear the directory rather than
+    # writing over it: renaming or removing a game leaves artifacts that
+    # nothing references but that still ship with a copied or published site.
+    if games_dir.exists():
+        shutil.rmtree(games_dir)
+    games_dir.mkdir(parents=True)
 
     # Check required tools upfront (once) before spawning worker threads.
     from ..deps import check_html_deps
@@ -671,17 +721,32 @@ def generate_html(
 
         ordered_labels = [g.label for g in proof.games]
 
+        # Both filters are pure functions of (label, proof.source_text,
+        # ordered_labels), and each game's lines are needed several times over
+        # -- once for its own panel, again for the removed-highlight panel of
+        # every game that diffs against it. A branch point shared by n
+        # successors would otherwise be re-filtered n times.
+        #
+        # Callers get the cached list itself, so they must treat it as
+        # read-only: the croppers and diff helpers all build new lists rather
+        # than mutating their arguments, and this cache relies on that.
+        _filter_cache: dict[tuple[str, bool], list[str]] = {}
+
+        def _filter(label: str, strip_star: bool) -> list[str]:
+            key = (label, strip_star)
+            if key not in _filter_cache:
+                _filter_cache[key] = filter_for_game_from_text(
+                    proof.source_text, label, ordered_labels,
+                    strip_star=strip_star,
+                )
+            return _filter_cache[key]
+
         def _filter_game(label: str) -> list[str]:
-            return filter_for_game_from_text(
-                proof.source_text, label, ordered_labels,
-            )
+            return _filter(label, False)
 
         def _filter_game_for_diff(label: str) -> list[str]:
             """Like _filter_game but strips \\tfonly* content for diff."""
-            return filter_for_game_from_text(
-                proof.source_text, label, ordered_labels,
-                strip_star=True,
-            )
+            return _filter(label, True)
 
         # For each reduction shown with related games, remember the segment
         # set all of its panels (related games + the reduction) are cropped
@@ -689,49 +754,29 @@ def generate_html(
         # (and are not left as full, uncropped listings).
         reduction_active: dict[str, set[int]] = {}
 
-        # Diff target actually used per game (after resolving \tfrendergame
+        # Baseline actually used per game (after resolving \tfrendergame
         # diff= overrides), so the removed-panel step below can reuse it
         # instead of re-deriving list-order predecessors.
-        prev_label_by_game: dict[str, Optional[str]] = {}
+        prev_label_by_game = resolve_prev_labels(proof.games)
 
         # Build filtered lines per game, compute diffs, and write .tex files.
         for i, game in enumerate(proof.games):
             label = game.label
             game_lines = _filter_game(label)
 
-            # Compute changed lines relative to the diff target.
+            # Compute changed lines relative to the baseline.
             # Use diff lines (with \tfonly* stripped) so that per-game headers
             # (which change between every game) are not highlighted.
-            # An explicit \tfrendergame[diff=X] target wins; otherwise
-            # non-reduction games diff against the previous non-reduction
-            # game (skipping intervening reductions), and reductions diff
-            # against the immediately preceding entry. This mirrors the PDF
-            # renderer so branching game families (case splits) don't show
-            # spurious rollback diffs in the HTML viewer (see issue #17).
-            prev_label = None
-            if i == 0:
+            prev_label = prev_label_by_game[label]
+            if prev_label is None:
                 changed: set[int] = set()
             else:
-                if game.diff_target is not None:
-                    prev_label = game.diff_target
-                elif game.reduction:
-                    prev_label = ordered_labels[i - 1]
-                else:
-                    prev_label = None
-                    for j in range(i - 1, -1, -1):
-                        if not proof.games[j].reduction:
-                            prev_label = ordered_labels[j]
-                            break
-                if prev_label is None:
-                    changed = set()
-                else:
-                    changed = compute_changed_lines(
-                        _filter_game_for_diff(prev_label),
-                        _filter_game_for_diff(label),
-                    )
-            prev_label_by_game[label] = prev_label
+                changed = compute_changed_lines(
+                    _filter_game_for_diff(prev_label),
+                    _filter_game_for_diff(label),
+                )
 
-            if proof.crop_default and i > 0 and prev_label is not None:
+            if proof.crop_default and prev_label is not None:
                 if game.reduction and game.related_games:
                     # Crop the reduction to the union set shared by all its
                     # panels, so the middle (reduction) panel shows the same
@@ -910,7 +955,9 @@ def generate_html(
             "description": _expand_tfgamename(game.description, game_names),
             "has_commentary": bool(proof.commentary.get(game.label, "").strip()),
             "reduction": game.reduction,
-            "diff_target": prev_label_by_game.get(game.label),
+            # The resolved baseline, not Game.diff_target: most games have one
+            # without carrying an explicit \tfrendergame diff= override.
+            "prev_label": prev_label_by_game.get(game.label),
             "related_games": game.related_games,
         })
 
