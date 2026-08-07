@@ -37,6 +37,23 @@ def test_get_templates_unknown_package():
         get_templates("nonexistent")
 
 
+@pytest.mark.parametrize("package", ["cryptocode", "nicodemus", "algpseudocodex"])
+def test_every_profile_bundles_texfrog_sty(package: str):
+    r"""Every scaffold must ship ``texfrog.sty``.
+
+    ``proof.tex`` does ``\usepackage{texfrog}`` for all three profiles, and the
+    CLI tells the user to run ``pdflatex proof.tex`` next, so a scaffold without
+    the package cannot compile.
+    """
+    templates = get_templates(package)
+    assert "texfrog.sty" in templates
+    content, _ = templates["texfrog.sty"]
+    assert r"\ProvidesPackage{texfrog}" in content
+    # Guards against a broken symlink checkout being packaged as a short text
+    # file containing the link target rather than the real package.
+    assert len(content) > 1000
+
+
 def test_nicodemus_templates_bundle_sty():
     """nicodemus is not on CTAN, so the scaffold must ship ``nicodemus.sty``."""
     templates = get_templates("nicodemus")
@@ -45,8 +62,8 @@ def test_nicodemus_templates_bundle_sty():
     assert r"\ProvidesPackage{nicodemus}" in content
 
 
-def test_cryptocode_templates_do_not_bundle_sty():
-    """cryptocode ships with TeX Live, so no ``.sty`` should be scaffolded."""
+def test_cryptocode_templates_do_not_bundle_nicodemus_sty():
+    """cryptocode ships with TeX Live, so ``nicodemus.sty`` is not scaffolded."""
     assert "nicodemus.sty" not in get_templates("cryptocode")
 
 
@@ -74,7 +91,8 @@ def test_init_creates_files_in_new_directory(tmp_path: Path):
     assert (target / "commentary" / "Red1.tex").exists()
     assert (target / "commentary" / "G2.tex").exists()
     assert (target / ".gitignore").exists()
-    assert "Created 7 file(s)" in result.output
+    assert (target / "texfrog.sty").exists()
+    assert "Created 8 file(s)" in result.output
 
 
 def test_init_creates_files_in_existing_directory(tmp_path: Path):
@@ -132,7 +150,7 @@ def test_init_skips_existing_files(tmp_path: Path):
 
 
 def test_init_all_existing_writes_nothing(tmp_path: Path):
-    for name in ("proof.tex", "macros.tex", ".gitignore"):
+    for name in ("proof.tex", "macros.tex", "texfrog.sty", ".gitignore"):
         (tmp_path / name).write_text("existing")
     commentary_dir = tmp_path / "commentary"
     commentary_dir.mkdir()

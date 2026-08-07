@@ -18,9 +18,14 @@ from pathlib import Path
 
 import pytest
 
+from texfrog._resources import read_package_resource
+
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
-_STY_PATH = _PROJECT_ROOT / "latex" / "texfrog.sty"
 _TUTORIAL_DIR = _PROJECT_ROOT / "examples" / "tutorial-cryptocode-quickstart"
+
+# Read bundled .sty files through the same accessor the shipping code uses, so
+# these tests stay correct if the on-disk layout of texfrog/resources/ moves.
+_STY_TEXT = read_package_resource("texfrog.resources", "texfrog.sty")
 
 needs_pdflatex = pytest.mark.skipif(
     shutil.which("pdflatex") is None,
@@ -52,7 +57,7 @@ def _compile_tex(
     Returns:
         The completed subprocess result.
     """
-    shutil.copy2(_STY_PATH, tmp_path / "texfrog.sty")
+    (tmp_path / "texfrog.sty").write_text(_STY_TEXT, encoding="utf-8")
     (tmp_path / "test.tex").write_text(tex_content, encoding="utf-8")
     if extra_files:
         for name, content in extra_files.items():
@@ -123,7 +128,7 @@ _NICODEMUS_PREAMBLE = r"""\documentclass{article}
 \usepackage[package=nicodemus]{texfrog}
 """
 
-_NICODEMUS_STY_PATH = _PROJECT_ROOT / "texfrog" / "resources" / "nicodemus.sty"
+_NICODEMUS_STY_TEXT = read_package_resource("texfrog.resources", "nicodemus.sty")
 
 
 # ---------------------------------------------------------------------------
@@ -137,7 +142,7 @@ def test_tutorial_cryptocode_quickstart_compiles(tmp_path):
     # Copy the entire tutorial directory so macros.tex is found.
     tutorial_copy = tmp_path / "tutorial"
     shutil.copytree(_TUTORIAL_DIR, tutorial_copy)
-    shutil.copy2(_STY_PATH, tutorial_copy / "texfrog.sty")
+    (tutorial_copy / "texfrog.sty").write_text(_STY_TEXT, encoding="utf-8")
 
     result = subprocess.run(
         ["pdflatex", "-interaction=nonstopmode", "-no-shell-escape", "main.tex"],
@@ -590,15 +595,17 @@ def test_user_macro_file(tmp_path):
 
 @needs_pdflatex
 def test_init_cryptocode_proof_compiles(tmp_path):
-    """Scaffolded cryptocode proof.tex compiles with pdflatex."""
+    """Scaffolded cryptocode proof.tex compiles with pdflatex, as scaffolded.
+
+    Nothing is supplied beyond what ``texfrog init`` writes: the scaffold has
+    to be self-contained, which is what issue #20 was about.
+    """
     from click.testing import CliRunner
     from texfrog.cli import main
 
     runner = CliRunner()
     result = runner.invoke(main, ["init", str(tmp_path)])
     assert result.exit_code == 0
-
-    shutil.copy2(_STY_PATH, tmp_path / "texfrog.sty")
 
     result = subprocess.run(
         ["pdflatex", "-interaction=nonstopmode", "-no-shell-escape", "proof.tex"],
@@ -617,10 +624,11 @@ def test_init_cryptocode_proof_compiles(tmp_path):
 
 @needs_pdflatex
 def test_init_nicodemus_proof_compiles(tmp_path):
-    """Scaffolded nicodemus proof.tex compiles with pdflatex.
+    """Scaffolded nicodemus proof.tex compiles with pdflatex, as scaffolded.
 
-    ``texfrog init --package nicodemus`` bundles ``nicodemus.sty`` (it is not
-    on CTAN), so only ``texfrog.sty`` needs to be supplied here.
+    ``texfrog init --package nicodemus`` bundles both ``texfrog.sty`` and
+    ``nicodemus.sty`` (neither is on CTAN for this profile's purposes), so
+    nothing needs to be supplied here.
     """
     from click.testing import CliRunner
     from texfrog.cli import main
@@ -628,8 +636,6 @@ def test_init_nicodemus_proof_compiles(tmp_path):
     runner = CliRunner()
     result = runner.invoke(main, ["init", str(tmp_path), "--package", "nicodemus"])
     assert result.exit_code == 0
-
-    shutil.copy2(_STY_PATH, tmp_path / "texfrog.sty")
 
     result = subprocess.run(
         ["pdflatex", "-interaction=nonstopmode", "-no-shell-escape", "proof.tex"],
@@ -648,15 +654,17 @@ def test_init_nicodemus_proof_compiles(tmp_path):
 
 @needs_pdflatex
 def test_init_algpseudocodex_proof_compiles(tmp_path):
-    """Scaffolded algpseudocodex proof.tex compiles with pdflatex."""
+    """Scaffolded algpseudocodex proof.tex compiles with pdflatex, as scaffolded.
+
+    Nothing is supplied beyond what ``texfrog init`` writes; ``algpseudocodex``
+    itself comes from TeX Live.
+    """
     from click.testing import CliRunner
     from texfrog.cli import main
 
     runner = CliRunner()
     result = runner.invoke(main, ["init", str(tmp_path), "--package", "algpseudocodex"])
     assert result.exit_code == 0
-
-    shutil.copy2(_STY_PATH, tmp_path / "texfrog.sty")
 
     result = subprocess.run(
         ["pdflatex", "-interaction=nonstopmode", "-no-shell-escape", "proof.tex"],
@@ -804,7 +812,7 @@ def test_tfsegmentstub_color_is_grouped_for_cryptocode_and_nicodemus():
     just the stub's own text -- a silent visual bug pdflatex's exit code
     can't detect (see the compile tests below for the "still typesets"
     half of this regression test)."""
-    sty_text = _STY_PATH.read_text(encoding="utf-8")
+    sty_text = _STY_TEXT
     assert _CRYPTOCODE_STUB_GROUPED_RE.search(sty_text), (
         "cryptocode's \\tfsegmentstub override must wrap \\color{black!55} "
         "in its own brace group ({\\color{black!55}...}) with the trailing "
@@ -861,7 +869,7 @@ def test_tfsegmentstub_grouped_color_compiles_nicodemus(tmp_path):
 """
     result = _compile_tex(
         tmp_path, tex,
-        extra_files={"nicodemus.sty": _NICODEMUS_STY_PATH.read_text(encoding="utf-8")},
+        extra_files={"nicodemus.sty": _NICODEMUS_STY_TEXT},
     )
     assert result.returncode == 0
     _assert_compiled(tmp_path, result)
@@ -1247,7 +1255,7 @@ def test_crop_stubs_unchanged_segment_nicodemus(tmp_path):
     )
     result = _compile_tex(
         tmp_path, tex,
-        extra_files={"nicodemus.sty": _NICODEMUS_STY_PATH.read_text(encoding="utf-8")},
+        extra_files={"nicodemus.sty": _NICODEMUS_STY_TEXT},
     )
     assert result.returncode == 0
     _assert_compiled(tmp_path, result)

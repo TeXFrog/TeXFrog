@@ -16,6 +16,7 @@ import pytest
 from jinja2 import Environment, PackageLoader
 
 from texfrog.model import Game, Proof
+from texfrog.output.html import _load_template_resource
 
 # ---------------------------------------------------------------------------
 # Playwright availability check
@@ -145,14 +146,6 @@ def _make_placeholder_svg(label: str) -> str:
         f'<text x="100" y="55" text-anchor="middle" font-size="14">{label}</text>'
         "</svg>"
     )
-
-
-def _load_template_resource(filename: str) -> str:
-    """Read a static file from the templates package."""
-    import importlib.resources
-
-    ref = importlib.resources.files("texfrog.output.templates").joinpath(filename)
-    return ref.read_text(encoding="utf-8")
 
 
 @pytest.fixture(scope="session")

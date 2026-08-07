@@ -17,7 +17,6 @@ import concurrent.futures
 import contextlib
 import html as html_module
 import http.server
-import importlib.resources
 import json
 import os
 import re
@@ -33,6 +32,7 @@ from typing import Optional
 
 from jinja2 import Environment, PackageLoader
 
+from .._resources import read_package_resource
 from ..filter import (
     SEGMENT_RE,
     compute_active_segments,
@@ -549,8 +549,7 @@ _jinja_env = Environment(
 
 def _load_template_resource(filename: str) -> str:
     """Read a static file from the templates package."""
-    ref = importlib.resources.files("texfrog.output.templates").joinpath(filename)
-    return ref.read_text(encoding="utf-8")
+    return read_package_resource("texfrog.output.templates", filename)
 
 
 def _expand_tfgamename(text: str, game_names: dict[str, str]) -> str:
