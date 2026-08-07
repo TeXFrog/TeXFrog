@@ -26,7 +26,7 @@ from texfrog.output.html import (
 )
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
-_NICODEMUS_STY = _PROJECT_ROOT / "resources" / "nicodemus.sty"
+_NICODEMUS_STY = _PROJECT_ROOT / "texfrog" / "resources" / "nicodemus.sty"
 
 needs_pdflatex = pytest.mark.skipif(
     shutil.which("pdflatex") is None,

@@ -123,7 +123,7 @@ _NICODEMUS_PREAMBLE = r"""\documentclass{article}
 \usepackage[package=nicodemus]{texfrog}
 """
 
-_NICODEMUS_STY_PATH = _PROJECT_ROOT / "resources" / "nicodemus.sty"
+_NICODEMUS_STY_PATH = _PROJECT_ROOT / "texfrog" / "resources" / "nicodemus.sty"
 
 
 # ---------------------------------------------------------------------------

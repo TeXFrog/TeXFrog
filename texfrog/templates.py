@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+import importlib.resources
 
 # Bundled LaTeX resources (e.g. the ``nicodemus`` pseudocode package, which is
-# not on CTAN) live in the repository's top-level ``resources/`` directory.
-_RESOURCES_DIR = Path(__file__).resolve().parent.parent / "resources"
+# not on CTAN) live in the ``texfrog.resources`` package so they are included
+# in wheel/sdist builds via package-data.
 
 
 def _read_resource(name: str) -> str:
-    """Return the text of a bundled resource file from ``resources/``."""
-    return (_RESOURCES_DIR / name).read_text(encoding="utf-8")
+    """Return the text of a bundled resource file from ``texfrog.resources``."""
+    return (
+        importlib.resources.files("texfrog.resources")
+        .joinpath(name)
+        .read_text(encoding="utf-8")
+    )
+
 
 # ---------------------------------------------------------------------------
 # cryptocode templates (pure LaTeX format)
