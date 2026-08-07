@@ -80,6 +80,33 @@ jobs:
       - name: Run LaTeX tests
         run: pytest tests/test_sty_compilation.py tests/test_integration.py -q --tb=short
 
+  wheel-install-smoke-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+
+      - name: Build wheel
+        run: |
+          pip install build
+          python -m build --wheel -o dist .
+
+      - name: Install wheel into a clean venv
+        run: |
+          python -m venv /tmp/wheel-venv
+          /tmp/wheel-venv/bin/pip install dist/*.whl
+
+      - name: Scaffold each package profile
+        run: |
+          for pkg in cryptocode nicodemus algpseudocodex; do
+            /tmp/wheel-venv/bin/texfrog init "/tmp/wheel-init-$pkg" --package "$pkg"
+          done
+
   vscode-extension:
     runs-on: ubuntu-latest
 
