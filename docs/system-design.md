@@ -45,7 +45,12 @@ TeXFrog/
 │   ├── validate.py             # Proof validation checks
 │   ├── cli.py                  # Click CLI: texfrog init / check / html build / html serve
 │   ├── templates.py            # Inline template strings for texfrog init
+│   ├── _resources.py           # importlib.resources accessor for bundled package data
 │   ├── watcher.py              # File watching + safe rebuild for live-reload
+│   ├── resources/              # Bundled .sty files shipped via package-data
+│   │   ├── __init__.py         # Makes this a package so packages.find picks it up
+│   │   ├── texfrog.sty         # -> ../../latex/texfrog.sty (symlink; deref'd at build)
+│   │   └── nicodemus.sty       # Not on CTAN, so scaffolded by texfrog init
 │   └── output/
 │       ├── __init__.py
 │       └── html.py             # generate_html() + serve_html(): per-game .tex, pdflatex → SVG → HTML site
@@ -60,6 +65,7 @@ TeXFrog/
 │   ├── test_check_cli.py       # texfrog check CLI tests
 │   ├── test_cli_helpers.py     # CLI helper function tests
 │   ├── test_init.py            # texfrog init scaffolding tests
+│   ├── test_resources.py       # Bundled package-data lookup + packaging declarations
 │   ├── test_integration.py     # End-to-end integration tests
 │   ├── test_watcher.py         # File watcher tests
 │   ├── test_sty_compilation.py # texfrog.sty LaTeX compilation tests
@@ -432,15 +438,35 @@ Scaffolds a new proof directory with a `proof.tex` file containing TeXFrog comma
 a `macros.tex` file, a `commentary/` subdirectory with starter commentary files, and
 a `.gitignore` covering LaTeX build artifacts and the default `texfrog html build` output.
 The `--package` option selects the template flavour (default: `cryptocode`).
-The `nicodemus` scaffold additionally bundles `nicodemus.sty` (copied from the
-repository's `resources/` directory and registered via `\tfmacrofile{nicodemus.sty}`)
-because that package is not on CTAN; this keeps the scaffold self-contained for both
-`pdflatex` and `texfrog html build`. Existing files are never overwritten — skipped
-with a warning instead.
+Every scaffold bundles `texfrog.sty`, since each `proof.tex` does
+`\usepackage{texfrog}`; the `nicodemus` scaffold additionally bundles
+`nicodemus.sty` (registered via `\tfmacrofile{nicodemus.sty}`) because that
+package is not on CTAN. This keeps the scaffold self-contained for both
+`pdflatex` and `texfrog html build` — with no separate download — even when
+TeXFrog was installed from a wheel rather than a source checkout. Existing
+files are never overwritten — skipped with a warning instead.
 
-Templates are stored as inline strings in `texfrog/templates.py` (non-CTAN `.sty`
-resources live in `resources/`). Each template set produces a minimal 4-game proof
-that is immediately compilable with `pdflatex`.
+Templates are stored as inline strings in `texfrog/templates.py`. Bundled `.sty`
+resources live in the `texfrog/resources/` **subpackage**, not a top-level
+directory, and are read via `importlib.resources` (`texfrog/_resources.py`)
+rather than paths derived from `__file__`. Both parts matter: a plain directory
+outside the `texfrog` package is not picked up by
+`[tool.setuptools.packages.find]`, and a `__file__`-relative path resolves in a
+source checkout while failing in an installed wheel — that combination was
+issue #20. `texfrog/resources/texfrog.sty` is a symlink to the canonical
+`latex/texfrog.sty` (the copy the README tells non-Python users to download);
+both `bdist_wheel` and `sdist` dereference it into a real file. Anything added
+here must also be declared in `[tool.setuptools.package-data]`.
+
+When checking packaging changes locally, delete `build/` and `texfrog.egg-info/`
+first. A stale `texfrog.egg-info/SOURCES.txt` keeps including files that the
+current configuration would no longer ship, so a local rebuild can appear to
+pass while the same tree fails from a fresh checkout. The
+`wheel-install-smoke-test` CI job does not have this problem (it always starts
+from a clean `actions/checkout`).
+
+Each template set produces a minimal 4-game proof that is immediately
+compilable with `pdflatex`.
 
 Default output dir: `texfrog_html/` next to the input file.
 

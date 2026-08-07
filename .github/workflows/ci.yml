@@ -80,6 +80,83 @@ jobs:
       - name: Run LaTeX tests
         run: pytest tests/test_sty_compilation.py tests/test_integration.py -q --tb=short
 
+  wheel-install-smoke-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+
+      # Both artifacts are built and exercised: wheel package-data and sdist
+      # contents are governed by different setuptools code paths, so a wheel-only
+      # check would not catch a .sty file dropping out of the tarball.
+      - name: Build wheel and sdist
+        run: |
+          pip install build
+          python -m build -o dist .
+
+      - name: Check both artifacts contain the bundled .sty resources
+        run: |
+          set -eux
+          python - <<'PY'
+          import pathlib, tarfile, zipfile
+
+          expected = {"texfrog/resources/texfrog.sty", "texfrog/resources/nicodemus.sty"}
+          dist = pathlib.Path("dist")
+
+          wheel = next(dist.glob("*.whl"))
+          names = set(zipfile.ZipFile(wheel).namelist())
+          missing = expected - names
+          assert not missing, f"{wheel.name} is missing {sorted(missing)}"
+
+          sdist = next(dist.glob("*.tar.gz"))
+          with tarfile.open(sdist) as tf:
+              members = {m.name.split("/", 1)[1]: m for m in tf.getmembers() if "/" in m.name}
+          for want in expected:
+              m = members.get(want)
+              assert m is not None, f"{sdist.name} is missing {want}"
+              # texfrog.sty is a symlink in the repo; packaging must dereference
+              # it into a real file rather than archiving a dangling link.
+              assert m.isfile(), f"{sdist.name}:{want} is not a regular file"
+              assert m.size > 1000, f"{sdist.name}:{want} is only {m.size} bytes"
+          print("wheel and sdist both contain the bundled .sty resources")
+          PY
+
+      - name: Install wheel and sdist into separate clean venvs
+        run: |
+          set -eux
+          python -m venv /tmp/wheel-venv
+          /tmp/wheel-venv/bin/pip install dist/*.whl
+          python -m venv /tmp/sdist-venv
+          /tmp/sdist-venv/bin/pip install --no-binary :all: dist/*.tar.gz
+
+      - name: Scaffold each package profile and assert the files landed
+        run: |
+          set -eux
+          for venv in wheel sdist; do
+            for pkg in cryptocode nicodemus algpseudocodex; do
+              # Always scaffold into a fresh directory: `texfrog init` skips
+              # pre-existing files and still exits 0, which would mask a
+              # resource that never got shipped.
+              out="$(mktemp -d)/$pkg"
+              "/tmp/$venv-venv/bin/texfrog" init "$out" --package "$pkg"
+
+              # Assert the artifacts, not just the exit code.
+              test -s "$out/proof.tex"
+              test -s "$out/macros.tex"
+              test -s "$out/texfrog.sty"
+              grep -q 'ProvidesPackage{texfrog}' "$out/texfrog.sty"
+              if [ "$pkg" = "nicodemus" ]; then
+                test -s "$out/nicodemus.sty"
+                grep -q 'ProvidesPackage{nicodemus}' "$out/nicodemus.sty"
+              fi
+            done
+          done
+
   vscode-extension:
     runs-on: ubuntu-latest
 

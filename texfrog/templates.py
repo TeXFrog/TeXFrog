@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+from texfrog._resources import read_package_resource
 
-# Bundled LaTeX resources (e.g. the ``nicodemus`` pseudocode package, which is
-# not on CTAN) live in the repository's top-level ``resources/`` directory.
-_RESOURCES_DIR = Path(__file__).resolve().parent.parent / "resources"
+# Bundled LaTeX resources live in the ``texfrog.resources`` package so they are
+# included in wheel/sdist builds via package-data.  Two files are shipped:
+# ``texfrog.sty`` itself (a symlink to the canonical ``latex/texfrog.sty``,
+# which packaging dereferences into a real file) and ``nicodemus.sty``, which
+# is not on CTAN.  Both are written into every scaffold so that a proof created
+# by ``texfrog init`` compiles with ``pdflatex`` straight out of a pip install.
 
 
 def _read_resource(name: str) -> str:
-    """Return the text of a bundled resource file from ``resources/``."""
-    return (_RESOURCES_DIR / name).read_text(encoding="utf-8")
+    """Return the text of a bundled resource file from ``texfrog.resources``."""
+    return read_package_resource("texfrog.resources", name)
+
 
 # ---------------------------------------------------------------------------
 # cryptocode templates (pure LaTeX format)
@@ -323,6 +327,9 @@ def get_templates(package: str) -> dict[str, tuple[str, str]]:
         "commentary/G2.tex": (COMMENTARY_G2.lstrip("\n"), "commentary for G2"),
     }
     common_files = {
+        # Every profile's proof.tex does \usepackage{texfrog}, so the scaffold
+        # ships the package itself and compiles without any separate download.
+        "texfrog.sty": (_read_resource("texfrog.sty"), "TeXFrog LaTeX package"),
         ".gitignore": (GITIGNORE, "git ignore rules"),
     }
     if package == "cryptocode":

@@ -36,10 +36,19 @@
   a fixed set of choices" error with no indication of what happened or what the valid
   choices are. It now emits a clear texfrog warning naming the valid choices and falls
   back to `cryptocode`.
-- **`texfrog init --package nicodemus` is now self-contained.** The scaffold bundles
-  `nicodemus.sty` (which is not on CTAN) and registers it with `\tfmacrofile`, so the
-  generated proof compiles with `pdflatex` and renders with `texfrog html build`
-  without a system-wide nicodemus install.
+- **`texfrog init` scaffolds are now self-contained.** Every profile's scaffold bundles
+  `texfrog.sty`, and the nicodemus scaffold additionally bundles `nicodemus.sty` (which
+  is not on CTAN) and registers it with `\tfmacrofile`. The generated proof now compiles
+  with `pdflatex proof.tex` and renders with `texfrog html build` immediately, with no
+  separate download and no system-wide install of either package.
+- **Bundled `.sty` files were missing from wheel and sdist installs.** `nicodemus.sty`
+  lived in a top-level `resources/` directory that setuptools never packaged, so
+  `texfrog init --package nicodemus` raised `FileNotFoundError` on any non-editable
+  install ([#20](https://github.com/TeXFrog/TeXFrog/issues/20)). Bundled resources now
+  live in the `texfrog.resources` subpackage, are declared in `package-data`, and are
+  read through `importlib.resources` rather than paths derived from `__file__`. CI now
+  builds both a wheel and an sdist, installs each into a clean venv, and asserts the
+  scaffolded files actually land.
 - **`\tfrendergame[diff=...]` highlighting was broken.** Two bugs in `texfrog.sty` made diff rendering mark every `\tfonly` line as changed and (with `algpseudocodex`) render changed lines as empty highlight boxes:
   - The diff target game label was stored as the unexpanded `\l__tf_diff_tl` token, so the recording pass never matched any tags and the recorded-positions property list stayed empty.
   - The highlight wrapper emitted its prefix (`\State`) before reading its local content variable. In `algpseudocodex`, `\State` closes the `varwidth` group of the previous line, reverting the local assignments and emptying the content. The wrapper output is now assembled in a global token list and emitted in a single expansion.

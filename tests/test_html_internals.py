@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from texfrog._resources import read_package_resource
 from texfrog.model import Game, Proof
 from texfrog.output.html import (
     _BUILTIN_MATHJAX_MACROS,
@@ -26,7 +27,10 @@ from texfrog.output.html import (
 )
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
-_NICODEMUS_STY = _PROJECT_ROOT / "resources" / "nicodemus.sty"
+
+# Read bundled .sty files through the same accessor the shipping code uses, so
+# these tests stay correct if the on-disk layout of texfrog/resources/ moves.
+_NICODEMUS_STY_TEXT = read_package_resource("texfrog.resources", "nicodemus.sty")
 
 needs_pdflatex = pytest.mark.skipif(
     shutil.which("pdflatex") is None,
@@ -132,7 +136,7 @@ def test_html_tfsegmentstub_defined_for_each_profile():
 # line typeset the way the real HTML pipeline would emit it (as one filtered
 # content line, alongside one ordinary line). Regression coverage for the
 # nicodemus \Statex bug: nicodemus is an \item-based list environment
-# (enumitem via resources/nicodemus.sty) where \Statex is undefined, so the
+# (enumitem via texfrog/resources/nicodemus.sty) where \Statex is undefined, so the
 # pre-fix html_tfsegmentstub() (which used \Statex unconditionally for any
 # non-cryptocode profile) fails to compile here.
 _STUB_GAME_BODIES = {
@@ -169,7 +173,9 @@ def _compile_profile_stub(
     if profile_name == "nicodemus":
         # nicodemus.sty is not on CTAN; supply it locally like other
         # nicodemus-compiling tests do (see test_sty_compilation.py).
-        shutil.copy2(_NICODEMUS_STY, tmp_path / "nicodemus.sty")
+        (tmp_path / "nicodemus.sty").write_text(
+            _NICODEMUS_STY_TEXT, encoding="utf-8"
+        )
 
     wrapper_src = _build_wrapper_template(profile_name).format(
         macro_inputs="", gamename_defs="", game_file="game.tex"

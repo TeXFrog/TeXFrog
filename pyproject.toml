@@ -48,3 +48,4 @@ include = ["texfrog*"]
 
 [tool.setuptools.package-data]
 "texfrog.output.templates" = ["*.css", "*.js", "*.j2"]
+"texfrog.resources" = ["*.sty"]
