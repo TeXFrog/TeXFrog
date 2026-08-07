@@ -107,11 +107,14 @@ jobs:
 
       - name: Package extension
         working-directory: vscode-texfrog
-        run: npx --yes @vscode/vsce package
+        run: npm run package
 
+      # archive: false uploads the .vsix as-is (directly installable, no unzip
+      # step). It also makes upload-artifact ignore any `name:` input and use the
+      # file name instead, so the artifact is named texfrog-<version>.vsix.
       - name: Upload extension artifact
         uses: actions/upload-artifact@v7
         with:
-          name: texfrog-vscode-extension
           path: vscode-texfrog/*.vsix
           archive: false
+          if-no-files-found: error
